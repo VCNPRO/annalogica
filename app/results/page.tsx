@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Download, FileText, Film } from 'lucide-react';
+import { Download, Trash2, Sun, Moon, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 const API_URL = 'https://wri2uro216.execute-api.eu-west-1.amazonaws.com/prod';
@@ -9,6 +9,8 @@ const API_URL = 'https://wri2uro216.execute-api.eu-west-1.amazonaws.com/prod';
 export default function Results() {
   const [files, setFiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [darkMode, setDarkMode] = useState(true);
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
 
   useEffect(() => {
     loadFiles();
@@ -48,83 +50,188 @@ export default function Results() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-12">
-          <Link href="/" className="text-4xl font-bold text-orange-600 mb-2 inline-block">
-            anna logica
-          </Link>
-          <h2 className="text-3xl font-bold text-gray-900 mt-4">Mis Archivos</h2>
-        </header>
+  const deleteFile = (fileName: string) => {
+    if (confirm(`¿Eliminar ${fileName}?`)) {
+      setFiles(prev => prev.filter(f => f.name !== fileName));
+    }
+  };
 
-        {loading ? (
-          <p className="text-gray-600">Cargando...</p>
-        ) : files.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-lg p-12 text-center">
-            <FileText className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-            <p className="text-gray-600 mb-4">No tienes archivos procesados aún</p>
-            <Link href="/" className="text-orange-600 hover:underline">
-              Sube tu primer archivo →
+  const deleteSelected = () => {
+    if (selectedFiles.length === 0) return;
+    if (confirm(`¿Eliminar ${selectedFiles.length} archivos seleccionados?`)) {
+      setFiles(prev => prev.filter(f => !selectedFiles.includes(f.name)));
+      setSelectedFiles([]);
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedFiles(checked ? files.map(f => f.name) : []);
+  };
+
+  const bgPrimary = darkMode ? 'bg-black' : 'bg-gray-50';
+  const bgSecondary = darkMode ? 'bg-zinc-900' : 'bg-white';
+  const textPrimary = darkMode ? 'text-white' : 'text-gray-900';
+  const textSecondary = darkMode ? 'text-zinc-400' : 'text-gray-600';
+  const border = darkMode ? 'border-zinc-800' : 'border-gray-200';
+  const hover = darkMode ? 'hover:bg-zinc-800' : 'hover:bg-gray-50';
+
+  if (loading) {
+    return (
+      <div className={`min-h-screen ${bgPrimary} flex items-center justify-center`}>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-orange-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`min-h-screen ${bgPrimary}`}>
+      <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
+        Archivos Procesados
+      </div>
+
+      <div className="fixed top-16 right-6 z-40 flex items-center gap-2">
+        <button 
+          onClick={() => setDarkMode(!darkMode)} 
+          className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
+        >
+          {darkMode ? <Sun className="h-4 w-4 text-zinc-400" /> : <Moon className="h-4 w-4 text-gray-600" />}
+        </button>
+        <Link href="/settings" className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}>
+          <span className={`text-sm ${textSecondary}`}>Ajustes</span>
+          <span>⚙️</span>
+        </Link>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-24">
+        <div className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/" className={`flex items-center gap-2 ${textSecondary} hover:text-orange-500`}>
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm">Volver al dashboard</span>
             </Link>
           </div>
-        ) : (
-          <div className="grid gap-6">
-            {files.map((file, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-lg p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{file.name}</h3>
-                    <p className="text-sm text-gray-500 mb-4">{file.date}</p>
-                    
-                    <div className="flex gap-3 flex-wrap">
-                      <button
-                        onClick={() => downloadFile(file.transcriptKey, 'transcripcion.txt')}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        <Download className="h-4 w-4" />
-                        Transcripción
-                      </button>
-                      
-                      {file.hasSummary && (
-                        <button
-                          onClick={() => downloadFile(file.summaryKey, 'resumen.txt')}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                        >
-                          <Download className="h-4 w-4" />
-                          Resumen
-                        </button>
-                      )}
-                      
-                      {file.hasSRT && (
-                        <button
-                          onClick={() => downloadFile(file.srtKey, 'subtitulos.srt')}
-                          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-                        >
-                          <Film className="h-4 w-4" />
-                          Subtítulos SRT
-                        </button>
-                      )}
-                      
-                      {file.hasPDF && (
-                        <button
-                          onClick={() => downloadFile(file.pdfKey, 'informe.pdf')}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                        >
-                          <FileText className="h-4 w-4" />
-                          PDF
-                        </button>
-                      )}
-                    </div>
-                  </div>
+          
+          {selectedFiles.length > 0 && (
+            <button 
+              onClick={deleteSelected}
+              className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Eliminar {selectedFiles.length} seleccionados
+            </button>
+          )}
+        </div>
+
+        <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden`}>
+          <div className={`px-6 py-4 ${border} border-b`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-orange-500 text-xl">📁</span>
+              <h1 className={`text-xl font-semibold ${textPrimary}`}>Archivos Procesados</h1>
+            </div>
+            <p className={`text-sm ${textSecondary}`}>
+              {files.length} {files.length === 1 ? 'archivo procesado' : 'archivos procesados'}
+            </p>
+          </div>
+
+          {files.length === 0 ? (
+            <div className="px-6 py-16 text-center">
+              <div className={`${textSecondary} mb-4`}>
+                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p className={`${textSecondary} mb-4`}>No hay archivos procesados</p>
+              <Link href="/" className="text-orange-500 hover:underline text-sm font-medium">
+                Subir tu primer archivo →
+              </Link>
+            </div>
+          ) : (
+            <>
+              <div className={`px-6 py-3 ${border} border-b`}>
+                <div className="flex items-center gap-4">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 scale-75"
+                    checked={selectedFiles.length === files.length}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                  />
+                  <span className={`text-xs font-medium ${textPrimary} flex-1`}>Nombre</span>
+                  <span className={`text-xs font-medium ${textSecondary}`} style={{ minWidth: '120px' }}>Fecha</span>
+                  <span className={`text-xs font-medium ${textSecondary}`} style={{ minWidth: '200px' }}>Descargas</span>
+                  <span className={`text-xs font-medium ${textSecondary}`} style={{ minWidth: '60px' }}>Acción</span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
 
-        <div className="text-center mt-12">
-          <Link href="/" className="text-orange-600 hover:underline">← Volver al inicio</Link>
+              <div className="divide-y divide-zinc-800">
+                {files.map((file, idx) => (
+                  <div key={idx} className={`px-6 py-4 ${hover} transition-colors`}>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 scale-75"
+                        checked={selectedFiles.includes(file.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedFiles(prev => [...prev, file.name]);
+                          } else {
+                            setSelectedFiles(prev => prev.filter(n => n !== file.name));
+                          }
+                        }}
+                      />
+                      
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${textPrimary} truncate`}>{file.name}</p>
+                      </div>
+
+                      <div className={`text-xs ${textSecondary}`} style={{ minWidth: '120px' }}>
+                        {new Date(file.date).toLocaleDateString('es-ES')}
+                      </div>
+
+                      <div className="flex gap-2" style={{ minWidth: '200px' }}>
+                        {file.transcriptKey && (
+                          <button
+                            onClick={() => downloadFile(file.transcriptKey, 'transcripcion.txt')}
+                            className="flex items-center gap-1 px-2 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs transition-colors"
+                          >
+                            <Download className="h-3 w-3" />
+                            TXT
+                          </button>
+                        )}
+                        
+                        {file.srtKey && (
+                          <button
+                            onClick={() => downloadFile(file.srtKey, 'subtitulos.srt')}
+                            className="flex items-center gap-1 px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-xs transition-colors"
+                          >
+                            <Download className="h-3 w-3" />
+                            SRT
+                          </button>
+                        )}
+
+                        {file.summaryKey && (
+                          <button
+                            onClick={() => downloadFile(file.summaryKey, 'resumen.txt')}
+                            className="flex items-center gap-1 px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs transition-colors"
+                          >
+                            <Download className="h-3 w-3" />
+                            Resumen
+                          </button>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => deleteFile(file.name)}
+                        className="p-2 hover:bg-red-500/10 rounded transition-colors"
+                        style={{ minWidth: '60px' }}
+                        title="Eliminar archivo"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
