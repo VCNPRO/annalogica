@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { RefreshCw, Trash2, Sun, Moon } from 'lucide-react';
+import { RefreshCw, Trash2, Sun, Moon, HelpCircle } from 'lucide-react';
 
 const API_URL = 'https://wri2uro216.execute-api.eu-west-1.amazonaws.com/prod';
 
@@ -163,14 +163,36 @@ export default function Dashboard() {
     setSelectedProcessedFiles(checked ? processedFiles.map(f => f.name) : []);
   };
 
-  const handleDeleteSelected = () => {
-    if (selectedUploadedFiles.length > 0) {
-      setUploadedFiles(prev => prev.filter(f => !selectedUploadedFiles.includes(f.id)));
-      setSelectedUploadedFiles([]);
-    }
-    if (selectedProcessedFiles.length > 0) {
+  const handleDeleteSelectedProcessed = async () => {
+    if (selectedProcessedFiles.length === 0) return;
+    
+    if (!confirm(`¿Eliminar ${selectedProcessedFiles.length} archivos?`)) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Eliminar del backend
+      for (const fileName of selectedProcessedFiles) {
+        await fetch(`${API_URL}/files/${encodeURIComponent(fileName)}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+
+      // Actualizar estado local
       setProcessedFiles(prev => prev.filter(f => !selectedProcessedFiles.includes(f.name)));
       setSelectedProcessedFiles([]);
+    } catch (err) {
+      console.error('Error deleting files:', err);
+    }
+  };
+
+  const handleDeleteSelectedUploaded = () => {
+    if (selectedUploadedFiles.length === 0) return;
+    
+    if (confirm(`¿Eliminar ${selectedUploadedFiles.length} archivos?`)) {
+      setUploadedFiles(prev => prev.filter(f => !selectedUploadedFiles.includes(f.id)));
+      setSelectedUploadedFiles([]);
     }
   };
 
@@ -223,6 +245,13 @@ export default function Dashboard() {
       </div>
 
       <div className="fixed top-16 right-6 z-40 flex items-center gap-2">
+        <button 
+          onClick={() => alert('Guía de usuario próximamente')} 
+          className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
+          title="Guía de usuario"
+        >
+          <HelpCircle className={`h-4 w-4 ${textSecondary}`} />
+        </button>
         <button 
           onClick={() => setDarkMode(!darkMode)} 
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
@@ -376,12 +405,12 @@ export default function Dashboard() {
                 </div>
                 <p className={`text-xs ${textSecondary}`}>Archivos en proceso de subida y procesamiento</p>
               </div>
-              {(selectedUploadedFiles.length > 0 || selectedProcessedFiles.length > 0) && (
+              {selectedUploadedFiles.length > 0 && (
                 <button 
-                  onClick={handleDeleteSelected}
+                  onClick={handleDeleteSelectedUploaded}
                   className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
                 >
-                  Eliminar seleccionados
+                  Eliminar {selectedUploadedFiles.length}
                 </button>
               )}
             </div>
@@ -475,12 +504,30 @@ export default function Dashboard() {
           </div>
 
           <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden`} style={{ flex: '1 1 40%', minHeight: '250px' }}>
-            <div className={`px-4 py-3 ${border} border-b`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-green-500 text-sm">✓</span>
-                <h2 className={`text-sm font-medium ${textPrimary}`}>Archivos Procesados</h2>
+            <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-green-500 text-sm">✓</span>
+                  <h2 className={`text-sm font-medium ${textPrimary}`}>Archivos Procesados</h2>
+                </div>
+                <p className={`text-xs ${textSecondary}`}>Archivos completados y listos para descargar</p>
               </div>
-              <p className={`text-xs ${textSecondary}`}>Archivos completados y listos para descargar</p>
+              <div className="flex items-center gap-2">
+                {selectedProcessedFiles.length > 0 && (
+                  <button 
+                    onClick={handleDeleteSelectedProcessed}
+                    className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
+                  >
+                    Eliminar {selectedProcessedFiles.length}
+                  </button>
+                )}
+                <Link 
+                  href="/results"
+                  className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-medium transition-colors"
+                >
+                  Ver todos →
+                </Link>
+              </div>
             </div>
 
             <div className={`px-4 py-3 ${border} border-b`}>
@@ -500,9 +547,6 @@ export default function Dashboard() {
               {processedFiles.length === 0 ? (
                 <div className="px-4 py-8 text-center">
                   <p className={`text-xs ${textSecondary}`}>No hay archivos procesados aún.</p>
-                  <Link href="/results" className="text-xs text-orange-500 hover:underline mt-2 inline-block">
-                    Ver historial completo →
-                  </Link>
                 </div>
               ) : (
                 processedFiles.slice(0, 5).map((file, idx) => (
