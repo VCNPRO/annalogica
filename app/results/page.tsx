@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Download, Trash2, Sun, Moon, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-const API_URL = 'https://wri2uro216.execute-api.eu-west-1.amazonaws.com/prod';
+const API_URL = 'https://26iia05sva.execute-api.eu-west-1.amazonaws.com';
 
 export default function Results() {
   const [files, setFiles] = useState<any[]>([]);
