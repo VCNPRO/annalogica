@@ -2,7 +2,7 @@
 'use client';
 
 import { useFileProcessing } from '@/hooks/useFileProcessing';
-import { Upload, Settings, CreditCard } from 'lucide-react';
+import { Upload, Settings, CreditCard, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
