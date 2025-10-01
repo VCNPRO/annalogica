@@ -76,7 +76,7 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Link href="/pricing" className="p-3 rounded-lg bg-white shadow hover:shadow-lg transition-all">
+            <Link href="/results" className="p-3 rounded-lg bg-white shadow hover:shadow-lg transition-all"><FileText className="h-6 w-6 text-gray-600" /></Link><Link href="/pricing" className="p-3 rounded-lg bg-white shadow hover:shadow-lg transition-all">
               <CreditCard className="h-6 w-6 text-gray-600" />
             </Link>
             <Link href="/settings" className="p-3 rounded-lg bg-white shadow hover:shadow-lg transition-all">
