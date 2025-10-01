@@ -129,7 +129,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header corporativo */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
@@ -162,7 +161,6 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         
-        {/* Métricas principales */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-2">
@@ -203,7 +201,6 @@ export default function Dashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Panel de carga */}
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="border-b border-gray-200 px-6 py-4">
@@ -258,7 +255,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Archivos recientes */}
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="border-b border-gray-200 px-6 py-4">
                 <h2 className="text-lg font-semibold text-gray-900">Archivos Recientes</h2>
@@ -275,7 +271,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Panel de configuración */}
           <div className="space-y-6">
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="border-b border-gray-200 px-6 py-4">
@@ -372,7 +367,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Info plan */}
             <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
               <h4 className="text-sm font-semibold text-gray-900 mb-3">Información de Cuenta</h4>
               <div className="space-y-2 text-sm">
