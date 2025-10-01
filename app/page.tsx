@@ -12,7 +12,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState('es');
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
@@ -29,47 +30,91 @@ export default function Dashboard() {
     
     setUser(JSON.parse(userData));
     setLoading(false);
+    loadFiles();
   }, [router]);
 
+  const loadFiles = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/files`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUploadedFiles(data.files || []);
+      }
+    } catch (err) {
+      console.error('Error loading files:', err);
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     setUploading(true);
     setProgress(0);
+    setError(null);
 
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Sesión expirada');
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        const uploadResponse = await fetch(`${API_URL}/upload`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ filename: file.name })
-        });
+      const uploadResponse = await fetch(`${API_URL}/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ filename: file.name })
+      });
 
-        if (!uploadResponse.ok) throw new Error('Error al obtener URL');
-
-        const { uploadUrl, fields } = await uploadResponse.json();
-
-        const formData = new FormData();
-        Object.keys(fields).forEach(key => formData.append(key, fields[key]));
-        formData.append('file', file);
-
-        await fetch(uploadUrl, { method: 'POST', body: formData });
-        
-        setProgress(((i + 1) / files.length) * 100);
+      if (!uploadResponse.ok) {
+        const data = await uploadResponse.json();
+        throw new Error(data.error || 'Error al obtener URL');
       }
 
-      alert('Archivos subidos correctamente');
+      const { uploadUrl, fields } = await uploadResponse.json();
+
+      const formData = new FormData();
+      Object.keys(fields).forEach(key => formData.append(key, fields[key]));
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          setProgress((e.loaded / e.total) * 100);
+        }
+      });
+
+      await new Promise((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(xhr.response);
+          } else {
+            reject(new Error('Error al subir archivo'));
+          }
+        });
+        
+        xhr.addEventListener('error', () => reject(new Error('Error de conexión')));
+        xhr.open('POST', uploadUrl);
+        xhr.send(formData);
+      });
+
+      // Agregar archivo a la lista local
+      setUploadedFiles(prev => [...prev, {
+        name: file.name,
+        date: new Date().toISOString(),
+        status: 'processing'
+      }]);
+
+      // Recargar lista después de 2 segundos
+      setTimeout(loadFiles, 2000);
+
     } catch (err: any) {
-      alert(err.message);
+      setError(err.message);
     } finally {
       setUploading(false);
       setProgress(0);
@@ -92,7 +137,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Banner superior */}
       <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
         🚀 Modo Producción - Usuario: {user?.email || 'Usuario'}
         <button onClick={handleLogout} className="ml-2 underline hover:no-underline">
@@ -100,7 +144,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Botón ajustes */}
       <div className="fixed top-16 right-6 z-40">
         <Link href="/settings" className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200">
           <span className="text-sm text-gray-600">Ajustes</span>
@@ -109,14 +152,12 @@ export default function Dashboard() {
       </div>
 
       <div className="flex pt-10" style={{ height: '100vh' }}>
-        {/* Sidebar izquierdo */}
         <div className="bg-white border-r border-gray-200 p-6 flex flex-col" style={{ width: '33.333%', minWidth: '33.333%', maxWidth: '33.333%', height: '100%' }}>
           
           <div className="flex items-center mb-6">
             <h1 className="text-3xl text-orange-500 tracking-tight font-black">anna logica</h1>
           </div>
 
-          {/* Carga de archivos */}
           <div className="mb-6">
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-orange-400 transition-colors">
               <div className="flex items-center gap-2 mb-3">
@@ -138,7 +179,6 @@ export default function Dashboard() {
                   Selecciona archivos de tu equipo
                 </span>
                 <input
-                  id="file-input"
                   type="file"
                   multiple
                   className="hidden"
@@ -154,12 +194,17 @@ export default function Dashboard() {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div className="bg-orange-500 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
                 </div>
-                <p className="text-xs text-gray-600 mt-1 text-center">{progress.toFixed(0)}%</p>
+                <p className="text-xs text-gray-600 mt-1 text-center">{progress.toFixed(0)}% subido</p>
+              </div>
+            )}
+
+            {error && (
+              <div className="mt-3 bg-red-50 border border-red-200 rounded p-2">
+                <p className="text-xs text-red-700">{error}</p>
               </div>
             )}
           </div>
 
-          {/* Acciones IA */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-orange-500 text-sm">🤖</span>
@@ -249,7 +294,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Área principal */}
         <div className="flex-1 p-6 overflow-y-auto" style={{ height: '100%' }}>
           <div className="mb-6" style={{ height: '28px' }}></div>
           
@@ -271,11 +315,30 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="px-4 py-8 text-center">
-              <p className="text-xs text-gray-500">Aún no has subido ningún archivo.</p>
-              <Link href="/results" className="text-xs text-orange-500 hover:underline mt-2 inline-block">
-                Ver archivos procesados →
-              </Link>
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 350px)' }}>
+              {uploadedFiles.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-xs text-gray-500">Aún no has subido ningún archivo.</p>
+                  <Link href="/results" className="text-xs text-orange-500 hover:underline mt-2 inline-block">
+                    Ver archivos procesados →
+                  </Link>
+                </div>
+              ) : (
+                uploadedFiles.map((file, idx) => (
+                  <div key={idx} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50">
+                    <div className="flex items-center gap-4">
+                      <input type="checkbox" className="rounded border-gray-300 scale-75" />
+                      <span className="text-xs text-gray-900 flex-1 truncate">{file.name}</span>
+                      <span className="text-xs text-amber-600 text-center" style={{ minWidth: '80px' }}>
+                        {file.status === 'processing' ? 'Procesando...' : 'Completado'}
+                      </span>
+                      <Link href="/results" className="text-xs text-orange-500 hover:underline">
+                        Ver
+                      </Link>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
