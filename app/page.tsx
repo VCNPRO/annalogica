@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Settings, LogOut, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 const API_URL = 'https://wri2uro216.execute-api.eu-west-1.amazonaws.com/prod';
@@ -13,17 +12,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  const [options, setOptions] = useState({
-    transcription: true,
-    summary: true,
-    summaryType: 'detailed' as 'short' | 'detailed',
-    tags: true,
-    speakers: true,
-    srt: true
-  });
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
+  const [language, setLanguage] = useState('es');
+  const [targetLanguage, setTargetLanguage] = useState('en');
+  const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
+  const [speakerHints, setSpeakerHints] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -39,72 +32,47 @@ export default function Dashboard() {
   }, [router]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setUploading(true);
     setProgress(0);
-    setError(null);
-    setSuccess(false);
 
     try {
       const token = localStorage.getItem('token');
-      
-      if (!token) {
-        throw new Error('Sesión expirada');
-      }
+      if (!token) throw new Error('Sesión expirada');
 
-      const uploadResponse = await fetch(`${API_URL}/upload`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ filename: file.name })
-      });
-
-      if (!uploadResponse.ok) {
-        const data = await uploadResponse.json();
-        throw new Error(data.error || 'Error al obtener URL');
-      }
-
-      const { uploadUrl, fields } = await uploadResponse.json();
-
-      const formData = new FormData();
-      Object.keys(fields).forEach(key => {
-        formData.append(key, fields[key]);
-      });
-      formData.append('file', file);
-
-      const xhr = new XMLHttpRequest();
-      
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          setProgress((e.loaded / e.total) * 100);
-        }
-      });
-
-      await new Promise((resolve, reject) => {
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(xhr.response);
-          } else {
-            reject(new Error('Error al subir'));
-          }
-        });
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         
-        xhr.addEventListener('error', () => reject(new Error('Error de conexión')));
-        xhr.open('POST', uploadUrl);
-        xhr.send(formData);
-      });
+        const uploadResponse = await fetch(`${API_URL}/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ filename: file.name })
+        });
 
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 5000);
+        if (!uploadResponse.ok) throw new Error('Error al obtener URL');
 
+        const { uploadUrl, fields } = await uploadResponse.json();
+
+        const formData = new FormData();
+        Object.keys(fields).forEach(key => formData.append(key, fields[key]));
+        formData.append('file', file);
+
+        await fetch(uploadUrl, { method: 'POST', body: formData });
+        
+        setProgress(((i + 1) / files.length) * 100);
+      }
+
+      alert('Archivos subidos correctamente');
     } catch (err: any) {
-      setError(err.message);
+      alert(err.message);
     } finally {
       setUploading(false);
+      setProgress(0);
     }
   };
 
@@ -116,215 +84,199 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-orange-500 border-t-transparent"></div>
       </div>
     );
   }
 
-  if (!user) return null;
-
   return (
-    <div className="min-h-screen bg-black text-white">
-      
-      {/* Header */}
-      <header className="border-b border-zinc-800">
-        <div className="max-w-7xl mx-auto px-8 h-16 flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-orange-500">anna logica</h1>
-          <div className="flex items-center gap-6">
-            <Link href="/results" className="text-sm text-zinc-400 hover:text-white">Archivos</Link>
-            <Link href="/settings" className="text-sm text-zinc-400 hover:text-white">Configuración</Link>
-            <button onClick={handleLogout} className="text-sm text-zinc-400 hover:text-white">
-              Salir
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-50">
+      {/* Banner superior */}
+      <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
+        🚀 Modo Producción - Usuario: {user?.email || 'Usuario'}
+        <button onClick={handleLogout} className="ml-2 underline hover:no-underline">
+          Cerrar sesión
+        </button>
+      </div>
 
-      <div className="max-w-5xl mx-auto px-8 py-16">
-        
-        {/* Área de carga principal */}
-        <div className="mb-16">
-          <h2 className="text-3xl font-bold mb-2">Procesar archivos</h2>
-          <p className="text-zinc-400 mb-8">Sube audio, vídeo o documentos para transcribir y analizar</p>
+      {/* Botón ajustes */}
+      <div className="fixed top-16 right-6 z-40">
+        <Link href="/settings" className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg shadow-sm border border-gray-200">
+          <span className="text-sm text-gray-600">Ajustes</span>
+          <span>⚙️</span>
+        </Link>
+      </div>
+
+      <div className="flex pt-10" style={{ height: '100vh' }}>
+        {/* Sidebar izquierdo */}
+        <div className="bg-white border-r border-gray-200 p-6 flex flex-col" style={{ width: '33.333%', minWidth: '33.333%', maxWidth: '33.333%', height: '100%' }}>
           
-          <div className="border-2 border-dashed border-zinc-800 rounded-2xl p-20 text-center hover:border-orange-500 transition-colors">
-            <Upload className="mx-auto h-16 w-16 text-zinc-700 mb-6" />
-            <label className="cursor-pointer">
-              <span className="inline-block px-8 py-3 bg-orange-500 text-black font-semibold rounded-lg hover:bg-orange-400 transition">
-                Seleccionar archivo
-              </span>
-              <input
-                type="file"
-                className="hidden"
-                accept=".mp3,.mp4,.wav,.m4a,.mov,.avi,.webm,.mkv,.flac,.ogg,.txt,.pdf"
-                onChange={handleFileChange}
-                disabled={uploading}
-              />
-            </label>
-            <p className="text-zinc-500 text-sm mt-4">o arrastra y suelta aquí</p>
+          <div className="flex items-center mb-6">
+            <h1 className="text-3xl text-orange-500 tracking-tight font-black">anna logica</h1>
           </div>
 
-          {uploading && (
-            <div className="mt-8">
-              <div className="flex justify-between mb-2">
-                <span className="text-sm">Subiendo...</span>
-                <span className="text-sm text-zinc-400">{progress.toFixed(0)}%</span>
+          {/* Carga de archivos */}
+          <div className="mb-6">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-orange-400 transition-colors">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-orange-500 text-sm">📁</span>
+                <h2 className="text-sm font-medium text-gray-900">Carga de Archivos</h2>
               </div>
-              <div className="w-full bg-zinc-900 rounded-full h-2">
-                <div className="bg-orange-500 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+              <p className="text-xs text-gray-600 mb-3">
+                Sube archivos de audio, vídeo o texto (archivos grandes soportados con subida fragmentada).
+              </p>
+              <div className="text-gray-400 mb-3">
+                <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
               </div>
+              <p className="text-xs text-gray-600 mb-1">Arrastra y suelta hasta 50 archivos aquí</p>
+              <p className="text-xs text-gray-500 mb-2">o</p>
+              <label>
+                <span className="text-orange-500 text-xs font-medium hover:text-orange-600 cursor-pointer">
+                  Selecciona archivos de tu equipo
+                </span>
+                <input
+                  id="file-input"
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept="audio/*,video/*,.txt,.docx,.pdf"
+                  onChange={handleFileChange}
+                  disabled={uploading}
+                />
+              </label>
             </div>
-          )}
 
-          {success && (
-            <div className="mt-8 bg-green-500/10 border border-green-500/20 rounded-lg p-4">
-              <p className="text-sm text-green-400">✓ Archivo subido correctamente</p>
-            </div>
-          )}
+            {uploading && (
+              <div className="mt-3">
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="bg-orange-500 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                </div>
+                <p className="text-xs text-gray-600 mt-1 text-center">{progress.toFixed(0)}%</p>
+              </div>
+            )}
+          </div>
 
-          {error && (
-            <div className="mt-8 bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-              <p className="text-sm text-red-400">{error}</p>
+          {/* Acciones IA */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-orange-500 text-sm">🤖</span>
+              <h2 className="text-sm font-medium text-gray-900">Acciones IA</h2>
             </div>
-          )}
+            <p className="text-xs text-gray-600 mb-3">Selecciona archivos y aplica una acción de IA.</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Idioma del Contenido</label>
+                <select 
+                  className="w-full p-2 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                >
+                  <option value="auto">Detección automática</option>
+                  <option value="es">Español</option>
+                  <option value="en">English</option>
+                  <option value="fr">Français</option>
+                  <option value="ca">Català</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors">
+                  📝 Transcribir
+                </button>
+                <button className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors">
+                  👥 Identificar Oradores
+                </button>
+              </div>
+
+              <button className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors">
+                📋 Resumir y Etiquetar
+              </button>
+
+              <div className="flex items-center gap-3 text-xs mb-2">
+                <label className="flex items-center gap-1">
+                  <input 
+                    type="radio" 
+                    className="accent-orange-500 scale-75" 
+                    name="summary"
+                    checked={summaryType === 'short'}
+                    onChange={() => setSummaryType('short')}
+                  />
+                  <span className="text-gray-700">Corto</span>
+                </label>
+                <label className="flex items-center gap-1">
+                  <input 
+                    type="radio" 
+                    className="accent-orange-500 scale-75" 
+                    name="summary"
+                    checked={summaryType === 'detailed'}
+                    onChange={() => setSummaryType('detailed')}
+                  />
+                  <span className="text-gray-700">Detallado</span>
+                </label>
+              </div>
+
+              <input
+                type="text"
+                placeholder="Pistas de oradores (ej: Ana, Juan)"
+                className="w-full p-2 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 mb-2"
+                value={speakerHints}
+                onChange={(e) => setSpeakerHints(e.target.value)}
+              />
+
+              <button className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors mb-2">
+                🌐 Traducir
+              </button>
+
+              <select 
+                className="w-full p-2 border border-gray-300 rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 mb-3"
+                value={targetLanguage}
+                onChange={(e) => setTargetLanguage(e.target.value)}
+              >
+                <option value="en">Inglés</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="ca">Català</option>
+              </select>
+
+              <button className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors">
+                📊 Analizar Fichero
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Opciones de procesamiento */}
-        <div className="grid grid-cols-2 gap-12">
-          <div>
-            <h3 className="text-xl font-semibold mb-6">Opciones de procesamiento</h3>
-            
-            <div className="space-y-4">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={options.transcription}
-                  onChange={(e) => setOptions({...options, transcription: e.target.checked})}
-                  className="mt-1 w-5 h-5 bg-zinc-900 border-zinc-700 rounded text-orange-500"
-                />
-                <div>
-                  <p className="font-medium group-hover:text-orange-500">Transcripción</p>
-                  <p className="text-sm text-zinc-500">Conversión de audio a texto</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={options.summary}
-                  onChange={(e) => setOptions({...options, summary: e.target.checked})}
-                  className="mt-1 w-5 h-5 bg-zinc-900 border-zinc-700 rounded text-orange-500"
-                />
-                <div className="flex-1">
-                  <p className="font-medium group-hover:text-orange-500">Resumen</p>
-                  <p className="text-sm text-zinc-500 mb-3">Síntesis automática del contenido</p>
-                  {options.summary && (
-                    <div className="space-y-2 pl-8">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          checked={options.summaryType === 'short'}
-                          onChange={() => setOptions({...options, summaryType: 'short'})}
-                          className="w-4 h-4 text-orange-500"
-                        />
-                        <span className="text-sm text-zinc-400">Breve</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          checked={options.summaryType === 'detailed'}
-                          onChange={() => setOptions({...options, summaryType: 'detailed'})}
-                          className="w-4 h-4 text-orange-500"
-                        />
-                        <span className="text-sm text-zinc-400">Detallado</span>
-                      </label>
-                    </div>
-                  )}
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={options.tags}
-                  onChange={(e) => setOptions({...options, tags: e.target.checked})}
-                  className="mt-1 w-5 h-5 bg-zinc-900 border-zinc-700 rounded text-orange-500"
-                />
-                <div>
-                  <p className="font-medium group-hover:text-orange-500">Etiquetas</p>
-                  <p className="text-sm text-zinc-500">Palabras clave automáticas</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={options.speakers}
-                  onChange={(e) => setOptions({...options, speakers: e.target.checked})}
-                  className="mt-1 w-5 h-5 bg-zinc-900 border-zinc-700 rounded text-orange-500"
-                />
-                <div>
-                  <p className="font-medium group-hover:text-orange-500">Intervinientes</p>
-                  <p className="text-sm text-zinc-500">Identificación de hablantes</p>
-                </div>
-              </label>
-
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={options.srt}
-                  onChange={(e) => setOptions({...options, srt: e.target.checked})}
-                  className="mt-1 w-5 h-5 bg-zinc-900 border-zinc-700 rounded text-orange-500"
-                />
-                <div>
-                  <p className="font-medium group-hover:text-orange-500">Subtítulos (SRT)</p>
-                  <p className="text-sm text-zinc-500">Archivo de subtítulos</p>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-xl font-semibold mb-6">Tu cuenta</h3>
-            
-            <div className="bg-zinc-900 rounded-xl p-6 border border-zinc-800">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <p className="text-sm text-zinc-500">Plan actual</p>
-                  <p className="text-xl font-semibold mt-1">{user.plan || 'Free'}</p>
-                </div>
-                <Link href="/pricing" className="text-sm text-orange-500 hover:text-orange-400">
-                  Actualizar
-                </Link>
+        {/* Área principal */}
+        <div className="flex-1 p-6 overflow-y-auto" style={{ height: '100%' }}>
+          <div className="mb-6" style={{ height: '28px' }}></div>
+          
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden" style={{ height: 'calc(100vh - 200px)', minHeight: '500px' }}>
+            <div className="px-4 py-3 border-b border-gray-200">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-orange-500 text-sm">📁</span>
+                <h2 className="text-sm font-medium text-gray-900">Archivos</h2>
               </div>
-              
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-zinc-400">Archivos procesados</span>
-                    <span>{user.filesProcessed || 0} / {user.monthlyLimit || 10}</span>
-                  </div>
-                  <div className="w-full bg-zinc-800 rounded-full h-2">
-                    <div 
-                      className="bg-orange-500 h-2 rounded-full transition-all" 
-                      style={{ width: `${((user.filesProcessed || 0) / (user.monthlyLimit || 10)) * 100}%` }}
-                    />
-                  </div>
-                </div>
+              <p className="text-xs text-gray-600">Archivos cargados y resultados del procesamiento</p>
+            </div>
+
+            <div className="px-4 py-3 border-b border-gray-200">
+              <div className="flex items-center gap-4">
+                <input type="checkbox" className="rounded border-gray-300 scale-75" />
+                <span className="text-xs font-medium text-gray-900 flex-1">Nombre Archivo</span>
+                <span className="text-xs font-medium text-gray-600 text-center" style={{ minWidth: '80px' }}>Estado</span>
+                <span className="text-xs font-medium text-gray-600">Acciones</span>
               </div>
             </div>
 
-            <Link 
-              href="/results" 
-              className="mt-6 flex items-center justify-between p-4 bg-zinc-900 rounded-xl border border-zinc-800 hover:border-orange-500 transition group"
-            >
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-zinc-400 group-hover:text-orange-500" />
-                <span className="font-medium">Ver archivos procesados</span>
-              </div>
-              <span className="text-zinc-400 group-hover:text-orange-500">→</span>
-            </Link>
+            <div className="px-4 py-8 text-center">
+              <p className="text-xs text-gray-500">Aún no has subido ningún archivo.</p>
+              <Link href="/results" className="text-xs text-orange-500 hover:underline mt-2 inline-block">
+                Ver archivos procesados →
+              </Link>
+            </div>
           </div>
         </div>
       </div>
