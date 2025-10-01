@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Settings, LogOut, FileText, BarChart3, Clock, Database } from 'lucide-react';
+import { Upload, FileAudio, FileVideo, FileText, Settings, LogOut, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 
 const API_URL = 'https://wri2uro216.execute-api.eu-west-1.amazonaws.com/prod';
@@ -51,7 +51,7 @@ export default function Dashboard() {
       const token = localStorage.getItem('token');
       
       if (!token) {
-        throw new Error('Sesión expirada. Por favor, inicie sesión nuevamente.');
+        throw new Error('Sesión expirada');
       }
 
       const uploadResponse = await fetch(`${API_URL}/upload`, {
@@ -65,7 +65,7 @@ export default function Dashboard() {
 
       if (!uploadResponse.ok) {
         const data = await uploadResponse.json();
-        throw new Error(data.error || 'Error al obtener URL de subida');
+        throw new Error(data.error || 'Error al obtener URL');
       }
 
       const { uploadUrl, fields } = await uploadResponse.json();
@@ -89,7 +89,7 @@ export default function Dashboard() {
           if (xhr.status >= 200 && xhr.status < 300) {
             resolve(xhr.response);
           } else {
-            reject(new Error('Error en la transferencia del archivo'));
+            reject(new Error('Error al subir'));
           }
         });
         
@@ -116,10 +116,10 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando sistema...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-zinc-900 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-sm text-zinc-600">Cargando...</p>
         </div>
       </div>
     );
@@ -128,91 +128,54 @@ export default function Dashboard() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-8">
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">anna logica</h1>
-              <nav className="hidden md:flex gap-6">
-                <Link href="/" className="text-sm font-medium text-gray-900 border-b-2 border-blue-600 pb-4">
-                  Dashboard
-                </Link>
-                <Link href="/results" className="text-sm font-medium text-gray-600 hover:text-gray-900 pb-4">
-                  Archivos
-                </Link>
-                <Link href="/settings" className="text-sm font-medium text-gray-600 hover:text-gray-900 pb-4">
-                  Configuración
-                </Link>
-              </nav>
+    <div className="min-h-screen bg-zinc-50">
+      
+      {/* Header */}
+      <header className="bg-white border-b border-zinc-200">
+        <div className="max-w-[1400px] mx-auto px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-12">
+            <h1 className="text-xl font-semibold text-zinc-900 tracking-tight">anna logica</h1>
+            <nav className="hidden md:flex items-center gap-8">
+              <Link href="/" className="text-sm text-zinc-900 font-medium">Dashboard</Link>
+              <Link href="/results" className="text-sm text-zinc-500 hover:text-zinc-900">Archivos</Link>
+              <Link href="/settings" className="text-sm text-zinc-500 hover:text-zinc-900">Configuración</Link>
+            </nav>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden md:block">
+              <p className="text-sm font-medium text-zinc-900">{user.email}</p>
+              <p className="text-xs text-zinc-500">Plan {user.plan || 'Free'}</p>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right hidden md:block">
-                <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
-                <p className="text-xs text-gray-500">Plan {user.plan || 'Free'}</p>
-              </div>
-              <button onClick={handleLogout} className="p-2 hover:bg-gray-100 rounded-lg transition">
-                <LogOut className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
+            <button onClick={handleLogout} className="p-2 hover:bg-zinc-100 rounded-md">
+              <LogOut className="h-4 w-4 text-zinc-600" />
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-[1400px] mx-auto px-8 py-12">
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-600">Archivos Procesados</p>
-              <BarChart3 className="h-5 w-5 text-blue-600" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{user.filesProcessed || 0}</p>
-            <p className="text-xs text-gray-500 mt-1">de {user.monthlyLimit || 10} este mes</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-600">En Proceso</p>
-              <Clock className="h-5 w-5 text-amber-600" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">0</p>
-            <p className="text-xs text-gray-500 mt-1">archivos en cola</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-600">Almacenamiento</p>
-              <Database className="h-5 w-5 text-green-600" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">0 GB</p>
-            <p className="text-xs text-gray-500 mt-1">de 10 GB disponibles</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-600">Estado</p>
-              <div className="h-3 w-3 rounded-full bg-green-500"></div>
-            </div>
-            <p className="text-xl font-semibold text-gray-900">Operativo</p>
-            <p className="text-xs text-gray-500 mt-1">Todos los servicios activos</p>
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-lg border border-gray-200">
-              <div className="border-b border-gray-200 px-6 py-4">
-                <h2 className="text-lg font-semibold text-gray-900">Carga de Archivos</h2>
-                <p className="text-sm text-gray-600 mt-1">Formatos soportados: MP3, MP4, WAV, M4A, PDF, TXT</p>
+          {/* Panel principal */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Área de carga */}
+            <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+              <div className="px-8 py-6 border-b border-zinc-100">
+                <h2 className="text-base font-semibold text-zinc-900">Procesar Archivo</h2>
+                <p className="text-sm text-zinc-500 mt-1">Sube audio, vídeo o documentos para transcribir y analizar</p>
               </div>
               
-              <div className="p-6">
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-blue-500 transition">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <div className="p-8">
+                <div className="border-2 border-dashed border-zinc-200 rounded-lg p-16 text-center hover:border-zinc-400 hover:bg-zinc-50 transition-all">
+                  <div className="flex justify-center gap-4 mb-6">
+                    <FileAudio className="h-8 w-8 text-zinc-300" />
+                    <FileVideo className="h-8 w-8 text-zinc-300" />
+                    <FileText className="h-8 w-8 text-zinc-300" />
+                  </div>
                   <label className="cursor-pointer">
-                    <span className="text-blue-600 font-semibold hover:text-blue-700">
+                    <span className="inline-block px-6 py-2.5 bg-zinc-900 text-white text-sm font-medium rounded-lg hover:bg-zinc-800 transition">
                       Seleccionar archivo
                     </span>
                     <input
@@ -223,71 +186,77 @@ export default function Dashboard() {
                       disabled={uploading}
                     />
                   </label>
-                  <p className="text-sm text-gray-500 mt-2">o arrastra y suelta aquí</p>
-                  <p className="text-xs text-gray-400 mt-4">Tamaño máximo: 500 MB por archivo</p>
+                  <p className="text-xs text-zinc-400 mt-4">o arrastra y suelta aquí · Máx. 500 MB</p>
                 </div>
 
                 {uploading && (
-                  <div className="mt-6">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">Procesando archivo...</span>
-                      <span className="text-sm text-gray-500">{progress.toFixed(0)}%</span>
+                  <div className="mt-8">
+                    <div className="flex justify-between mb-3">
+                      <span className="text-sm font-medium text-zinc-900">Subiendo archivo</span>
+                      <span className="text-sm text-zinc-500">{progress.toFixed(0)}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                    <div className="w-full bg-zinc-100 rounded-full h-1.5">
+                      <div className="bg-zinc-900 h-1.5 rounded-full transition-all" style={{ width: `${progress}%` }} />
                     </div>
                   </div>
                 )}
 
                 {success && (
-                  <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-sm font-medium text-green-800">Archivo subido correctamente</p>
-                    <p className="text-xs text-green-600 mt-1">El procesamiento comenzará en breve</p>
+                  <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-green-900">Archivo subido correctamente</p>
+                    <p className="text-xs text-green-700 mt-1">Procesamiento iniciado · Tiempo estimado: 2-4 minutos</p>
                   </div>
                 )}
 
                 {error && (
-                  <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-sm font-medium text-red-800">Error</p>
-                    <p className="text-xs text-red-600 mt-1">{error}</p>
+                  <div className="mt-8 bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-red-900">Error</p>
+                    <p className="text-xs text-red-700 mt-1">{error}</p>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200">
-              <div className="border-b border-gray-200 px-6 py-4">
-                <h2 className="text-lg font-semibold text-gray-900">Archivos Recientes</h2>
+            {/* Archivos procesados */}
+            <div className="bg-white rounded-xl border border-zinc-200">
+              <div className="px-8 py-6 border-b border-zinc-100 flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-zinc-900">Archivos Procesados</h2>
+                  <p className="text-sm text-zinc-500 mt-1">{user.filesProcessed || 0} archivos este mes</p>
+                </div>
+                <Link href="/results" className="text-sm font-medium text-zinc-900 hover:text-zinc-600">
+                  Ver todos →
+                </Link>
               </div>
-              <div className="p-6">
-                <div className="text-center py-12 text-gray-500">
-                  <FileText className="mx-auto h-12 w-12 text-gray-300 mb-3" />
-                  <p className="text-sm">No hay archivos procesados</p>
-                  <Link href="/results" className="text-sm text-blue-600 hover:underline mt-2 inline-block">
-                    Ver todos los archivos
-                  </Link>
+              <div className="p-8">
+                <div className="text-center py-16 text-zinc-400">
+                  <Upload className="mx-auto h-12 w-12 mb-4" />
+                  <p className="text-sm">Aún no has procesado ningún archivo</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg border border-gray-200">
-              <div className="border-b border-gray-200 px-6 py-4">
-                <h3 className="text-base font-semibold text-gray-900">Opciones de Procesamiento</h3>
+          {/* Panel lateral */}
+          <div className="space-y-8">
+            
+            {/* Opciones */}
+            <div className="bg-white rounded-xl border border-zinc-200">
+              <div className="px-6 py-5 border-b border-zinc-100">
+                <h3 className="text-sm font-semibold text-zinc-900">Opciones de Procesamiento</h3>
               </div>
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-5">
                 
                 <label className="flex items-start gap-3 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={options.transcription}
                     onChange={(e) => setOptions({...options, transcription: e.target.checked})}
-                    className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300"
+                    className="mt-0.5 w-4 h-4 text-zinc-900 rounded border-zinc-300"
                   />
                   <div>
-                    <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600">Transcripción</p>
-                    <p className="text-xs text-gray-500">Conversión de audio a texto</p>
+                    <p className="text-sm font-medium text-zinc-900 group-hover:text-zinc-700">Transcripción completa</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">Conversión de audio/vídeo a texto</p>
                   </div>
                 </label>
 
@@ -296,30 +265,30 @@ export default function Dashboard() {
                     type="checkbox"
                     checked={options.summary}
                     onChange={(e) => setOptions({...options, summary: e.target.checked})}
-                    className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300"
+                    className="mt-0.5 w-4 h-4 text-zinc-900 rounded border-zinc-300"
                   />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600">Resumen</p>
-                    <p className="text-xs text-gray-500 mb-2">Generación automática de resumen</p>
+                    <p className="text-sm font-medium text-zinc-900 group-hover:text-zinc-700">Resumen automático</p>
+                    <p className="text-xs text-zinc-500 mt-0.5 mb-3">Síntesis del contenido generada por IA</p>
                     {options.summary && (
-                      <div className="ml-0 space-y-1 border-l-2 border-gray-200 pl-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
+                      <div className="space-y-2 pl-1 border-l-2 border-zinc-200 ml-2">
+                        <label className="flex items-center gap-2.5 cursor-pointer ml-3">
                           <input
                             type="radio"
                             checked={options.summaryType === 'short'}
                             onChange={() => setOptions({...options, summaryType: 'short'})}
-                            className="w-3 h-3 text-blue-600"
+                            className="w-3.5 h-3.5 text-zinc-900"
                           />
-                          <span className="text-xs text-gray-700">Resumen breve</span>
+                          <span className="text-xs text-zinc-700">Resumen breve (2-3 párrafos)</span>
                         </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
+                        <label className="flex items-center gap-2.5 cursor-pointer ml-3">
                           <input
                             type="radio"
                             checked={options.summaryType === 'detailed'}
                             onChange={() => setOptions({...options, summaryType: 'detailed'})}
-                            className="w-3 h-3 text-blue-600"
+                            className="w-3.5 h-3.5 text-zinc-900"
                           />
-                          <span className="text-xs text-gray-700">Resumen detallado</span>
+                          <span className="text-xs text-zinc-700">Resumen detallado (estructura completa)</span>
                         </label>
                       </div>
                     )}
@@ -331,11 +300,11 @@ export default function Dashboard() {
                     type="checkbox"
                     checked={options.tags}
                     onChange={(e) => setOptions({...options, tags: e.target.checked})}
-                    className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300"
+                    className="mt-0.5 w-4 h-4 text-zinc-900 rounded border-zinc-300"
                   />
                   <div>
-                    <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600">Etiquetas</p>
-                    <p className="text-xs text-gray-500">Identificación de palabras clave</p>
+                    <p className="text-sm font-medium text-zinc-900 group-hover:text-zinc-700">Etiquetas y palabras clave</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">Identificación automática de temas</p>
                   </div>
                 </label>
 
@@ -344,11 +313,11 @@ export default function Dashboard() {
                     type="checkbox"
                     checked={options.speakers}
                     onChange={(e) => setOptions({...options, speakers: e.target.checked})}
-                    className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300"
+                    className="mt-0.5 w-4 h-4 text-zinc-900 rounded border-zinc-300"
                   />
                   <div>
-                    <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600">Intervinientes</p>
-                    <p className="text-xs text-gray-500">Identificación de personas</p>
+                    <p className="text-sm font-medium text-zinc-900 group-hover:text-zinc-700">Identificación de intervinientes</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">Detección de diferentes hablantes</p>
                   </div>
                 </label>
 
@@ -357,37 +326,34 @@ export default function Dashboard() {
                     type="checkbox"
                     checked={options.srt}
                     onChange={(e) => setOptions({...options, srt: e.target.checked})}
-                    className="mt-1 w-4 h-4 text-blue-600 rounded border-gray-300"
+                    className="mt-0.5 w-4 h-4 text-zinc-900 rounded border-zinc-300"
                   />
                   <div>
-                    <p className="text-sm font-medium text-gray-900 group-hover:text-blue-600">Subtítulos (SRT)</p>
-                    <p className="text-xs text-gray-500">Formato de subtítulos temporizado</p>
+                    <p className="text-sm font-medium text-zinc-900 group-hover:text-zinc-700">Archivo de subtítulos (SRT)</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">Formato compatible con reproductores</p>
                   </div>
                 </label>
               </div>
             </div>
 
-            <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
-              <h4 className="text-sm font-semibold text-gray-900 mb-3">Información de Cuenta</h4>
+            {/* Info cuenta */}
+            <div className="bg-zinc-900 rounded-xl text-white p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-semibold">Plan {user.plan || 'Free'}</h4>
+                <Link href="/pricing" className="text-xs font-medium hover:underline">Actualizar</Link>
+              </div>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Plan actual:</span>
-                  <span className="font-medium text-gray-900">{user.plan || 'Free'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Archivos usados:</span>
-                  <span className="font-medium text-gray-900">{user.filesProcessed || 0} / {user.monthlyLimit || 10}</span>
+                <div className="flex justify-between text-zinc-400">
+                  <span>Archivos procesados</span>
+                  <span className="text-white font-medium">{user.filesProcessed || 0} / {user.monthlyLimit || 10}</span>
                 </div>
               </div>
-              <div className="w-full bg-blue-200 rounded-full h-2 mt-4">
+              <div className="w-full bg-zinc-700 rounded-full h-1.5 mt-4">
                 <div 
-                  className="bg-blue-600 h-2 rounded-full transition-all" 
+                  className="bg-white h-1.5 rounded-full transition-all" 
                   style={{ width: `${((user.filesProcessed || 0) / (user.monthlyLimit || 10)) * 100}%` }}
                 />
               </div>
-              <Link href="/pricing" className="mt-4 block text-center text-sm text-blue-600 hover:underline font-medium">
-                Actualizar plan
-              </Link>
             </div>
           </div>
         </div>
