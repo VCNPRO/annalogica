@@ -50,17 +50,25 @@ export default function Results() {
     }
   };
 
-  const deleteFile = (fileName: string) => {
-    if (confirm(`¿Eliminar ${fileName}?`)) {
-      setFiles(prev => prev.filter(f => f.name !== fileName));
-    }
-  };
-
-  const deleteSelected = () => {
+  const deleteSelected = async () => {
     if (selectedFiles.length === 0) return;
-    if (confirm(`¿Eliminar ${selectedFiles.length} archivos seleccionados?`)) {
+    if (!confirm(`¿Eliminar ${selectedFiles.length} archivos seleccionados?`)) return;
+
+    try {
+      const token = localStorage.getItem('token');
+      
+      for (const fileName of selectedFiles) {
+        await fetch(`${API_URL}/files/${encodeURIComponent(fileName)}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      }
+
       setFiles(prev => prev.filter(f => !selectedFiles.includes(f.name)));
       setSelectedFiles([]);
+      alert('Archivos eliminados correctamente');
+    } catch (err) {
+      alert('Error al eliminar archivos');
     }
   };
 
@@ -157,11 +165,10 @@ export default function Results() {
                   <span className={`text-xs font-medium ${textPrimary} flex-1`}>Nombre</span>
                   <span className={`text-xs font-medium ${textSecondary}`} style={{ minWidth: '120px' }}>Fecha</span>
                   <span className={`text-xs font-medium ${textSecondary}`} style={{ minWidth: '200px' }}>Descargas</span>
-                  <span className={`text-xs font-medium ${textSecondary}`} style={{ minWidth: '60px' }}>Acción</span>
                 </div>
               </div>
 
-              <div className="divide-y divide-zinc-800">
+              <div className={`divide-y ${border}`}>
                 {files.map((file, idx) => (
                   <div key={idx} className={`px-6 py-4 ${hover} transition-colors`}>
                     <div className="flex items-center gap-4">
@@ -217,15 +224,6 @@ export default function Results() {
                           </button>
                         )}
                       </div>
-
-                      <button
-                        onClick={() => deleteFile(file.name)}
-                        className="p-2 hover:bg-red-500/10 rounded transition-colors"
-                        style={{ minWidth: '60px' }}
-                        title="Eliminar archivo"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </button>
                     </div>
                   </div>
                 ))}
