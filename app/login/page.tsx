@@ -22,7 +22,7 @@ export default function Login() {
       const endpoint = isLogin ? '/auth/login' : '/auth/register';
       const body = isLogin ? { email, password } : { email, password, name };
 
-      const response = await fetch(`https://26iia05sva.execute-api.eu-west-1.amazonaws.com${endpoint}`, {
+      const response = await fetch(`https://wri2uro216.execute-api.eu-west-1.amazonaws.com/prod${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
