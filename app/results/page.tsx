@@ -5,8 +5,16 @@ import { useRouter } from 'next/navigation';
 
 const API_URL = 'https://p0qgpbsiyh.execute-api.eu-west-1.amazonaws.com';
 
+interface FileData {
+  name: string;
+  date: string;
+  transcriptKey: string;
+  srtKey: string;
+  summaryKey: string;
+}
+
 export default function Results() {
-  const [files, setFiles] = useState([]);
+  const [files, setFiles] = useState<FileData[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
