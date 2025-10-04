@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, HelpCircle } from 'lucide-react';
 
-const API_URL = 'https://wri2uro216.execute-api.eu-west-1.amazonaws.com/prod';
+const API_URL = 'https://p0qgpbsiyh.execute-api.eu-west-1.amazonaws.com';
 
 type FileStatus = 'uploading' | 'processing' | 'completed' | 'error';
 
