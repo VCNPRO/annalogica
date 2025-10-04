@@ -1,6 +1,3 @@
-ENDFILE
-~ $ 
-~ $ cat /tmp/results-page.txt
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
