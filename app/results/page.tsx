@@ -33,7 +33,7 @@ export default function Results() {
     }
   };
 
-  const downloadFile = async (key) => {
+  const downloadFile = async (key: string) => {
     try {
       const response = await fetch(`${API_URL}/download?key=${encodeURIComponent(key)}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
@@ -45,7 +45,7 @@ export default function Results() {
     }
   };
 
-  const deleteFile = async (fileName) => {
+  const deleteFile = async (fileName: string) => {
     if (!confirm('¿Eliminar?')) return;
     try {
       await fetch(`${API_URL}/files/${encodeURIComponent(fileName)}`, {
