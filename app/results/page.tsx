@@ -16,6 +16,7 @@ interface FileData {
 export default function Results() {
   const [files, setFiles] = useState<FileData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -66,29 +67,99 @@ export default function Results() {
     }
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedFiles(checked ? files.map(f => f.name) : []);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedFiles.length === 0) return;
+    if (!confirm(`¿Eliminar ${selectedFiles.length} archivos?`)) return;
+    
+    try {
+      for (const fileName of selectedFiles) {
+        await fetch(`${API_URL}/files/${encodeURIComponent(fileName)}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+      }
+      setSelectedFiles([]);
+      loadFiles();
+    } catch (error) {
+      alert('Error eliminando archivos');
+    }
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center">Cargando...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4">
+    <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Archivos Procesados</h1>
-        {files.length === 0 ? (
-          <p className="text-gray-500">No hay archivos</p>
-        ) : (
-          <div className="space-y-4">
-            {files.map((file) => (
-              <div key={file.name} className="bg-white p-6 rounded-lg shadow">
-                <h3 className="font-semibold mb-4">{file.name}</h3>
-                <div className="flex gap-3 flex-wrap">
-                  <button onClick={() => downloadFile(file.transcriptKey)} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">TXT</button>
-                  <button onClick={() => downloadFile(file.srtKey)} className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">SRT</button>
-                  <button onClick={() => downloadFile(file.transcriptKey.replace('.txt', '.pdf'))} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">PDF</button>
-                  <button onClick={() => deleteFile(file.name)} className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Eliminar</button>
-                </div>
-              </div>
-            ))}
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900">Todos los Archivos Procesados</h1>
+              <p className="text-sm text-gray-500 mt-1">{files.length} archivos totales</p>
+            </div>
+            {selectedFiles.length > 0 && (
+              <button 
+                onClick={handleDeleteSelected}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors"
+              >
+                Eliminar {selectedFiles.length}
+              </button>
+            )}
           </div>
-        )}
+          
+          <div className="px-6 py-3 border-b bg-gray-50">
+            <div className="flex items-center gap-4">
+              <input 
+                type="checkbox" 
+                className="rounded border-gray-300"
+                checked={selectedFiles.length === files.length && files.length > 0}
+                onChange={(e) => handleSelectAll(e.target.checked)}
+              />
+              <span className="text-sm font-medium text-gray-700 flex-1">Nombre Archivo</span>
+              <span className="text-sm font-medium text-gray-500 w-96">Descargas</span>
+            </div>
+          </div>
+
+          {files.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <p className="text-sm text-gray-500">No hay archivos procesados</p>
+            </div>
+          ) : (
+            <div>
+              {files.map((file) => (
+                <div key={file.name} className="px-6 py-4 border-b hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-gray-300"
+                      checked={selectedFiles.includes(file.name)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedFiles(prev => [...prev, file.name]);
+                        } else {
+                          setSelectedFiles(prev => prev.filter(n => n !== file.name));
+                        }
+                      }}
+                    />
+                    <span className="text-sm text-gray-900 truncate flex-1">{file.name}</span>
+                    <div className="flex gap-2 w-96">
+                      <button onClick={() => downloadFile(file.transcriptKey)} className="text-xs text-blue-600 hover:underline">TXT</button>
+                      <span className="text-gray-300">|</span>
+                      <button onClick={() => downloadFile(file.srtKey)} className="text-xs text-green-600 hover:underline">SRT</button>
+                      <span className="text-gray-300">|</span>
+                      <button onClick={() => downloadFile(file.transcriptKey.replace('.txt', '.pdf'))} className="text-xs text-purple-600 hover:underline">PDF</button>
+                      <span className="text-gray-300">|</span>
+                      <button onClick={() => deleteFile(file.name)} className="text-xs text-red-600 hover:underline">Eliminar</button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
