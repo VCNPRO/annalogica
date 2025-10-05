@@ -6,9 +6,9 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Faltan datos requeridos' }, { status: 400 });
     }
 
-    // Limpiar y formatear el texto
-    const cleanText = text.replace(/[^\x20-\x7E\n\r\t\u00A0-\u00FF]/g, '').trim();
-    const lines = cleanText.split('\n').filter((line: string) => line.trim());
+    // Limpiar y formatear el texto (preservar todo el contenido)
+    const cleanText = text.trim();
+    const lines = cleanText.split('\n');
 
     // Crear un PDF más robusto
     const generatePDFContent = () => {
@@ -22,29 +22,7 @@ ${'='.repeat(60)}
 
 `;
 
-      const formattedText = lines.map((line: string, index: number) => {
-        // Dividir líneas largas en chunks de 80 caracteres
-        const chunks: string[] = [];
-        let currentLine = line.trim();
-
-        while (currentLine.length > 80) {
-          let splitIndex = 80;
-          // Buscar el último espacio antes de 80 caracteres
-          const lastSpace = currentLine.lastIndexOf(' ', 80);
-          if (lastSpace > 60) {
-            splitIndex = lastSpace;
-          }
-
-          chunks.push(currentLine.substring(0, splitIndex));
-          currentLine = currentLine.substring(splitIndex).trim();
-        }
-
-        if (currentLine.length > 0) {
-          chunks.push(currentLine);
-        }
-
-        return chunks.join('\n');
-      }).join('\n\n');
+      const formattedText = lines.join('\n');
 
       return header + formattedText;
     };
