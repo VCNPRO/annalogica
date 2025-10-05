@@ -3,34 +3,47 @@ import { put } from '@vercel/blob';
 
 export async function POST(request: Request) {
   try {
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const
+
+
+
+
+
+
+
+
+
+cd /tmp/annalogica
+
+# Completar /api/process
+cat > app/api/process/route.ts << 'EOF'
+import Replicate from "replicate";
+import { put } from '@vercel/blob';
+
+export async function POST(request: Request) {
+  try {
+    const { audioUrl, filename } = await request.json();
     const token = request.headers.get('Authorization')?.replace('Bearer ', '');
     
     if (!token) return Response.json({ error: 'No autorizado' }, { status: 401 });
     
-    const filename = file.name.split('.')[0];
-    
-    // Subir archivo original
-    const audioBlob = await put(file.name, file, { access: 'public' });
-    
-    // Transcribir con Replicate
+    // Transcribir con Replicate usando la URL del blob
     const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
     const output: any = await replicate.run(
       "openai/whisper:4d50797290df275329f202e48c76360b3f22b08d28c196cbc54600319435f8d2",
-      { input: { audio: audioBlob.url, language: "Spanish" }}
+      { input: { audio: audioUrl, language: "Spanish" }}
     );
     
     const text = output.transcription || output.text || '';
     const segments = output.segments || [];
     
-    // Generar TXT
+    // Guardar TXT
     const txtBlob = await put(`${filename}.txt`, text, { 
       access: 'public',
       contentType: 'text/plain; charset=utf-8'
     });
     
-    // Generar SRT
+    // Guardar SRT
     let srt = '';
     segments.forEach((seg: any, i: number) => {
       const start = formatTime(seg.start);
@@ -42,7 +55,7 @@ export async function POST(request: Request) {
       contentType: 'text/plain; charset=utf-8'
     });
     
-    // Generar resumen con Claude
+    // Generar resumen
     let summaryUrl = null;
     if (text.length > 100) {
       try {
@@ -73,11 +86,9 @@ export async function POST(request: Request) {
     
     return Response.json({
       success: true,
-      filename,
       txtUrl: txtBlob.url,
       srtUrl: srtBlob.url,
-      summaryUrl,
-      audioUrl: audioBlob.url
+      summaryUrl
     });
     
   } catch (error: any) {
