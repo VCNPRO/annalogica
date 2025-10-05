@@ -6,51 +6,47 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Faltan datos requeridos' }, { status: 400 });
     }
 
-    // Limpiar y formatear el texto (preservar todo el contenido)
-    const cleanText = text.trim();
-    const lines = cleanText.split('\n');
-
-    // Crear un PDF más robusto
-    const generatePDFContent = () => {
-      const header = `TRANSCRIPCIÓN DE AUDIO
+    // Crear contenido de texto simple y completo
+    const textContent = `TRANSCRIPCIÓN DE AUDIO
+${'='.repeat(60)}
 
 Archivo: ${filename}
 Fecha: ${new Date().toLocaleDateString('es-ES')}
 Hora: ${new Date().toLocaleTimeString('es-ES')}
 
+CONTENIDO:
 ${'='.repeat(60)}
 
+${text}
+
+${'='.repeat(60)}
+Generado por Annalogica
 `;
 
-      const formattedText = lines.join('\n');
-
-      return header + formattedText;
-    };
-
-    const fullContent = generatePDFContent();
-
-    // Generar PDF manual mejorado
-    const pdfLines = fullContent.split('\n');
+    // Para PDF, usar el contenido completo sin truncar
+    const pdfContent = textContent;
+    const pdfLines = pdfContent.split('\n');
     const textCommands: string[] = [];
     let yPosition = 750;
 
-    // Añadir cada línea
+    // Procesar cada línea sin cortarla
     pdfLines.forEach((line: string, index: number) => {
       if (yPosition < 50) {
         // Nueva página si nos quedamos sin espacio
         yPosition = 750;
-        textCommands.push('ET\nBT\n/F1 11 Tf\n50 750 Td');
+        textCommands.push('ET\\nBT\\n/F1 11 Tf\\n50 750 Td');
       }
 
-      const escapedLine = line.replace(/[()\\]/g, '\\$&').substring(0, 75);
-      textCommands.push(`(${escapedLine}) Tj\n0 -15 Td`);
+      // Escapar caracteres especiales pero NO cortar la línea
+      const escapedLine = line.replace(/[()\\]/g, '\\\\$&');
+      textCommands.push(`(${escapedLine}) Tj\\n0 -15 Td`);
       yPosition -= 15;
     });
 
     const streamContent = `BT
 /F1 11 Tf
 50 750 Td
-${textCommands.join('\n')}
+${textCommands.join('\\n')}
 ET`;
 
     const pdfTemplate = `%PDF-1.4
@@ -122,7 +118,7 @@ startxref
     return new Response(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf"`,
+        'Content-Disposition': `attachment; filename="${filename.replace(/\\.[^/.]+$/, '')}-transcripcion.pdf"`,
         'Content-Length': pdfBuffer.length.toString(),
         'Cache-Control': 'no-cache, no-store, must-revalidate'
       }
@@ -131,11 +127,12 @@ startxref
   } catch (error: any) {
     console.error('Error generando PDF:', error);
 
-    // Fallback robusto: archivo de texto formateado
-    const { text, filename } = await request.json();
-    const cleanFilename = filename?.replace(/\.[^/.]+$/, '') || 'transcripcion';
+    // Fallback: archivo de texto
+    try {
+      const { text, filename } = await request.json();
+      const cleanFilename = filename?.replace(/\\.[^/.]+$/, '') || 'transcripcion';
 
-    const textContent = `TRANSCRIPCIÓN DE AUDIO
+      const textContent = `TRANSCRIPCIÓN DE AUDIO
 ${'='.repeat(50)}
 
 Archivo: ${filename || 'Sin nombre'}
@@ -151,11 +148,14 @@ ${'='.repeat(50)}
 Generado por Annalogica
 `;
 
-    return new Response(textContent, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${cleanFilename}-transcripcion.txt"`
-      }
-    });
+      return new Response(textContent, {
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Content-Disposition': `attachment; filename="${cleanFilename}-transcripcion.txt"`
+        }
+      });
+    } catch (fallbackError) {
+      return Response.json({ error: 'Error generando archivo' }, { status: 500 });
+    }
   }
 }
