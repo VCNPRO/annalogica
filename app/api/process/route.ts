@@ -3,31 +3,11 @@ import { put } from '@vercel/blob';
 
 export async function POST(request: Request) {
   try {
-    const
-
-
-
-
-
-
-
-
-
-cd /tmp/annalogica
-
-# Completar /api/process
-cat > app/api/process/route.ts << 'EOF'
-import Replicate from "replicate";
-import { put } from '@vercel/blob';
-
-export async function POST(request: Request) {
-  try {
     const { audioUrl, filename } = await request.json();
     const token = request.headers.get('Authorization')?.replace('Bearer ', '');
     
     if (!token) return Response.json({ error: 'No autorizado' }, { status: 401 });
     
-    // Transcribir con Replicate usando la URL del blob
     const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
     const output: any = await replicate.run(
       "openai/whisper:4d50797290df275329f202e48c76360b3f22b08d28c196cbc54600319435f8d2",
@@ -36,26 +16,24 @@ export async function POST(request: Request) {
     
     const text = output.transcription || output.text || '';
     const segments = output.segments || [];
+    const baseName = filename.replace(/\.[^/.]+$/, '');
     
-    // Guardar TXT
-    const txtBlob = await put(`${filename}.txt`, text, { 
+    const txtBlob = await put(`${baseName}.txt`, text, { 
       access: 'public',
       contentType: 'text/plain; charset=utf-8'
     });
     
-    // Guardar SRT
     let srt = '';
     segments.forEach((seg: any, i: number) => {
       const start = formatTime(seg.start);
       const end = formatTime(seg.end);
       srt += `${i + 1}\n${start} --> ${end}\n${seg.text.trim()}\n\n`;
     });
-    const srtBlob = await put(`${filename}.srt`, srt, { 
+    const srtBlob = await put(`${baseName}.srt`, srt, { 
       access: 'public',
       contentType: 'text/plain; charset=utf-8'
     });
     
-    // Generar resumen
     let summaryUrl = null;
     if (text.length > 100) {
       try {
@@ -74,7 +52,7 @@ export async function POST(request: Request) {
         });
         const summaryData = await summaryRes.json();
         const summary = summaryData.content[0].text;
-        const summaryBlob = await put(`${filename}-summary.txt`, summary, { 
+        const summaryBlob = await put(`${baseName}-summary.txt`, summary, { 
           access: 'public',
           contentType: 'text/plain; charset=utf-8'
         });
