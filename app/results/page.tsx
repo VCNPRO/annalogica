@@ -3,21 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-const API_URL = 'https://p0qgpbsiyh.execute-api.eu-west-1.amazonaws.com';
-
-interface FileData {
-  name: string;
-  date: string;
-  transcriptKey: string;
-  srtKey: string;
-  summaryKey: string;
-}
-
 export default function Results() {
-  const [files, setFiles] = useState<FileData[]>([]);
+  const [files, setFiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -26,17 +15,14 @@ export default function Results() {
       router.push('/login');
       return;
     }
-    
-    const savedMode = localStorage.getItem('darkMode');
-    setDarkMode(savedMode === 'true');
-    
     loadFiles();
   }, []);
 
   const loadFiles = async () => {
     try {
-      const response = await fetch(`${API_URL}/files`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/files', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
       setFiles(data.files || []);
@@ -47,50 +33,48 @@ export default function Results() {
     }
   };
 
-  const downloadFile = async (key: string) => {
+  const downloadFile = (url: string) => {
+    window.open(url, '_blank');
+  };
+
+  const downloadPDF = async (txtUrl: string, filename: string) => {
     try {
-      const response = await fetch(`${API_URL}/download?key=${encodeURIComponent(key)}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      const textRes = await fetch(txtUrl);
+      const text = await textRes.text();
+      
+      const pdfRes = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, filename })
       });
-      const data = await response.json();
-      window.open(data.url, '_blank');
+      
+      const blob = await pdfRes.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${filename}.pdf`;
+      a.click();
     } catch (error) {
-      alert('Error al descargar');
+      alert('Error generando PDF');
     }
   };
 
-  const deleteFile = async (fileName: string) => {
+  const deleteFile = async (filename: string) => {
     if (!confirm('¿Eliminar?')) return;
+    
     try {
-      await fetch(`${API_URL}/files/${encodeURIComponent(fileName)}`, {
+      const token = localStorage.getItem('token');
+      await fetch('/api/files', {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ filename })
       });
       loadFiles();
     } catch (error) {
       alert('Error');
-    }
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedFiles(checked ? files.map(f => f.name) : []);
-  };
-
-  const handleDeleteSelected = async () => {
-    if (selectedFiles.length === 0) return;
-    if (!confirm(`¿Eliminar ${selectedFiles.length} archivos?`)) return;
-    
-    try {
-      for (const fileName of selectedFiles) {
-        await fetch(`${API_URL}/files/${encodeURIComponent(fileName)}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-      }
-      setSelectedFiles([]);
-      loadFiles();
-    } catch (error) {
-      alert('Error eliminando archivos');
     }
   };
 
@@ -99,72 +83,37 @@ export default function Results() {
   const textPrimary = darkMode ? 'text-white' : 'text-gray-900';
   const textSecondary = darkMode ? 'text-zinc-400' : 'text-gray-600';
   const border = darkMode ? 'border-zinc-800' : 'border-gray-200';
-  const hover = darkMode ? 'hover:bg-zinc-800' : 'hover:bg-gray-50';
 
-  if (loading) return <div className={`min-h-screen ${bgPrimary} flex items-center justify-center`}>Cargando...</div>;
+  if (loading) return <div className={`min-h-screen ${bgPrimary} flex items-center justify-center`}><div className="text-orange-500">Cargando...</div></div>;
 
   return (
     <div className={`min-h-screen ${bgPrimary} p-6`}>
       <div className="max-w-6xl mx-auto">
-        <div className={`${bgSecondary} rounded-lg shadow`}>
-          <div className={`px-6 py-4 ${border} border-b flex items-center justify-between`}>
-            <div>
-              <h1 className={`text-lg font-semibold ${textPrimary}`}>Todos los Archivos Procesados</h1>
-              <p className={`text-sm ${textSecondary} mt-1`}>{files.length} archivos totales</p>
-            </div>
-            {selectedFiles.length > 0 && (
-              <button 
-                onClick={handleDeleteSelected}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded text-sm font-medium transition-colors"
-              >
-                Eliminar {selectedFiles.length}
-              </button>
-            )}
+        <div className={`${bgSecondary} rounded-lg ${border} border`}>
+          <div className={`px-6 py-4 ${border} border-b`}>
+            <h1 className={`text-lg font-semibold ${textPrimary}`}>Todos los Archivos</h1>
+            <p className={`text-sm ${textSecondary} mt-1`}>{files.length} archivos totales</p>
           </div>
           
-          <div className={`px-6 py-3 ${border} border-b ${darkMode ? 'bg-zinc-800' : 'bg-gray-50'}`}>
-            <div className="flex items-center gap-4">
-              <input 
-                type="checkbox" 
-                className="rounded border-gray-300"
-                checked={selectedFiles.length === files.length && files.length > 0}
-                onChange={(e) => handleSelectAll(e.target.checked)}
-              />
-              <span className={`text-sm font-medium ${textPrimary} flex-1`}>Nombre Archivo</span>
-              <span className={`text-sm font-medium ${textSecondary} w-96`}>Descargas</span>
-            </div>
-          </div>
-
           {files.length === 0 ? (
             <div className="px-6 py-12 text-center">
-              <p className={`text-sm ${textSecondary}`}>No hay archivos procesados</p>
+              <p className={`text-sm ${textSecondary}`}>No hay archivos</p>
             </div>
           ) : (
             <div>
-              {files.map((file) => (
-                <div key={file.name} className={`px-6 py-4 ${border} border-b ${hover} transition-colors`}>
-                  <div className="flex items-center gap-4">
-                    <input 
-                      type="checkbox" 
-                      className="rounded border-gray-300"
-                      checked={selectedFiles.includes(file.name)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedFiles(prev => [...prev, file.name]);
-                        } else {
-                          setSelectedFiles(prev => prev.filter(n => n !== file.name));
-                        }
-                      }}
-                    />
+              {files.map((file: any) => (
+                <div key={file.name} className={`px-6 py-4 ${border} border-b hover:bg-zinc-800 transition-colors`}>
+                  <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${textPrimary} truncate flex-1`}>{file.name}</span>
-                    <div className="flex gap-2 w-96">
-                      <button onClick={() => downloadFile(file.transcriptKey)} className="text-xs text-blue-600 hover:underline">TXT</button>
+                    <div className="flex gap-2 text-xs">
+                      <button onClick={() => downloadFile(file.txtUrl)} className="text-blue-500 hover:underline">TXT</button>
                       <span className={textSecondary}>|</span>
-                      <button onClick={() => downloadFile(file.srtKey)} className="text-xs text-green-600 hover:underline">SRT</button>
+                      <button onClick={() => downloadFile(file.srtUrl)} className="text-green-500 hover:underline">SRT</button>
                       <span className={textSecondary}>|</span>
-                      <button onClick={() => downloadFile(file.transcriptKey.replace('.txt', '.pdf'))} className="text-xs text-purple-600 hover:underline">PDF</button>
+                      <button onClick={() => downloadPDF(file.txtUrl, file.name)} className="text-purple-500 hover:underline">PDF</button>
+                      {file.summaryUrl && <><span className={textSecondary}>|</span><button onClick={() => downloadFile(file.summaryUrl)} className="text-amber-500 hover:underline">Resumen</button></>}
                       <span className={textSecondary}>|</span>
-                      <button onClick={() => deleteFile(file.name)} className="text-xs text-red-600 hover:underline">Eliminar</button>
+                      <button onClick={() => deleteFile(file.name)} className="text-red-500 hover:underline">Eliminar</button>
                     </div>
                   </div>
                 </div>
