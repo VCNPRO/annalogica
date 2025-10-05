@@ -87,15 +87,11 @@ export default function Dashboard() {
       // Upload directo a Blob con progreso
       const { upload } = await import('@vercel/blob/client');
       
-      // Generar nombre único para evitar conflictos
-      const timestamp = Date.now();
-      const uniqueFileName = `${timestamp}-${file.name}`;
-
-      const blob = await upload(uniqueFileName, file, {
+      const blob = await upload(file.name, file, {
         access: 'public',
         handleUploadUrl: '/api/blob-upload',
         onUploadProgress: ({ percentage }) => {
-          setUploadedFiles(prev => prev.map(f =>
+          setUploadedFiles(prev => prev.map(f => 
             f.id === fileId ? { ...f, uploadProgress: percentage } : f
           ));
         },
@@ -141,6 +137,7 @@ export default function Dashboard() {
       ));
       setError(err.message);
     }
+  };
   };
 
   const handleSelectAllUploaded = (checked: boolean) => {
@@ -552,6 +549,10 @@ export default function Dashboard() {
                           }
                         }}
                       />
+                      <span className={`text-xs ${textPrimary} truncate flex-1`}>{file.name}</span>
+                      <Link href="/results" className="text-xs text-orange-500 hover:underline">
+                        Descargar
+                      </Link>
                       <span className={`text-xs ${textPrimary} truncate flex-1`}>{file.name}</span>
                       <Link href="/results" className="text-xs text-orange-500 hover:underline">
                         Descargar
