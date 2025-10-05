@@ -4,15 +4,15 @@ export async function POST(request: Request) {
   try {
     const { text, filename } = await request.json();
     
-    const chunks: Uint8Array[] = [];
+    const chunks: Buffer[] = [];
     const doc = new PDFDocument({ size: 'A4', margins: { top: 50, bottom: 50, left: 60, right: 60 }});
     
     doc.on('data', (chunk) => chunks.push(chunk));
     
-    const pdfPromise = new Promise<Uint8Array>((resolve) => {
+    const pdfPromise = new Promise<ArrayBuffer>((resolve) => {
       doc.on('end', () => {
-        const pdfBuffer = new Uint8Array(Buffer.concat(chunks));
-        resolve(pdfBuffer);
+        const buffer = Buffer.concat(chunks);
+        resolve(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
       });
     });
     
