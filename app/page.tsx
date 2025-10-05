@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, HelpCircle } from 'lucide-react';
 
-// API local - Replicate backend
+const API_URL = 'https://p0qgpbsiyh.execute-api.eu-west-1.amazonaws.com';
 
 type FileStatus = 'uploading' | 'processing' | 'completed' | 'error';
 
@@ -50,7 +50,7 @@ export default function Dashboard() {
   const loadProcessedFiles = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/files`, {
+      const response = await fetch(`${API_URL}/files`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -66,10 +66,8 @@ export default function Dashboard() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     const fileId = Date.now().toString();
-    const filename = file.name.split('.')[0];
-    
     const newFile: UploadedFile = {
       id: fileId,
       name: file.name,
@@ -78,35 +76,59 @@ export default function Dashboard() {
       status: 'uploading',
       date: new Date().toISOString()
     };
-    
+
     setUploadedFiles(prev => [...prev, newFile]);
     setError(null);
-    
+
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Sesión expirada');
-      
-      // Subir archivo directamente a Vercel Blob
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const uploadRes = await fetch(`https://blob.vercel-storage.com/upload?filename=${encodeURIComponent(file.name)}`, {
-        method: 'PUT',
-        body: file,
+
+      const uploadResponse = await fetch(`${API_URL}/upload`, {
+        method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'x-vercel-blob-token': process.env.NEXT_PUBLIC_BLOB_READ_WRITE_TOKEN || ''
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ filename: file.name })
+      });
+
+      if (!uploadResponse.ok) throw new Error('Error al obtener URL');
+
+      const { uploadUrl, fields } = await uploadResponse.json();
+      const formData = new FormData();
+      Object.keys(fields).forEach(key => formData.append(key, fields[key]));
+      formData.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const progress = (e.loaded / e.total) * 100;
+          setUploadedFiles(prev => prev.map(f => 
+            f.id === fileId ? { ...f, uploadProgress: progress } : f
+          ));
         }
       });
-      
-      if (!uploadRes.ok) throw new Error('Error al subir archivo');
-      const { url: audioUrl } = await uploadRes.json();
-      
+
+      await new Promise((resolve, reject) => {
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(xhr.response);
+          } else {
+            reject(new Error('Error al subir'));
+          }
+        });
+        
+        xhr.addEventListener('error', () => reject(new Error('Error de conexión')));
+        xhr.open('POST', uploadUrl);
+        xhr.send(formData);
+      });
+
       setUploadedFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, uploadProgress: 100, status: 'processing' } : f
+        f.id === fileId ? { ...f, status: 'processing', uploadProgress: 100 } : f
       ));
-      
-      // Procesar con Replicate
+
       let processProgress = 0;
       const processInterval = setInterval(() => {
         processProgress += 10;
@@ -115,25 +137,16 @@ export default function Dashboard() {
         ));
         
         if (processProgress >= 90) clearInterval(processInterval);
-      }, 3000);
-      
-      const processRes = await fetch('/api/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ audioUrl, filename })
-      });
-      
-      if (!processRes.ok) throw new Error('Error al procesar');
-      
-      clearInterval(processInterval);
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, status: 'completed', processProgress: 100 } : f
-      ));
-      loadProcessedFiles();
-      
+      }, 500);
+
+      setTimeout(() => {
+        clearInterval(processInterval);
+        setUploadedFiles(prev => prev.map(f => 
+          f.id === fileId ? { ...f, status: 'completed', processProgress: 100 } : f
+        ));
+        loadProcessedFiles();
+      }, 180000);
+
     } catch (err: any) {
       setUploadedFiles(prev => prev.map(f => 
         f.id === fileId ? { ...f, status: 'error' } : f
@@ -141,6 +154,18 @@ export default function Dashboard() {
       setError(err.message);
     }
   };
+
+  const handleSelectAllUploaded = (checked: boolean) => {
+    setSelectedUploadedFiles(checked ? uploadedFiles.map(f => f.id) : []);
+  };
+
+  const handleSelectAllProcessed = (checked: boolean) => {
+    setSelectedProcessedFiles(checked ? processedFiles.map(f => f.name) : []);
+  };
+
+  const handleDeleteSelectedProcessed = async () => {
+    if (selectedProcessedFiles.length === 0) return;
+    
     if (!confirm(`¿Eliminar ${selectedProcessedFiles.length} archivos?`)) return;
 
     try {
@@ -148,7 +173,7 @@ export default function Dashboard() {
       
       // Eliminar del backend
       for (const fileName of selectedProcessedFiles) {
-        await fetch(`/api/files/${encodeURIComponent(fileName)}`, {
+        await fetch(`${API_URL}/files/${encodeURIComponent(fileName)}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
