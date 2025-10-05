@@ -1,0 +1,22 @@
+export const runtime = "nodejs";
+
+export async function POST(req: Request) {
+  try {
+    const { input } = await req.json();
+    const model = process.env.REPLICATE_MODEL || "replicate/hello-world";
+
+    const r = await fetch("https://api.replicate.com/v1/predictions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model, input: input || { text: "Hola món!" } }),
+    });
+
+    if (!r.ok) return new Response(await r.text(), { status: 500 });
+    return new Response(await r.text(), { status: 200 });
+  } catch (e: any) {
+    return new Response(String(e), { status: 500 });
+  }
+}
