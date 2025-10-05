@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     
     doc.on('data', (chunk) => chunks.push(chunk));
     
-    const pdfPromise = new Promise((resolve) => {
+    const pdfPromise = new Promise<Buffer>((resolve) => {
       doc.on('end', () => {
         const pdfBuffer = Buffer.concat(chunks);
         resolve(pdfBuffer);
