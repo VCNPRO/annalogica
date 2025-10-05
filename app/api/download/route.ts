@@ -8,7 +8,7 @@ export async function POST(request: Request) {
 
     // Limpiar y formatear el texto
     const cleanText = text.replace(/[^\x20-\x7E\n\r\t\u00A0-\u00FF]/g, '').trim();
-    const lines = cleanText.split('\n').filter(line => line.trim());
+    const lines = cleanText.split('\n').filter((line: string) => line.trim());
 
     // Crear un PDF más robusto
     const generatePDFContent = () => {
