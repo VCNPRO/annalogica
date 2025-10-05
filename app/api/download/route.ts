@@ -22,9 +22,9 @@ ${'='.repeat(60)}
 
 `;
 
-      const formattedText = lines.map((line, index) => {
+      const formattedText = lines.map((line: string, index: number) => {
         // Dividir líneas largas en chunks de 80 caracteres
-        const chunks = [];
+        const chunks: string[] = [];
         let currentLine = line.trim();
 
         while (currentLine.length > 80) {
@@ -53,11 +53,11 @@ ${'='.repeat(60)}
 
     // Generar PDF manual mejorado
     const pdfLines = fullContent.split('\n');
-    const textCommands = [];
+    const textCommands: string[] = [];
     let yPosition = 750;
 
     // Añadir cada línea
-    pdfLines.forEach((line, index) => {
+    pdfLines.forEach((line: string, index: number) => {
       if (yPosition < 50) {
         // Nueva página si nos quedamos sin espacio
         yPosition = 750;
