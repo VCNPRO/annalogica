@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, HelpCircle } from 'lucide-react';
 
-const API_URL = 'https://p0qgpbsiyh.execute-api.eu-west-1.amazonaws.com';
+// Usando APIs locales de Replicate
 
 type FileStatus = 'uploading' | 'processing' | 'completed' | 'error';
 
@@ -50,7 +50,7 @@ export default function Dashboard() {
   const loadProcessedFiles = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/files`, {
+      const response = await fetch(`/api/files`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -66,7 +66,7 @@ export default function Dashboard() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+    
     const fileId = Date.now().toString();
     const newFile: UploadedFile = {
       id: fileId,
@@ -76,83 +76,68 @@ export default function Dashboard() {
       status: 'uploading',
       date: new Date().toISOString()
     };
-
+    
     setUploadedFiles(prev => [...prev, newFile]);
     setError(null);
-
+    
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Sesión expirada');
-
-      const uploadResponse = await fetch(`${API_URL}/upload`, {
+      
+      // Upload directo a Blob con progreso
+      const { upload } = await import('@vercel/blob/client');
+      
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
+        onUploadProgress: ({ percentage }) => {
+          setUploadedFiles(prev => prev.map(f => 
+            f.id === fileId ? { ...f, uploadProgress: percentage } : f
+          ));
+        },
+      });
+      
+      // Cambiar a procesando
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === fileId ? { ...f, status: 'processing', uploadProgress: 100 } : f
+      ));
+      
+      // Simular progreso mientras Replicate procesa
+      let processProgress = 0;
+      const processInterval = setInterval(() => {
+        processProgress += 8;
+        setUploadedFiles(prev => prev.map(f => 
+          f.id === fileId ? { ...f, processProgress: Math.min(processProgress, 90) } : f
+        ));
+        if (processProgress >= 90) clearInterval(processInterval);
+      }, 3000);
+      
+      // Procesar con Replicate
+      const filename = file.name.split('.')[0];
+      const processRes = await fetch('/api/process', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ filename: file.name })
+        body: JSON.stringify({ audioUrl: blob.url, filename })
       });
-
-      if (!uploadResponse.ok) throw new Error('Error al obtener URL');
-
-      const { uploadUrl, fields } = await uploadResponse.json();
-      const formData = new FormData();
-      Object.keys(fields).forEach(key => formData.append(key, fields[key]));
-      formData.append('file', file);
-
-      const xhr = new XMLHttpRequest();
       
-      xhr.upload.addEventListener('progress', (e) => {
-        if (e.lengthComputable) {
-          const progress = (e.loaded / e.total) * 100;
-          setUploadedFiles(prev => prev.map(f => 
-            f.id === fileId ? { ...f, uploadProgress: progress } : f
-          ));
-        }
-      });
-
-      await new Promise((resolve, reject) => {
-        xhr.addEventListener('load', () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve(xhr.response);
-          } else {
-            reject(new Error('Error al subir'));
-          }
-        });
-        
-        xhr.addEventListener('error', () => reject(new Error('Error de conexión')));
-        xhr.open('POST', uploadUrl);
-        xhr.send(formData);
-      });
-
+      if (!processRes.ok) throw new Error('Error al procesar');
+      
+      clearInterval(processInterval);
       setUploadedFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, status: 'processing', uploadProgress: 100 } : f
+        f.id === fileId ? { ...f, status: 'completed', processProgress: 100 } : f
       ));
-
-      let processProgress = 0;
-      const processInterval = setInterval(() => {
-        processProgress += 10;
-        setUploadedFiles(prev => prev.map(f => 
-          f.id === fileId ? { ...f, processProgress: Math.min(processProgress, 90) } : f
-        ));
-        
-        if (processProgress >= 90) clearInterval(processInterval);
-      }, 500);
-
-      setTimeout(() => {
-        clearInterval(processInterval);
-        setUploadedFiles(prev => prev.map(f => 
-          f.id === fileId ? { ...f, status: 'completed', processProgress: 100 } : f
-        ));
-        loadProcessedFiles();
-      }, 180000);
-
+      loadProcessedFiles();
+      
     } catch (err: any) {
       setUploadedFiles(prev => prev.map(f => 
         f.id === fileId ? { ...f, status: 'error' } : f
       ));
       setError(err.message);
     }
+  };
   };
 
   const handleSelectAllUploaded = (checked: boolean) => {
@@ -173,7 +158,7 @@ export default function Dashboard() {
       
       // Eliminar del backend
       for (const fileName of selectedProcessedFiles) {
-        await fetch(`${API_URL}/files/${encodeURIComponent(fileName)}`, {
+        await fetch(`/api/files/${encodeURIComponent(fileName)}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         });
