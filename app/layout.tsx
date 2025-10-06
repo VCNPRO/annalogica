@@ -13,7 +13,27 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        {children}
+        <footer className="bg-slate-900 text-slate-400 py-6 px-4 mt-auto border-t border-slate-800">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-sm">
+              © 2025 Annalogica. Todos los derechos reservados.
+            </p>
+            <div className="flex gap-6 text-sm">
+              <a href="/privacy" className="hover:text-white transition-colors">
+                Privacidad
+              </a>
+              <a href="/terms" className="hover:text-white transition-colors">
+                Términos
+              </a>
+              <a href="mailto:legal@annalogica.eu" className="hover:text-white transition-colors">
+                Contacto
+              </a>
+            </div>
+          </div>
+        </footer>
+      </body>
     </html>
   );
 }
