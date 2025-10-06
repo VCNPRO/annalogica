@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { verifyRequestAuth } from '@/lib/auth';
 import { uploadRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 import { logUpload } from '@/lib/usage-tracking';
@@ -29,75 +29,91 @@ const ALLOWED_VIDEO_TYPES = [
 ];
 
 export async function POST(request: Request): Promise<Response> {
+  const body = (await request.json()) as HandleUploadBody;
+
   try {
-    // SECURITY: Verify user authentication
-    const user = verifyRequestAuth(request);
-    if (!user) {
-      return Response.json(
-        { error: 'No autorizado. Debes iniciar sesión para subir archivos.' },
-        { status: 401 }
-      );
-    }
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
+        // Extract file info from clientPayload
+        const payload = typeof clientPayload === 'string'
+          ? JSON.parse(clientPayload)
+          : clientPayload;
 
-    // SECURITY: Rate limiting
-    const identifier = getClientIdentifier(request, user.userId);
-    const rateLimitResponse = await checkRateLimit(uploadRateLimit, identifier, 'archivos subidos');
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
+        const fileSize = payload?.size || 0;
+        const fileType = payload?.type || '';
+        const token = payload?.token || '';
 
-    // Get file from request
-    const formData = await request.formData();
-    const file = formData.get('file') as File;
+        // SECURITY: Verify user authentication from clientPayload
+        if (!token) {
+          throw new Error('No autorizado. Debes iniciar sesión para subir archivos.');
+        }
 
-    if (!file) {
-      return Response.json({ error: 'No se proporcionó ningún archivo' }, { status: 400 });
-    }
+        const { verifyToken } = await import('@/lib/auth');
+        const user = verifyToken(token);
 
-    // SECURITY: Validate file type
-    const isAudioAllowed = ALLOWED_AUDIO_TYPES.includes(file.type);
-    const isVideoAllowed = ALLOWED_VIDEO_TYPES.includes(file.type);
+        if (!user) {
+          throw new Error('No autorizado. Token inválido.');
+        }
 
-    if (!isAudioAllowed && !isVideoAllowed) {
-      return Response.json(
-        { error: 'Tipo de archivo no permitido. Solo se aceptan archivos de audio (MP3, WAV, OGG, M4A) o video (MP4, WEBM, MOV).' },
-        { status: 400 }
-      );
-    }
+        // SECURITY: Rate limiting
+        const identifier = getClientIdentifier(request, user.userId);
+        const rateLimitResponse = await checkRateLimit(uploadRateLimit, identifier, 'archivos subidos');
+        if (rateLimitResponse) {
+          throw new Error('Demasiados archivos subidos. Intenta de nuevo más tarde.');
+        }
 
-    // SECURITY: Validate file size
-    const maxSize = isAudioAllowed ? MAX_FILE_SIZE_AUDIO : MAX_FILE_SIZE_VIDEO;
-    if (file.size > maxSize) {
-      const maxSizeMB = maxSize / 1024 / 1024;
-      const fileType = isAudioAllowed ? 'audio' : 'video';
-      return Response.json(
-        { error: `El archivo ${fileType} es demasiado grande. Tamaño máximo: ${maxSizeMB} MB` },
-        { status: 400 }
-      );
-    }
+        // SECURITY: Validate file type first
+        const isAudioAllowed = ALLOWED_AUDIO_TYPES.includes(fileType);
+        const isVideoAllowed = ALLOWED_VIDEO_TYPES.includes(fileType);
 
-    // Upload to Vercel Blob
-    const blob = await put(file.name, file, {
-      access: 'public',
-      addRandomSuffix: true,
-      token: process.env.BLOB_READ_WRITE_TOKEN,
+        if (!isAudioAllowed && !isVideoAllowed) {
+          throw new Error(
+            'Tipo de archivo no permitido. Solo se aceptan archivos de audio (MP3, WAV, OGG, M4A) o video (MP4, WEBM, MOV).'
+          );
+        }
+
+        // SECURITY: Validate file size based on type
+        const maxSize = isAudioAllowed ? MAX_FILE_SIZE_AUDIO : MAX_FILE_SIZE_VIDEO;
+        if (fileSize > maxSize) {
+          const maxSizeMB = maxSize / 1024 / 1024;
+          const fileType = isAudioAllowed ? 'audio' : 'video';
+          throw new Error(
+            `El archivo ${fileType} es demasiado grande. Tamaño máximo: ${maxSizeMB} MB`
+          );
+        }
+
+        return {
+          allowedContentTypes: [...ALLOWED_AUDIO_TYPES, ...ALLOWED_VIDEO_TYPES],
+          addRandomSuffix: true,
+          maximumSizeInBytes: MAX_FILE_SIZE_VIDEO,
+          tokenPayload: JSON.stringify({
+            userId: user.userId,
+            email: user.email,
+            timestamp: new Date().toISOString(),
+          }),
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        console.log('Archivo subido exitosamente:', blob.url);
+
+        // TRACKING: Log upload
+        try {
+          const payload = JSON.parse(tokenPayload as string);
+          await logUpload(payload.userId, blob.size, blob.pathname, blob.contentType || 'unknown');
+        } catch (e) {
+          console.error('Failed to log upload:', e);
+        }
+      },
     });
 
-    console.log('Archivo subido exitosamente:', blob.url);
-
-    // TRACKING: Log upload
-    try {
-      await logUpload(user.userId, file.size, blob.pathname, file.type);
-    } catch (e) {
-      console.error('Failed to log upload:', e);
-    }
-
-    return Response.json({ url: blob.url });
+    return Response.json(jsonResponse);
   } catch (error) {
     console.error('Error en blob-upload:', error);
     return Response.json(
       { error: (error as Error).message },
-      { status: 500 }
+      { status: error instanceof Error && error.message.includes('autorizado') ? 401 : 400 }
     );
   }
 }

@@ -84,31 +84,25 @@ export default function Dashboard() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Sesión expirada');
 
-      // Upload directo a Blob con FormData
-      const formData = new FormData();
-      formData.append('file', file);
+      // Upload directo a Blob (bypass function size limit)
+      const { upload } = await import('@vercel/blob/client');
 
-      const uploadRes = await fetch('/api/blob-upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
+        clientPayload: JSON.stringify({
+          size: file.size,
+          type: file.type,
+          token: token, // Pass token in payload
+        }),
+        onUploadProgress: ({ percentage }) => {
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === fileId ? { ...f, uploadProgress: percentage } : f
+          ));
         },
-        body: formData
       });
 
-      if (!uploadRes.ok) {
-        const text = await uploadRes.text();
-        let errorMessage = 'Error al subir archivo';
-        try {
-          const errorData = JSON.parse(text);
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          errorMessage = text || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const { url: blobUrl } = await uploadRes.json();
+      const blobUrl = blob.url;
 
       // Actualizar progreso de upload
       setUploadedFiles(prev => prev.map(f =>
