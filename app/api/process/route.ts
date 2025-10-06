@@ -24,9 +24,15 @@ export async function POST(request: Request) {
       "openai/whisper:4d50797290df275329f202e48c76360b3f22b08d28c196cbc54600319435f8d2",
       { input: { audio: audioUrl, language: "Spanish" }}
     );
-    
+
+    // DEBUG: Log the complete output structure
+    console.log('Replicate Whisper output:', JSON.stringify(output, null, 2));
+
     const text = output.transcription || output.text || '';
     const segments = output.segments || [];
+
+    console.log('Extracted text length:', text.length);
+    console.log('Segments count:', segments.length);
     const baseName = filename.replace(/\.[^/.]+$/, '');
     
     const txtBlob = await put(`${baseName}.txt`, text, {
