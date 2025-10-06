@@ -83,39 +83,46 @@ export default function Dashboard() {
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Sesión expirada');
-      
-      // Upload directo a Blob con progreso
-      const { upload } = await import('@vercel/blob/client');
-      
-      // Generar nombre único para evitar conflictos
-      const timestamp = Date.now();
-      const uniqueFileName = `${timestamp}-${file.name}`;
 
-      const blob = await upload(uniqueFileName, file, {
-        access: 'public',
-        handleUploadUrl: '/api/blob-upload',
-        onUploadProgress: ({ percentage }) => {
-          setUploadedFiles(prev => prev.map(f =>
-            f.id === fileId ? { ...f, uploadProgress: percentage } : f
-          ));
+      // Upload directo a Blob con FormData
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadRes = await fetch('/api/blob-upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
         },
+        body: formData
       });
-      
-      // Cambiar a procesando
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, status: 'processing', uploadProgress: 100 } : f
+
+      if (!uploadRes.ok) {
+        const error = await uploadRes.json();
+        throw new Error(error.error || 'Error al subir archivo');
+      }
+
+      const { url: blobUrl } = await uploadRes.json();
+
+      // Actualizar progreso de upload
+      setUploadedFiles(prev => prev.map(f =>
+        f.id === fileId ? { ...f, uploadProgress: 100 } : f
       ));
-      
+
+      // Cambiar a procesando
+      setUploadedFiles(prev => prev.map(f =>
+        f.id === fileId ? { ...f, status: 'processing' } : f
+      ));
+
       // Simular progreso mientras Replicate procesa
       let processProgress = 0;
       const processInterval = setInterval(() => {
         processProgress += 8;
-        setUploadedFiles(prev => prev.map(f => 
+        setUploadedFiles(prev => prev.map(f =>
           f.id === fileId ? { ...f, processProgress: Math.min(processProgress, 90) } : f
         ));
         if (processProgress >= 90) clearInterval(processInterval);
       }, 3000);
-      
+
       // Procesar con Replicate
       const filename = file.name.split('.')[0];
       const processRes = await fetch('/api/process', {
@@ -124,13 +131,13 @@ export default function Dashboard() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ audioUrl: blob.url, filename })
+        body: JSON.stringify({ audioUrl: blobUrl, filename })
       });
-      
+
       if (!processRes.ok) throw new Error('Error al procesar');
-      
+
       clearInterval(processInterval);
-      setUploadedFiles(prev => prev.map(f => 
+      setUploadedFiles(prev => prev.map(f =>
         f.id === fileId ? { ...f, status: 'completed', processProgress: 100 } : f
       ));
       loadProcessedFiles();
