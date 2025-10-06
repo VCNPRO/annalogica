@@ -12,6 +12,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/pdfkit": "^0.17.3",
     "@vercel/blob": "^2.0.0",
+    "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.2",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.544.0",

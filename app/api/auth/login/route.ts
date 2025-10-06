@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { UserDB } from '@/lib/users-db';
+import { UserDB } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Buscar usuario
-    const user = UserDB.findByEmail(email);
+    const user = await UserDB.findByEmail(email);
     if (!user) {
       return NextResponse.json(
         { error: 'Credenciales inválidas' },
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
-        createdAt: user.createdAt
+        createdAt: user.created_at
       }
     });
 
