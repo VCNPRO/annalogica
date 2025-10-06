@@ -1,6 +1,7 @@
 import Replicate from "replicate";
 import { put } from '@vercel/blob';
 import { verifyRequestAuth } from '@/lib/auth';
+import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
@@ -9,6 +10,11 @@ export async function POST(request: Request) {
     if (!user) {
       return Response.json({ error: 'No autorizado' }, { status: 401 });
     }
+
+    // SECURITY: Rate limiting
+    const identifier = getClientIdentifier(request, user.userId);
+    const rateLimitResponse = await checkRateLimit(processRateLimit, identifier, 'transcripciones procesadas');
+    if (rateLimitResponse) return rateLimitResponse;
 
     const { audioUrl, filename } = await request.json();
     

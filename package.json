@@ -11,6 +11,8 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/pdfkit": "^0.17.3",
+    "@upstash/ratelimit": "^2.0.6",
+    "@upstash/redis": "^1.35.5",
     "@vercel/blob": "^2.0.0",
     "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.2",

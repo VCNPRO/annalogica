@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserDB } from '@/lib/db';
+import { loginRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
+    // SECURITY: Rate limiting
+    const identifier = getClientIdentifier(request);
+    const rateLimitResponse = await checkRateLimit(loginRateLimit, identifier, 'intentos de login');
+    if (rateLimitResponse) return rateLimitResponse;
+
     const { email, password } = await request.json();
 
     // Validaciones básicas

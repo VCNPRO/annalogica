@@ -1,5 +1,6 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { verifyRequestAuth } from '@/lib/auth';
+import { uploadRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 
 // File size limits (in bytes)
 const MAX_FILE_SIZE_AUDIO = 500 * 1024 * 1024; // 500 MB - ~8 horas podcast
@@ -38,6 +39,13 @@ export async function POST(request: Request): Promise<Response> {
         const user = verifyRequestAuth(request);
         if (!user) {
           throw new Error('No autorizado. Debes iniciar sesión para subir archivos.');
+        }
+
+        // SECURITY: Rate limiting
+        const identifier = getClientIdentifier(request, user.userId);
+        const rateLimitResponse = await checkRateLimit(uploadRateLimit, identifier, 'archivos subidos');
+        if (rateLimitResponse) {
+          throw new Error('Demasiados archivos subidos. Intenta de nuevo más tarde.');
         }
 
         // Extract file info from clientPayload
