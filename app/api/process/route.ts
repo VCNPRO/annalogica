@@ -32,7 +32,8 @@ export async function POST(request: Request) {
     const txtBlob = await put(`${baseName}.txt`, text, {
       access: 'public',
       contentType: 'text/plain; charset=utf-8',
-      token: process.env.BLOB_READ_WRITE_TOKEN
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      addRandomSuffix: true
     });
     
     let srt = '';
@@ -44,7 +45,8 @@ export async function POST(request: Request) {
     const srtBlob = await put(`${baseName}.srt`, srt, {
       access: 'public',
       contentType: 'text/plain; charset=utf-8',
-      token: process.env.BLOB_READ_WRITE_TOKEN
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      addRandomSuffix: true
     });
 
     // TRACKING: Log transcription
@@ -71,7 +73,8 @@ export async function POST(request: Request) {
         const summaryBlob = await put(`${baseName}-summary.txt`, summary, {
           access: 'public',
           contentType: 'text/plain; charset=utf-8',
-          token: process.env.BLOB_READ_WRITE_TOKEN
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+          addRandomSuffix: true
         });
         summaryUrl = summaryBlob.url;
 
