@@ -135,7 +135,17 @@ export default function Dashboard() {
         body: JSON.stringify({ audioUrl: blobUrl, filename })
       });
 
-      if (!processRes.ok) throw new Error('Error al procesar');
+      if (!processRes.ok) {
+        const text = await processRes.text();
+        let errorMessage = 'Error al procesar';
+        try {
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = text || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
 
       clearInterval(processInterval);
       setUploadedFiles(prev => prev.map(f =>
