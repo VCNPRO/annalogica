@@ -97,8 +97,15 @@ export default function Dashboard() {
       });
 
       if (!uploadRes.ok) {
-        const error = await uploadRes.json();
-        throw new Error(error.error || 'Error al subir archivo');
+        const text = await uploadRes.text();
+        let errorMessage = 'Error al subir archivo';
+        try {
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = text || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const { url: blobUrl } = await uploadRes.json();
