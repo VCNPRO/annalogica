@@ -2,6 +2,7 @@ import Replicate from "replicate";
 import { put } from '@vercel/blob';
 import { verifyRequestAuth } from '@/lib/auth';
 import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
+import { logTranscription, logSummary } from '@/lib/usage-tracking';
 
 export async function POST(request: Request) {
   try {
@@ -39,11 +40,14 @@ export async function POST(request: Request) {
       const end = formatTime(seg.end);
       srt += `${i + 1}\n${start} --> ${end}\n${seg.text.trim()}\n\n`;
     });
-    const srtBlob = await put(`${baseName}.srt`, srt, { 
+    const srtBlob = await put(`${baseName}.srt`, srt, {
       access: 'public',
       contentType: 'text/plain; charset=utf-8'
     });
-    
+
+    // TRACKING: Log transcription
+    await logTranscription(user.userId, filename);
+
     let summaryUrl = null;
     if (text.length > 100) {
       try {
@@ -62,11 +66,16 @@ export async function POST(request: Request) {
         });
         const summaryData = await summaryRes.json();
         const summary = summaryData.content[0].text;
-        const summaryBlob = await put(`${baseName}-summary.txt`, summary, { 
+        const summaryBlob = await put(`${baseName}-summary.txt`, summary, {
           access: 'public',
           contentType: 'text/plain; charset=utf-8'
         });
         summaryUrl = summaryBlob.url;
+
+        // TRACKING: Log summary generation
+        const tokensInput = text.slice(0, 8000).length / 4; // Rough estimate: 4 chars = 1 token
+        const tokensOutput = summary.length / 4;
+        await logSummary(user.userId, Math.ceil(tokensInput), Math.ceil(tokensOutput), 'sonnet');
       } catch (e) {
         console.log('Summary failed:', e);
       }

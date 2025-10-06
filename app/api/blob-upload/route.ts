@@ -1,6 +1,7 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { verifyRequestAuth } from '@/lib/auth';
 import { uploadRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
+import { logUpload } from '@/lib/usage-tracking';
 
 // File size limits (in bytes)
 const MAX_FILE_SIZE_AUDIO = 500 * 1024 * 1024; // 500 MB - ~8 horas podcast
@@ -94,9 +95,15 @@ export async function POST(request: Request): Promise<Response> {
         console.log('Archivo subido exitosamente:', blob.url);
         console.log('Usuario:', tokenPayload);
 
-        // TODO: Save to transcriptions table in database
-        // const payload = JSON.parse(tokenPayload);
-        // await TranscriptionDB.create(payload.userId, blob.pathname, blob.url, null, null, null);
+        // TRACKING: Log upload
+        try {
+          const payload = JSON.parse(tokenPayload as string);
+          // Blob doesn't have size in the response, we need to get it from metadata
+          // For now, log with 0 and update when we know the size
+          await logUpload(payload.userId, 0, blob.pathname, blob.contentType || 'unknown');
+        } catch (e) {
+          console.error('Failed to log upload:', e);
+        }
       },
     });
 
