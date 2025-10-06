@@ -1,9 +1,13 @@
 import { list, del } from '@vercel/blob';
+import { verifyRequestAuth } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) return Response.json({ error: 'No autorizado' }, { status: 401 });
+    // SECURITY: Verify authentication
+    const user = verifyRequestAuth(request);
+    if (!user) {
+      return Response.json({ error: 'No autorizado' }, { status: 401 });
+    }
     
     const { blobs } = await list();
     
@@ -34,8 +38,11 @@ export async function GET(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!token) return Response.json({ error: 'No autorizado' }, { status: 401 });
+    // SECURITY: Verify authentication
+    const user = verifyRequestAuth(request);
+    if (!user) {
+      return Response.json({ error: 'No autorizado' }, { status: 401 });
+    }
     
     const { filename } = await request.json();
     const { blobs } = await list();

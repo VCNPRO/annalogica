@@ -1,12 +1,16 @@
 import Replicate from "replicate";
 import { put } from '@vercel/blob';
+import { verifyRequestAuth } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
+    // SECURITY: Verify authentication
+    const user = verifyRequestAuth(request);
+    if (!user) {
+      return Response.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
     const { audioUrl, filename } = await request.json();
-    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
-    
-    if (!token) return Response.json({ error: 'No autorizado' }, { status: 401 });
     
     const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
     const output: any = await replicate.run(
