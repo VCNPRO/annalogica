@@ -29,9 +29,10 @@ export async function POST(request: Request) {
     const segments = output.segments || [];
     const baseName = filename.replace(/\.[^/.]+$/, '');
     
-    const txtBlob = await put(`${baseName}.txt`, text, { 
+    const txtBlob = await put(`${baseName}.txt`, text, {
       access: 'public',
-      contentType: 'text/plain; charset=utf-8'
+      contentType: 'text/plain; charset=utf-8',
+      token: process.env.BLOB_READ_WRITE_TOKEN
     });
     
     let srt = '';
@@ -42,7 +43,8 @@ export async function POST(request: Request) {
     });
     const srtBlob = await put(`${baseName}.srt`, srt, {
       access: 'public',
-      contentType: 'text/plain; charset=utf-8'
+      contentType: 'text/plain; charset=utf-8',
+      token: process.env.BLOB_READ_WRITE_TOKEN
     });
 
     // TRACKING: Log transcription
@@ -68,7 +70,8 @@ export async function POST(request: Request) {
         const summary = summaryData.content[0].text;
         const summaryBlob = await put(`${baseName}-summary.txt`, summary, {
           access: 'public',
-          contentType: 'text/plain; charset=utf-8'
+          contentType: 'text/plain; charset=utf-8',
+          token: process.env.BLOB_READ_WRITE_TOKEN
         });
         summaryUrl = summaryBlob.url;
 
