@@ -87,7 +87,12 @@ export default function Dashboard() {
       // Upload directo a Blob (bypass function size limit)
       const { upload } = await import('@vercel/blob/client');
 
-      const blob = await upload(file.name, file, {
+      // Generate unique filename to avoid conflicts
+      const timestamp = Date.now();
+      const randomSuffix = Math.random().toString(36).substring(2, 8);
+      const uniqueFilename = `${timestamp}-${randomSuffix}-${file.name}`;
+
+      const blob = await upload(uniqueFilename, file, {
         access: 'public',
         handleUploadUrl: '/api/blob-upload',
         clientPayload: JSON.stringify({
