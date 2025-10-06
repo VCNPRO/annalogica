@@ -91,6 +91,7 @@ export async function POST(request: Request): Promise<Response> {
           tokenPayload: JSON.stringify({
             userId: user.userId,
             email: user.email,
+            fileSize: fileSize,
             timestamp: new Date().toISOString(),
           }),
         };
@@ -101,7 +102,8 @@ export async function POST(request: Request): Promise<Response> {
         // TRACKING: Log upload
         try {
           const payload = JSON.parse(tokenPayload as string);
-          await logUpload(payload.userId, blob.size, blob.pathname, blob.contentType || 'unknown');
+          // Note: blob.size doesn't exist in PutBlobResult, we'll track size from clientPayload if needed
+          await logUpload(payload.userId, payload.fileSize || 0, blob.pathname, blob.contentType || 'unknown');
         } catch (e) {
           console.error('Failed to log upload:', e);
         }
