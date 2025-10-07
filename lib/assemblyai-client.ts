@@ -56,8 +56,8 @@ export async function transcribeAudio(
     speaker_labels: options.speakerLabels ?? true, // Enable by default
     dual_channel: options.dualChannel ?? false,
 
-    // Enable key phrases (included in base cost)
-    auto_highlights: true,
+    // Enable key phrases only for English (not available in Spanish)
+    auto_highlights: options.language === 'en' || options.language === 'auto',
   });
 
   console.log('[AssemblyAI] Transcription completed:', transcript.id);
