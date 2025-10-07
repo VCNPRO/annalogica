@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     // Wait for PDF generation
     const pdfBuffer = await pdfPromise;
 
-    return new Response(pdfBuffer, {
+    return new Response(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf"`,
