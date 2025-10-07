@@ -1,3 +1,5 @@
+import PDFDocument from 'pdfkit';
+
 export async function GET() {
   return Response.json({ error: 'Use POST method' }, { status: 405 });
 }
@@ -10,119 +12,55 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Faltan datos requeridos' }, { status: 400 });
     }
 
-    // Crear contenido de texto simple y completo
-    const textContent = `TRANSCRIPCIÓN DE AUDIO
-${'='.repeat(60)}
-
-Archivo: ${filename}
-Fecha: ${new Date().toLocaleDateString('es-ES')}
-Hora: ${new Date().toLocaleTimeString('es-ES')}
-
-CONTENIDO:
-${'='.repeat(60)}
-
-${text}
-
-${'='.repeat(60)}
-Generado por Annalogica
-`;
-
-    // Para PDF, usar el contenido completo sin truncar
-    const pdfContent = textContent;
-    const pdfLines = pdfContent.split('\n');
-    const textCommands: string[] = [];
-    let yPosition = 750;
-
-    // Procesar cada línea sin cortarla
-    pdfLines.forEach((line: string, index: number) => {
-      if (yPosition < 50) {
-        // Nueva página si nos quedamos sin espacio
-        yPosition = 750;
-        textCommands.push('ET\\nBT\\n/F1 11 Tf\\n50 750 Td');
-      }
-
-      // Escapar caracteres especiales pero NO cortar la línea
-      const escapedLine = line.replace(/[()\\]/g, '\\\\$&');
-      textCommands.push(`(${escapedLine}) Tj\\n0 -15 Td`);
-      yPosition -= 15;
+    // Create PDF using PDFKit
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 50, bottom: 50, left: 50, right: 50 }
     });
 
-    const streamContent = `BT
-/F1 11 Tf
-50 750 Td
-${textCommands.join('\\n')}
-ET`;
+    // Buffer to collect PDF chunks
+    const chunks: Buffer[] = [];
 
-    const pdfTemplate = `%PDF-1.4
-1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
+    doc.on('data', (chunk) => chunks.push(chunk));
 
-2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj
+    const pdfPromise = new Promise<Buffer>((resolve) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+    });
 
-3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/MediaBox [0 0 612 792]
-/Contents 4 0 R
-/Resources <<
-  /Font <<
-    /F1 5 0 R
-  >>
->>
->>
-endobj
+    // Add header
+    doc.fontSize(16).font('Helvetica-Bold').text('TRANSCRIPCIÓN DE AUDIO', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(10).font('Helvetica').text('='.repeat(80));
+    doc.moveDown();
 
-4 0 obj
-<<
-/Length ${streamContent.length}
->>
-stream
-${streamContent}
-endstream
-endobj
+    // Add metadata
+    doc.fontSize(11).text(`Archivo: ${filename}`);
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`);
+    doc.text(`Hora: ${new Date().toLocaleTimeString('es-ES')}`);
+    doc.moveDown();
+    doc.text('='.repeat(80));
+    doc.moveDown();
 
-5 0 obj
-<<
-/Type /Font
-/Subtype /Type1
-/BaseFont /Helvetica
->>
-endobj
+    // Add content
+    doc.fontSize(10).text('CONTENIDO:', { underline: true });
+    doc.moveDown();
+    doc.fontSize(10).text(text, { align: 'left' });
+    doc.moveDown(2);
 
-xref
-0 6
-0000000000 65535 f
-0000000010 00000 n
-0000000079 00000 n
-0000000136 00000 n
-0000000271 00000 n
-0000000400 00000 n
-trailer
-<<
-/Size 6
-/Root 1 0 R
->>
-startxref
-500
-%%EOF`;
+    // Add footer
+    doc.text('='.repeat(80));
+    doc.fontSize(9).text('Generado por Annalogica', { align: 'center' });
 
-    const pdfBuffer = Buffer.from(pdfTemplate, 'binary');
+    // Finalize PDF
+    doc.end();
+
+    // Wait for PDF generation
+    const pdfBuffer = await pdfPromise;
 
     return new Response(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename.replace(/\\.[^/.]+$/, '')}-transcripcion.pdf"`,
+        'Content-Disposition': `attachment; filename="${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf"`,
         'Content-Length': pdfBuffer.length.toString(),
         'Cache-Control': 'no-cache, no-store, must-revalidate'
       }
@@ -130,36 +68,6 @@ startxref
 
   } catch (error: any) {
     console.error('Error generando PDF:', error);
-
-    // Fallback: archivo de texto
-    try {
-      const { text, filename } = await request.json();
-      const cleanFilename = filename?.replace(/\\.[^/.]+$/, '') || 'transcripcion';
-
-      const textContent = `TRANSCRIPCIÓN DE AUDIO
-${'='.repeat(50)}
-
-Archivo: ${filename || 'Sin nombre'}
-Fecha: ${new Date().toLocaleDateString('es-ES')}
-Hora: ${new Date().toLocaleTimeString('es-ES')}
-
-CONTENIDO:
-${'='.repeat(50)}
-
-${text || 'Sin contenido disponible'}
-
-${'='.repeat(50)}
-Generado por Annalogica
-`;
-
-      return new Response(textContent, {
-        headers: {
-          'Content-Type': 'text/plain; charset=utf-8',
-          'Content-Disposition': `attachment; filename="${cleanFilename}-transcripcion.txt"`
-        }
-      });
-    } catch (fallbackError) {
-      return Response.json({ error: 'Error generando archivo' }, { status: 500 });
-    }
+    return Response.json({ error: 'Error generando PDF: ' + error.message }, { status: 500 });
   }
 }
