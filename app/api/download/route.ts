@@ -1,3 +1,7 @@
+export async function GET() {
+  return Response.json({ error: 'Use POST method' }, { status: 405 });
+}
+
 export async function POST(request: Request) {
   try {
     const { text, filename } = await request.json();
