@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, HelpCircle } from 'lucide-react';
 
-// Usando APIs locales de Replicate
+// AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
 type FileStatus = 'uploading' | 'processing' | 'completed' | 'error';
 
@@ -119,18 +119,8 @@ export default function Dashboard() {
         f.id === fileId ? { ...f, status: 'processing' } : f
       ));
 
-      // Simular progreso mientras Replicate procesa
-      let processProgress = 0;
-      const processInterval = setInterval(() => {
-        processProgress += 8;
-        setUploadedFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, processProgress: Math.min(processProgress, 90) } : f
-        ));
-        if (processProgress >= 90) clearInterval(processInterval);
-      }, 3000);
-
-      // Procesar con Replicate
-      const filename = file.name.split('.')[0];
+      // Iniciar procesamiento asíncrono con AssemblyAI
+      const filename = file.name;
       const processRes = await fetch('/api/process', {
         method: 'POST',
         headers: {
@@ -152,11 +142,58 @@ export default function Dashboard() {
         throw new Error(errorMessage);
       }
 
-      clearInterval(processInterval);
-      setUploadedFiles(prev => prev.map(f =>
-        f.id === fileId ? { ...f, status: 'completed', processProgress: 100 } : f
-      ));
-      loadProcessedFiles();
+      const { jobId } = await processRes.json();
+      console.log('[Upload] Job created:', jobId);
+
+      // Polling del estado del job cada 3 segundos
+      let processProgress = 0;
+      const pollInterval = setInterval(async () => {
+        try {
+          const jobRes = await fetch(`/api/jobs/${jobId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (!jobRes.ok) {
+            clearInterval(pollInterval);
+            throw new Error('Error al verificar estado del job');
+          }
+
+          const { job } = await jobRes.json();
+          console.log('[Upload] Job status:', job.status, job);
+
+          // Actualizar progreso estimado
+          if (job.status === 'processing') {
+            processProgress = Math.min(processProgress + 15, 85);
+            setUploadedFiles(prev => prev.map(f =>
+              f.id === fileId ? { ...f, processProgress } : f
+            ));
+          }
+
+          // Job completado
+          if (job.status === 'completed') {
+            clearInterval(pollInterval);
+            setUploadedFiles(prev => prev.map(f =>
+              f.id === fileId ? { ...f, status: 'completed', processProgress: 100 } : f
+            ));
+            loadProcessedFiles();
+          }
+
+          // Job falló
+          if (job.status === 'failed') {
+            clearInterval(pollInterval);
+            throw new Error(job.errorMessage || 'Error al procesar audio');
+          }
+        } catch (pollError: any) {
+          console.error('[Upload] Polling error:', pollError);
+          clearInterval(pollInterval);
+          throw pollError;
+        }
+      }, 3000); // Poll cada 3 segundos
+
+      // Timeout de seguridad (5 minutos)
+      setTimeout(() => {
+        clearInterval(pollInterval);
+      }, 300000);
       
     } catch (err: any) {
       setUploadedFiles(prev => prev.map(f => 

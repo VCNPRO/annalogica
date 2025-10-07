@@ -105,15 +105,23 @@ export default function Results() {
                 <div key={file.name} className={`px-6 py-4 ${border} border-b hover:bg-zinc-800 transition-colors`}>
                   <div className="flex items-center justify-between gap-4">
                     <span className={`text-sm ${textPrimary} truncate flex-1`}>{file.name}</span>
-                    <div className="flex gap-2 text-xs">
-                      <button onClick={() => downloadFile(file.txtUrl)} className="text-blue-500 hover:underline">TXT</button>
-                      <span className={textSecondary}>|</span>
-                      <button onClick={() => downloadFile(file.srtUrl)} className="text-green-500 hover:underline">SRT</button>
-                      <span className={textSecondary}>|</span>
-                      <button onClick={() => downloadPDF(file.txtUrl, file.name)} className="text-purple-500 hover:underline">PDF</button>
-                      {file.summaryUrl && <><span className={textSecondary}>|</span><button onClick={() => downloadFile(file.summaryUrl)} className="text-amber-500 hover:underline">Resumen</button></>}
-                      <span className={textSecondary}>|</span>
-                      <button onClick={() => deleteFile(file.name)} className="text-red-500 hover:underline">Eliminar</button>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2 text-xs">
+                        <button onClick={() => downloadFile(file.txtUrl)} className="text-blue-500 hover:underline">TXT</button>
+                        <span className={textSecondary}>|</span>
+                        <button onClick={() => downloadFile(file.srtUrl)} className="text-green-500 hover:underline">SRT</button>
+                        <span className={textSecondary}>|</span>
+                        {file.vttUrl && <><button onClick={() => downloadFile(file.vttUrl)} className="text-cyan-500 hover:underline">VTT</button><span className={textSecondary}>|</span></>}
+                        <button onClick={() => downloadPDF(file.txtUrl, file.name)} className="text-purple-500 hover:underline">PDF</button>
+                        {file.summaryUrl && <><span className={textSecondary}>|</span><button onClick={() => downloadFile(file.summaryUrl)} className="text-amber-500 hover:underline">Resumen</button></>}
+                        <span className={textSecondary}>|</span>
+                        <button onClick={() => deleteFile(file.name)} className="text-red-500 hover:underline">Eliminar</button>
+                      </div>
+                      {file.audioDuration && (
+                        <span className={`text-xs ${textSecondary}`}>
+                          Duración: {Math.floor(file.audioDuration / 60)}:{String(file.audioDuration % 60).padStart(2, '0')} min
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

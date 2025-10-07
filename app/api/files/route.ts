@@ -1,5 +1,6 @@
 import { list, del } from '@vercel/blob';
 import { verifyRequestAuth } from '@/lib/auth';
+import { TranscriptionJobDB } from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
@@ -8,30 +9,29 @@ export async function GET(request: Request) {
     if (!user) {
       return Response.json({ error: 'No autorizado' }, { status: 401 });
     }
-    
-    const { blobs } = await list();
-    
-    // Agrupar por transcripción
-    const grouped: any = {};
-    blobs.forEach(blob => {
-      const filename = blob.pathname;
-      if (filename.endsWith('.txt') && !filename.includes('summary')) {
-        const baseName = filename.replace('.txt', '');
-        grouped[baseName] = {
-          name: baseName,
-          date: blob.uploadedAt,
-          txtUrl: blob.url,
-          srtUrl: blobs.find(b => b.pathname === `${baseName}.srt`)?.url,
-          summaryUrl: blobs.find(b => b.pathname === `${baseName}-summary.txt`)?.url,
-          audioUrl: blobs.find(b => b.pathname.startsWith(baseName) && !b.pathname.includes('.txt') && !b.pathname.includes('.srt'))?.url
-        };
-      }
-    });
-    
-    const files = Object.values(grouped);
+
+    // Get completed jobs from database
+    const jobs = await TranscriptionJobDB.findByUserId(user.userId);
+
+    // Filter only completed jobs and format for frontend
+    const files = jobs
+      .filter(job => job.status === 'completed')
+      .map(job => ({
+        name: job.filename.replace(/\.[^/.]+$/, ''), // Remove extension
+        date: job.completed_at || job.created_at,
+        txtUrl: job.txt_url,
+        srtUrl: job.srt_url,
+        vttUrl: job.vtt_url, // NEW: VTT format
+        summaryUrl: job.summary_url,
+        audioUrl: job.audio_url,
+        audioDuration: job.audio_duration_seconds,
+        jobId: job.id
+      }));
+
     return Response.json({ files });
-    
+
   } catch (error: any) {
+    console.error('[API Files] Error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 }
