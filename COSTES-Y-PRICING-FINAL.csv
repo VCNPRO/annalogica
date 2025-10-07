@@ -1,0 +1,249 @@
+"=== ANNALOGICA - COSTES Y PRICING DEFINITIVOS ===",,,,,,
+"",,,,,,
+"PARTE 1: TUS COSTES REALES (con AssemblyAI)",,,,,,
+"",,,,,,
+"Concepto","Por Hora","Por 30 Min","Por Minuto","Necesario"
+"AssemblyAI - Transcripción Base","$0.15","$0.075","$0.0025","✅ Obligatorio"
+"AssemblyAI - Speaker Labels","GRATIS","$0","$0","✅ Incluido gratis"
+"AssemblyAI - SRT/VTT","GRATIS","$0","$0","✅ Incluido gratis"
+"AssemblyAI - Key Phrases","$0.01","$0.005","$0.00017","✅ Recomendado"
+"Claude - Resumen + Tags","(fijo)","$0.024","$0.0008","✅ Recomendado"
+"","","","",""
+"TOTAL POR AUDIO 30 MIN:","","$0.104","$0.00347",""
+"",,,,,,
+"=== RESUMEN: COSTE 1 TRANSCRIPCIÓN 30 MINUTOS ===",,,,,,
+"Tu coste total:","$0.104",,,"(10.4 centavos de dólar)"
+"Coste por minuto:","$0.00347",,,"(0.35 centavos por minuto)"
+"",,,,,,
+"",,,,,,
+"PARTE 2: PRECIOS EN EL MERCADO (Competencia 2025)",,,,,,
+"",,,,,,
+"MERCADO B2C (Consumidores)",,,,,,
+"Servicio","Modelo","Coste/Minuto","Audio 30min","Plan Mensual"
+"Rev.com (IA)","Pay-per-use","$0.25","$7.50","-"
+"Otter.ai Basic","Suscripción","~$0.10","$3","$9.99/mes (300 min)"
+"Descript Creator","Suscripción","~$0.14","$4.20","$12/mes (600 min)"
+"Trint","Suscripción","~$0.16","$4.80","$54/mes (420 min)"
+"","","","",""
+"PROMEDIO MERCADO B2C:","","$0.15-0.25","$4.50-7.50",""
+"",,,,,,
+"MERCADO B2B PROFESIONAL",,,,,,
+"Servicio","Tipo","Coste/Minuto","Audio 30min","Notas"
+"Rev.com (Humano)","Manual","$1.50","$45","Transcripción humana 99%"
+"Hispeo España","Profesional","$2.70 (€2.50)","$81 (€75)","Verbatim + timestamps"
+"Freelance","Variable","$2.00-3.00","$60-90","Depende calidad"
+"Otter Business","Corporativo","~$0.20","$6","Plan empresarial"
+"","","","",""
+"PROMEDIO B2B AUTOMÁTICO:","","$0.20-0.30","$6-9",""
+"PROMEDIO B2B MANUAL:","","$1.50-2.50","$45-75",""
+"",,,,,,
+"",,,,,,
+"PARTE 3: ANÁLISIS DE MARGEN",,,,,,
+"",,,,,,
+"Escenario","Precio al Usuario","Tu Coste","Margen $","Margen %"
+"Pay-per-use Individual","$5.00","$0.104","$4.90","97.9%"
+"Pay-per-use Competitivo","$7.00","$0.104","$6.90","98.5%"
+"Plan Basic (15 audios/mes)","$9.99","$1.56","$8.43","84.4%"
+"Plan Pro (50 audios/mes)","$24.99","$5.20","$19.79","79.2%"
+"Plan Business (250 audios/mes)","$99.00","$26.00","$73.00","73.7%"
+"",,,,,,
+"",,,,,,
+"PARTE 4: ESTRATEGIA DE PRICING RECOMENDADA",,,,,,
+"",,,,,,
+"=== PLAN FREE (Freemium) ===",,,,,,
+"Precio","GRATIS",,,,
+"Transcripciones/mes","1 audio (máx 15 min)",,,,
+"Minutos incluidos","15 min/mes",,,,
+"","","","",""
+"Funcionalidades:","","","",""
+"✅ Transcripción básica","","","",""
+"✅ Speaker labels (A, B, C)","","","",""
+"✅ Descarga TXT, SRT","","","",""
+"❌ Sin resumen IA","","","",""
+"❌ Sin tags","","","",""
+"❌ Sin PDF","","","",""
+"","","","",""
+"Tu coste/usuario:","$0.052/mes",,,,
+"Objetivo:","Captar usuarios, probar servicio",,,,
+"Límite:","500 usuarios máx (coste $26/mes)",,,,
+"",,,,,,
+"",,,,,,
+"=== PLAN BASIC - $9.99/mes ===",,,,,,
+"Precio","$9.99/mes (o $99/año)",,,,
+"Transcripciones/mes","15 audios (hasta 30 min c/u)",,,,
+"Minutos incluidos","450 min/mes",,,,
+"","","","",""
+"Funcionalidades:","","","",""
+"✅ Transcripción completa","","","",""
+"✅ Speaker labels automáticos (A, B, C)","","","",""
+"✅ Descarga TXT, SRT, VTT, PDF","","","",""
+"✅ Resumen con IA (Claude)","","","",""
+"✅ Tags automáticos (5-7 por audio)","","","",""
+"✅ Key phrases","","","",""
+"✅ Sin anuncios","","","",""
+"✅ Soporte email (48h)","","","",""
+"","","","",""
+"Tu coste/usuario:","$1.56/mes",,,,
+"Margen:","$8.43 (84.4%)",,,,
+"","","","",""
+"Comparación:","","","",""
+"vs Otter Basic","$9.99/mes - 300 min","TÚ OFRECES MÁS (+50% minutos)",,
+"vs Descript","$12/mes - 600 min","TÚ MÁS BARATO",,
+"vs Trint","$54/mes - 420 min","TÚ 5x MÁS BARATO",,
+"",,,,,,
+"",,,,,,
+"=== PLAN PRO - $24.99/mes ===",,,,,,
+"Precio","$24.99/mes (o $249/año)",,,,
+"Transcripciones/mes","50 audios (hasta 60 min c/u)",,,,
+"Minutos incluidos","3,000 min/mes",,,,
+"","","","",""
+"Funcionalidades:","","","",""
+"✅ Todo lo del plan Basic","","","",""
+"✅ Exportación WORD (.docx)","","","",""
+"✅ Identificación entidades (nombres, lugares)","","","",""
+"✅ Edición nombres de speakers","","","",""
+"✅ Prioridad en procesamiento","","","",""
+"✅ Soporte prioritario (24h)","","","",""
+"✅ Historial ilimitado","","","",""
+"✅ API access (opcional)","","","",""
+"","","","",""
+"Tu coste/usuario:","$5.20/mes",,,,
+"Margen:","$19.79 (79.2%)",,,,
+"","","","",""
+"Comparación:","","","",""
+"vs Otter Pro","$20/mes - 1,200 min","TÚ OFRECES 2.5x MÁS MINUTOS",,
+"vs Descript Pro","$24/mes - 1,800 min","MISMO PRECIO, MÁS MINUTOS",,
+"vs Trint","$54/mes - 420 min","TÚ 2x MÁS BARATO + 7x MÁS MINUTOS",,
+"",,,,,,
+"",,,,,,
+"PARTE 5: PROYECCIÓN DE INGRESOS",,,,,,
+"",,,,,,
+"=== ESCENARIO CONSERVADOR (6 meses) ===",,,,,,
+"Plan","Usuarios","Precio","Revenue Mensual","Tu Coste","Margen"
+"Free","200","$0","$0","$10.40","($10.40)"
+"Basic","80","$9.99","$799.20","$124.80","$674.40"
+"Pro","15","$24.99","$374.85","$78.00","$296.85"
+"","","","","",""
+"TOTALES:","295 usuarios","","$1,174.05/mes","$213.20","$960.85"
+"+ Infraestructura (Vercel, etc.):","","","","$30",""
+"","","","","",""
+"MARGEN NETO:","","","","","$930.85/mes"
+"Margen %:","","","","","79.3%"
+"REVENUE ANUAL:","","","$14,089","",""
+"BENEFICIO ANUAL:","","","","","$11,170"
+"",,,,,,
+"",,,,,,
+"=== ESCENARIO OPTIMISTA (12 meses) ===",,,,,,
+"Plan","Usuarios","Precio","Revenue Mensual","Tu Coste","Margen"
+"Free","500","$0","$0","$26.00","($26.00)"
+"Basic","200","$9.99","$1,998.00","$312.00","$1,686.00"
+"Pro","50","$24.99","$1,249.50","$260.00","$989.50"
+"Business","5","$99.00","$495.00","$130.00","$365.00"
+"","","","","",""
+"TOTALES:","755 usuarios","","$3,742.50/mes","$728.00","$3,014.50"
+"+ Infraestructura (Vercel Pro):","","","","$80",""
+"","","","","",""
+"MARGEN NETO:","","","","","$2,934.50/mes"
+"Margen %:","","","","","78.4%"
+"REVENUE ANUAL:","","","$44,910","",""
+"BENEFICIO ANUAL:","","","","","$35,214"
+"",,,,,,
+"",,,,,,
+"PARTE 6: COMPARATIVA FINAL - TÚ vs COMPETENCIA",,,,,,
+"",,,,,,
+"Proveedor","Plan Similar","Precio/Mes","Minutos/Mes","Coste/Min","Features Extras"
+"","","","","",""
+"🏆 ANNALOGICA Basic","Basic","$9.99","450 min","$0.022","✅ Resumen IA, Tags, PDF, Speaker labels"
+"Otter.ai Basic","Basic","$9.99","300 min","$0.033","❌ Sin resumen, Sin PDF"
+"Descript Creator","Creator","$12.00","600 min","$0.020","✅ Video editing (no necesitas)"
+"Trint","Standard","$54.00","420 min","$0.129","⚠️ 5x más caro"
+"","","","","",""
+"🏆 ANNALOGICA Pro","Pro","$24.99","3,000 min","$0.008","✅ Entities, WORD, API"
+"Otter.ai Pro","Pro","$20.00","1,200 min","$0.017","❌ Menos minutos"
+"Descript Pro","Pro","$24.00","1,800 min","$0.013","✅ Similar pero menos minutos"
+"Trint","Premium","$54.00","420 min","$0.129","⚠️ 2x más caro, 7x menos minutos"
+"",,,,,,
+"=== TU VENTAJA COMPETITIVA ===",,,,,,
+"","","","",""
+"✅ MÁS MINUTOS que Otter al mismo precio",,,,,,
+"✅ MÁS BARATO que Descript con más features",,,,,,
+"✅ 5x MÁS BARATO que Trint",,,,,,
+"✅ INCLUYES resumen IA (otros NO)",,,,,,
+"✅ INCLUYES speaker labels gratis (Rev cobra extra)",,,,,,
+"✅ MEJOR coste por minuto en todos los planes",,,,,,
+"",,,,,,
+"",,,,,,
+"PARTE 7: DECISIONES CLAVE",,,,,,
+"",,,,,,
+"=== PREGUNTA 1: ¿Cuál es el coste REAL por transcripción? ===",,,,,,
+"","","","",""
+"RESPUESTA: $0.104 por audio de 30 minutos",,,,,,
+"           $0.00347 por minuto",,,,,,
+"","","","",""
+"Desglose:","","","",""
+"- Transcripción (AssemblyAI): $0.075","","","",""
+"- Key Phrases (AssemblyAI): $0.005","","","",""
+"- Resumen + Tags (Claude): $0.024","","","",""
+"",,,,,,
+"",,,,,,
+"=== PREGUNTA 2: ¿Qué se cobra en el mercado? ===",,,,,,
+"","","","",""
+"MERCADO DOMÉSTICO (B2C):","","","",""
+"- Pay-per-use: $3 - $7.50 por audio 30min","","","",""
+"- Suscripciones: $9.99 - $54/mes","","","",""
+"","","","",""
+"MERCADO PROFESIONAL (B2B):","","","",""
+"- Automático: $6-9 por audio 30min","","","",""
+"- Manual (humano): $45-75 por audio 30min","","","",""
+"",,,,,,
+"",,,,,,
+"=== PREGUNTA 3: ¿Qué pricing es mejor para Annalogica? ===",,,,,,
+"","","","",""
+"RECOMENDACIÓN: Modelo Freemium + Suscripción","","","",""
+"","","","",""
+"Razones:","","","",""
+"✅ Revenue predecible y recurrente","","","",""
+"✅ Márgenes excelentes (79-84%)","","","",""
+"✅ Competitivo con mercado","","","",""
+"✅ LTV (Lifetime Value) alto","","","",""
+"✅ Escalable sin costes proporcionales","","","",""
+"","","","",""
+"Planes específicos:","","","",""
+"🆓 FREE: 1 audio/mes (15 min) - Captación","","","",""
+"⭐ BASIC: $9.99/mes (450 min) - Usuario individual","","","",""
+"🚀 PRO: $24.99/mes (3,000 min) - Profesional","","","",""
+"",,,,,,
+"",,,,,,
+"PARTE 8: ACCIÓN INMEDIATA",,,,,,
+"",,,,,,
+"=== PRÓXIMOS PASOS PARA IMPLEMENTAR ===",,,,,,
+"","","","",""
+"Tarea","Tiempo","Prioridad","Dependencias"
+"","","","",""
+"1. Confirmar pricing definitivo","5 min","🔴 CRÍTICO","Decisión tuya"
+"2. Migrar a AssemblyAI","4-5h","🔴 CRÍTICO","Confirmar opción A o B"
+"3. Implementar arquitectura async (Inngest)","2-3h","🔴 CRÍTICO","Después de #2"
+"4. Configurar Stripe (pagos)","1-2h","🟠 ALTO","Después de #1"
+"5. Crear sistema de planes en DB","1h","🟠 ALTO","Después de #4"
+"6. Diseñar página /pricing","2h","🟠 ALTO","Después de #1"
+"7. Implementar límites por plan","1h","🟠 ALTO","Después de #5"
+"8. Agregar exportación VTT","15 min","🟡 MEDIO","Después de #2"
+"9. Agregar exportación WORD (.docx)","30 min","🟡 MEDIO","Plan Pro"
+"10. Sistema edición nombres speakers","1h","🟡 MEDIO","Plan Pro"
+"11. Testing completo","2h","🔴 CRÍTICO","Después de todo"
+"12. Deploy a producción","30 min","🔴 CRÍTICO","Después de #11"
+"","","","",""
+"TIEMPO TOTAL ESTIMADO: 15-18 horas de desarrollo","","","",""
+"CALENDARIO REALISTA: 1 semana (2h/día)","","","",""
+"",,,,,,
+"",,,,,,
+"RESUMEN EJECUTIVO FINAL",,,,,,
+"",,,,,,
+"✅ TU COSTE por audio 30min: $0.104","","","",""
+"✅ MERCADO cobra: $3-9 por audio 30min","","","",""
+"✅ TU MARGEN potencial: 79-98% según modelo","","","",""
+"✅ PRICING recomendado: Basic $9.99 + Pro $24.99","","","",""
+"✅ REVENUE proyectado 6 meses: $1,174/mes (conservador)","","","",""
+"✅ BENEFICIO proyectado: $930/mes (~$11K/año)","","","",""
+"","","","",""
+"🎯 DECISIÓN: ¿Empezamos con la migración a AssemblyAI?",,,,,,
