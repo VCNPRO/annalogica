@@ -3,6 +3,7 @@ import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rat
 import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client';
 
+// API endpoint for creating async transcription jobs
 /**
  * POST /api/process
  * Create transcription job (async) - returns immediately
