@@ -81,7 +81,7 @@ export async function transcribeAudio(
       start: w.start,
       end: w.end,
       confidence: w.confidence,
-      speaker: w.speaker
+      speaker: w.speaker || undefined
     })) || [],
     utterances: transcript.utterances?.map(u => ({
       text: u.text,
