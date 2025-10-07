@@ -248,24 +248,34 @@ export const TranscriptionJobDB = {
     status: 'pending' | 'processing' | 'completed' | 'failed',
     errorMessage?: string
   ): Promise<boolean> => {
-    const updates: string[] = [`status = '${status}'`];
+    let result;
 
     if (status === 'processing') {
-      updates.push('started_at = CURRENT_TIMESTAMP');
+      result = await sql`
+        UPDATE transcription_jobs
+        SET status = ${status}, started_at = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+      `;
+    } else if ((status === 'completed' || status === 'failed') && errorMessage) {
+      result = await sql`
+        UPDATE transcription_jobs
+        SET status = ${status}, completed_at = CURRENT_TIMESTAMP, error_message = ${errorMessage}
+        WHERE id = ${id}
+      `;
     } else if (status === 'completed' || status === 'failed') {
-      updates.push('completed_at = CURRENT_TIMESTAMP');
+      result = await sql`
+        UPDATE transcription_jobs
+        SET status = ${status}, completed_at = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+      `;
+    } else {
+      result = await sql`
+        UPDATE transcription_jobs
+        SET status = ${status}
+        WHERE id = ${id}
+      `;
     }
 
-    if (errorMessage) {
-      const escapedMessage = errorMessage.replace(/'/g, "''");
-      updates.push(`error_message = '${escapedMessage}'`);
-    }
-
-    const result = await sql`
-      UPDATE transcription_jobs
-      SET ${sql(updates.join(', '))}
-      WHERE id = ${id}
-    `;
     return (result.rowCount ?? 0) > 0;
   },
 
