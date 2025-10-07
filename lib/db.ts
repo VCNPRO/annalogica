@@ -20,6 +20,29 @@ export interface Transcription {
   created_at: Date;
 }
 
+export interface TranscriptionJob {
+  id: string;
+  user_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  filename: string;
+  audio_url: string;
+  audio_size_bytes: number | null;
+  audio_duration_seconds: number | null;
+  assemblyai_id: string | null;
+  txt_url: string | null;
+  srt_url: string | null;
+  vtt_url: string | null;
+  summary_url: string | null;
+  error_message: string | null;
+  retry_count: number;
+  max_retries: number;
+  created_at: Date;
+  started_at: Date | null;
+  completed_at: Date | null;
+  updated_at: Date;
+  metadata: any;
+}
+
 export const UserDB = {
   // Create new user
   create: async (email: string, hashedPassword: string): Promise<User> => {
@@ -164,5 +187,131 @@ export const TranscriptionDB = {
       WHERE id = ${id}
     `;
     return (result.rowCount ?? 0) > 0;
+  }
+};
+
+export const TranscriptionJobDB = {
+  // Create new job
+  create: async (
+    userId: string,
+    filename: string,
+    audioUrl: string,
+    audioSizeBytes?: number
+  ): Promise<TranscriptionJob> => {
+    const result = await sql<TranscriptionJob>`
+      INSERT INTO transcription_jobs (user_id, filename, audio_url, audio_size_bytes, status)
+      VALUES (${userId}, ${filename}, ${audioUrl}, ${audioSizeBytes || null}, 'pending')
+      RETURNING *
+    `;
+    return result.rows[0];
+  },
+
+  // Find job by ID
+  findById: async (id: string): Promise<TranscriptionJob | null> => {
+    const result = await sql<TranscriptionJob>`
+      SELECT *
+      FROM transcription_jobs
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+    return result.rows[0] || null;
+  },
+
+  // Find jobs by user ID
+  findByUserId: async (userId: string, limit = 50): Promise<TranscriptionJob[]> => {
+    const result = await sql<TranscriptionJob>`
+      SELECT *
+      FROM transcription_jobs
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
+    return result.rows;
+  },
+
+  // Find pending jobs (for processing queue)
+  findPending: async (limit = 10): Promise<TranscriptionJob[]> => {
+    const result = await sql<TranscriptionJob>`
+      SELECT *
+      FROM transcription_jobs
+      WHERE status = 'pending'
+      AND retry_count < max_retries
+      ORDER BY created_at ASC
+      LIMIT ${limit}
+    `;
+    return result.rows;
+  },
+
+  // Update job status
+  updateStatus: async (
+    id: string,
+    status: 'pending' | 'processing' | 'completed' | 'failed',
+    errorMessage?: string
+  ): Promise<boolean> => {
+    const updates: string[] = [`status = '${status}'`];
+
+    if (status === 'processing') {
+      updates.push('started_at = CURRENT_TIMESTAMP');
+    } else if (status === 'completed' || status === 'failed') {
+      updates.push('completed_at = CURRENT_TIMESTAMP');
+    }
+
+    if (errorMessage) {
+      const escapedMessage = errorMessage.replace(/'/g, "''");
+      updates.push(`error_message = '${escapedMessage}'`);
+    }
+
+    const result = await sql`
+      UPDATE transcription_jobs
+      SET ${sql(updates.join(', '))}
+      WHERE id = ${id}
+    `;
+    return (result.rowCount ?? 0) > 0;
+  },
+
+  // Update job with results
+  updateResults: async (
+    id: string,
+    results: {
+      assemblyaiId?: string;
+      txtUrl?: string;
+      srtUrl?: string;
+      vttUrl?: string;
+      summaryUrl?: string;
+      audioDuration?: number;
+    }
+  ): Promise<boolean> => {
+    const result = await sql`
+      UPDATE transcription_jobs
+      SET
+        assemblyai_id = COALESCE(${results.assemblyaiId || null}, assemblyai_id),
+        txt_url = COALESCE(${results.txtUrl || null}, txt_url),
+        srt_url = COALESCE(${results.srtUrl || null}, srt_url),
+        vtt_url = COALESCE(${results.vttUrl || null}, vtt_url),
+        summary_url = COALESCE(${results.summaryUrl || null}, summary_url),
+        audio_duration_seconds = COALESCE(${results.audioDuration || null}, audio_duration_seconds)
+      WHERE id = ${id}
+    `;
+    return (result.rowCount ?? 0) > 0;
+  },
+
+  // Increment retry count
+  incrementRetry: async (id: string): Promise<boolean> => {
+    const result = await sql`
+      UPDATE transcription_jobs
+      SET retry_count = retry_count + 1
+      WHERE id = ${id}
+    `;
+    return (result.rowCount ?? 0) > 0;
+  },
+
+  // Delete old completed jobs (cleanup)
+  deleteOld: async (daysOld = 30): Promise<number> => {
+    const result = await sql`
+      DELETE FROM transcription_jobs
+      WHERE status IN ('completed', 'failed')
+      AND completed_at < NOW() - INTERVAL '${daysOld} days'
+    `;
+    return result.rowCount ?? 0;
   }
 };

@@ -1,9 +1,13 @@
-import Replicate from "replicate";
-import { put } from '@vercel/blob';
 import { verifyRequestAuth } from '@/lib/auth';
 import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
-import { logTranscription, logSummary } from '@/lib/usage-tracking';
+import { TranscriptionJobDB } from '@/lib/db';
+import { inngest } from '@/lib/inngest/client';
 
+/**
+ * POST /api/process
+ * Create transcription job (async) - returns immediately
+ * Job will be processed in background by Inngest
+ */
 export async function POST(request: Request) {
   try {
     // SECURITY: Verify authentication
@@ -14,106 +18,57 @@ export async function POST(request: Request) {
 
     // SECURITY: Rate limiting
     const identifier = getClientIdentifier(request, user.userId);
-    const rateLimitResponse = await checkRateLimit(processRateLimit, identifier, 'transcripciones procesadas');
+    const rateLimitResponse = await checkRateLimit(
+      processRateLimit,
+      identifier,
+      'transcripciones procesadas'
+    );
     if (rateLimitResponse) return rateLimitResponse;
 
     const { audioUrl, filename } = await request.json();
-    
-    const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
-    const output: any = await replicate.run(
-      "openai/whisper:4d50797290df275329f202e48c76360b3f22b08d28c196cbc54600319435f8d2",
-      { input: { audio: audioUrl, language: "Spanish" }}
+
+    if (!audioUrl || !filename) {
+      return Response.json(
+        { error: 'audioUrl y filename son requeridos' },
+        { status: 400 }
+      );
+    }
+
+    // Create job in database
+    const job = await TranscriptionJobDB.create(
+      user.userId,
+      filename,
+      audioUrl
     );
 
-    // DEBUG: Log the complete output structure
-    console.log('Replicate Whisper output:', JSON.stringify(output, null, 2));
+    console.log('[API Process] Job created:', job.id, { filename, audioUrl });
 
-    const text = output.transcription || output.text || '';
-    const segments = output.segments || [];
-
-    console.log('Extracted text length:', text.length);
-    console.log('Segments count:', segments.length);
-    const baseName = filename.replace(/\.[^/.]+$/, '');
-    
-    const txtBlob = await put(`${baseName}.txt`, text, {
-      access: 'public',
-      contentType: 'text/plain; charset=utf-8',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-      addRandomSuffix: true
-    });
-    
-    let srt = '';
-    segments.forEach((seg: any, i: number) => {
-      const start = formatTime(seg.start);
-      const end = formatTime(seg.end);
-      srt += `${i + 1}\n${start} --> ${end}\n${seg.text.trim()}\n\n`;
-    });
-    const srtBlob = await put(`${baseName}.srt`, srt, {
-      access: 'public',
-      contentType: 'text/plain; charset=utf-8',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-      addRandomSuffix: true
-    });
-
-    // TRACKING: Log transcription
-    await logTranscription(user.userId, filename);
-
-    let summaryUrl = null;
-    if (text.length > 100) {
-      try {
-        const summaryRes = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.CLAUDE_API_KEY!,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 2000,
-            messages: [{ role: 'user', content: `Resume en español en 3-4 párrafos:\n\n${text.slice(0, 8000)}` }]
-          })
-        });
-        const summaryData = await summaryRes.json();
-        const summary = summaryData.content[0].text;
-        const summaryBlob = await put(`${baseName}-summary.txt`, summary, {
-          access: 'public',
-          contentType: 'text/plain; charset=utf-8',
-          token: process.env.BLOB_READ_WRITE_TOKEN,
-          addRandomSuffix: true
-        });
-        summaryUrl = summaryBlob.url;
-
-        // TRACKING: Log summary generation
-        const tokensInput = text.slice(0, 8000).length / 4; // Rough estimate: 4 chars = 1 token
-        const tokensOutput = summary.length / 4;
-        await logSummary(user.userId, Math.ceil(tokensInput), Math.ceil(tokensOutput), 'sonnet');
-      } catch (e) {
-        console.log('Summary failed:', e);
+    // Send job to Inngest queue for async processing
+    await inngest.send({
+      name: 'transcription/job.created',
+      data: {
+        jobId: job.id,
+        userId: user.userId,
+        audioUrl,
+        filename
       }
-    }
-    
+    });
+
+    console.log('[API Process] Job sent to Inngest:', job.id);
+
+    // Return immediately with job ID
+    // Frontend will poll /api/jobs/:id for status
     return Response.json({
       success: true,
-      txtUrl: txtBlob.url,
-      srtUrl: srtBlob.url,
-      summaryUrl
+      message: 'Transcripción en proceso. Esto puede tardar 1-3 minutos.',
+      jobId: job.id,
+      status: 'pending'
     });
-    
   } catch (error: any) {
-    console.error('Process error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error('[API Process] Error:', error);
+    return Response.json(
+      { error: error.message || 'Error al procesar transcripción' },
+      { status: 500 }
+    );
   }
-}
-
-function formatTime(seconds: number) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
-  return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
-}
-
-function pad(num: number, size = 2) {
-  return String(num).padStart(size, '0');
 }
