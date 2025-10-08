@@ -18,21 +18,20 @@ export async function GET(request: Request) {
       console.log(`[API Files] Metadata for job ${job.id}:`, JSON.stringify(job.metadata, null, 2));
     });
 
-    // Filter only completed jobs and format for frontend
-    const files = jobs
-      .filter(job => job.status === 'completed')
-      .map(job => ({
+    // Return all jobs for the frontend to display
+    const files = jobs.map(job => ({
         name: job.filename.replace(/\.[^/.]+$/, ''), // Remove extension
-        date: job.completed_at || job.created_at,
+        date: job.created_at,
         txtUrl: job.txt_url,
         srtUrl: job.srt_url,
-        vttUrl: job.vtt_url, // NEW: VTT format
+        vttUrl: job.vtt_url,
         summaryUrl: job.summary_url,
         audioUrl: job.audio_url,
         audioDuration: job.audio_duration_seconds,
         jobId: job.id,
-        metadata: job.metadata
-      }));
+        status: job.status, // Include status for UI
+        metadata: job.metadata,
+    }));
 
     return Response.json({ files });
 
