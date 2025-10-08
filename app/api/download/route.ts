@@ -1,4 +1,6 @@
  import PDFDocument from 'pdfkit';
+
+  export async function GET() {
     return Response.json({ error: 'Use POST method' }, { status: 405 });
   }
 
@@ -10,6 +12,7 @@
       if (!text || !filename) {
         return Response.json({ error: 'Faltan datos requeridos' }, { status: 400 });
       }
+
 
       const doc = new PDFDocument({
         size: 'A4',
@@ -38,16 +41,17 @@
       doc.text('='.repeat(80));
       doc.moveDown();
 
+
       doc.fontSize(10).text('CONTENIDO:', { underline: true });
       doc.moveDown();
       doc.fontSize(10).text(text, { align: 'left' });
       doc.moveDown(2);
 
-
       doc.text('='.repeat(80));
       doc.fontSize(9).text('Generado por Annalogica', { align: 'center' });
 
       doc.end();
+
 
       const pdfBuffer = await pdfPromise;
 
