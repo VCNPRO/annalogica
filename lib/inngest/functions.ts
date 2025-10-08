@@ -166,7 +166,7 @@ export const processTranscription = inngest.createFunction(
       status: 'completed',
       results: {
         ...fileUrls,
-        summaryUrl
+        summaryUrl: finalData.summaryUrl
       }
     };
   }
