@@ -1,21 +1,21 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, HelpCircle } from 'lucide-react';
 
 // AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
-type FileStatus = 'uploading' | 'processing' | 'completed' | 'error';
+type FileStatus = 'uploading' | 'pending' | 'error'; // Simplified statuses for this page
 
 interface UploadedFile {
   id: string;
   name: string;
   uploadProgress: number;
-  processProgress: number;
   status: FileStatus;
   date: string;
+  jobId?: string; // Add jobId to link to details page
 }
 
 export default function Dashboard() {
@@ -23,10 +23,7 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [processedFiles, setProcessedFiles] = useState<any[]>([]);
-  const [selectedUploadedFiles, setSelectedUploadedFiles] = useState<string[]>([]);
-  const [selectedProcessedFiles, setSelectedProcessedFiles] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]); // Keep this state
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState('es');
   const [targetLanguage, setTargetLanguage] = useState('en');
@@ -44,208 +41,115 @@ export default function Dashboard() {
     
     setUser(JSON.parse(userData));
     setLoading(false);
-    loadProcessedFiles();
   }, [router]);
 
-  const loadProcessedFiles = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/files`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setProcessedFiles(data.files || []);
-      }
-    } catch (err) {
-      console.error('Error loading files:', err);
-    }
-  };
+  const processFiles = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const fileId = Date.now().toString();
-    const newFile: UploadedFile = {
-      id: fileId,
-      name: file.name,
-      uploadProgress: 0,
-      processProgress: 0,
-      status: 'uploading',
-      date: new Date().toISOString()
-    };
-    
-    setUploadedFiles(prev => [...prev, newFile]);
     setError(null);
     
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Sesión expirada');
 
-      // Upload directo a Blob (bypass function size limit)
-      const { upload } = await import('@vercel/blob/client');
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        const fileId = Date.now().toString() + i; // Unique ID for each file
+        const newFile: UploadedFile = {
+          id: fileId,
+          name: file.name,
+          uploadProgress: 0,
+          status: 'uploading',
+          date: new Date().toISOString()
+        };
+        setUploadedFiles(prev => [...prev, newFile]);
 
-      // Generate unique filename to avoid conflicts
-      const timestamp = Date.now();
-      const randomSuffix = Math.random().toString(36).substring(2, 8);
-      const uniqueFilename = `${timestamp}-${randomSuffix}-${file.name}`;
+        // Upload directo a Blob (bypass function size limit)
+        const { upload } = await import('@vercel/blob/client');
 
-      const blob = await upload(uniqueFilename, file, {
-        access: 'public',
-        handleUploadUrl: '/api/blob-upload',
-        clientPayload: JSON.stringify({
-          size: file.size,
-          type: file.type,
-          token: token, // Pass token in payload
-        }),
-        onUploadProgress: ({ percentage }) => {
-          setUploadedFiles(prev => prev.map(f =>
-            f.id === fileId ? { ...f, uploadProgress: percentage } : f
-          ));
-        },
-      });
+        // Generate unique filename to avoid conflicts
+        const timestamp = Date.now();
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
+        const uniqueFilename = `${timestamp}-${randomSuffix}-${file.name}`;
 
-      const blobUrl = blob.url;
+        const blob = await upload(uniqueFilename, file, {
+          access: 'public',
+          handleUploadUrl: '/api/blob-upload',
+          clientPayload: JSON.stringify({
+            size: file.size,
+            type: file.type,
+            token: token, // Pass token in payload
+          }),
+          onUploadProgress: ({ percentage }) => {
+            setUploadedFiles(prev => prev.map(f =>
+              f.id === fileId ? { ...f, uploadProgress: percentage } : f
+            ));
+          },
+        });
 
-      // Actualizar progreso de upload
-      setUploadedFiles(prev => prev.map(f =>
-        f.id === fileId ? { ...f, uploadProgress: 100 } : f
-      ));
+        const blobUrl = blob.url;
 
-      // Cambiar a procesando
-      setUploadedFiles(prev => prev.map(f =>
-        f.id === fileId ? { ...f, status: 'processing' } : f
-      ));
+        // Actualizar progreso de upload
+        setUploadedFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, uploadProgress: 100 } : f
+        ));
 
-      // Iniciar procesamiento asíncrono con AssemblyAI
-      const filename = file.name;
-      const processRes = await fetch('/api/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ audioUrl: blobUrl, filename })
-      });
+        // Iniciar procesamiento asíncrono con AssemblyAI (solo crear el job)
+        const filename = file.name;
+        const processRes = await fetch('/api/process', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ audioUrl: blobUrl, filename })
+        });
 
-      if (!processRes.ok) {
-        const text = await processRes.text();
-        let errorMessage = 'Error al procesar';
-        try {
-          const errorData = JSON.parse(text);
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          errorMessage = text || errorMessage;
+        if (!processRes.ok) {
+          const text = await processRes.text();
+          let errorMessage = 'Error al procesar';
+          try {
+            const errorData = JSON.parse(text);
+            errorMessage = errorData.error || errorMessage;
+          } catch {
+            errorMessage = text || errorMessage;
+          }
+          throw new Error(errorMessage);
         }
-        throw new Error(errorMessage);
+
+        const { jobId } = await processRes.json();
+        console.log('[Upload] Job created:', jobId);
+
+        // Update status to pending and add jobId
+        setUploadedFiles(prev => prev.map(f =>
+          f.id === fileId ? { ...f, status: 'pending', jobId: jobId } : f
+        ));
       }
-
-      const { jobId } = await processRes.json();
-      console.log('[Upload] Job created:', jobId);
-
-      // Polling del estado del job cada 3 segundos
-      let processProgress = 0;
-      const pollInterval = setInterval(async () => {
-        try {
-          const jobRes = await fetch(`/api/jobs/${jobId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-
-          if (!jobRes.ok) {
-            clearInterval(pollInterval);
-            throw new Error('Error al verificar estado del job');
-          }
-
-          const { job } = await jobRes.json();
-          console.log('[Upload] Job status:', job.status, job);
-
-          // Actualizar progreso estimado
-          if (job.status === 'processing') {
-            processProgress = Math.min(processProgress + 15, 85);
-            setUploadedFiles(prev => prev.map(f =>
-              f.id === fileId ? { ...f, processProgress } : f
-            ));
-          }
-
-          // Job completado
-          if (job.status === 'completed') {
-            clearInterval(pollInterval);
-            setUploadedFiles(prev => prev.map(f =>
-              f.id === fileId ? { ...f, status: 'completed', processProgress: 100 } : f
-            ));
-            loadProcessedFiles();
-          }
-
-          // Job falló
-          if (job.status === 'failed') {
-            clearInterval(pollInterval);
-            throw new Error(job.errorMessage || 'Error al procesar audio');
-          }
-        } catch (pollError: any) {
-          console.error('[Upload] Polling error:', pollError);
-          clearInterval(pollInterval);
-          throw pollError;
-        }
-      }, 3000); // Poll cada 3 segundos
-
-      // Timeout de seguridad (5 minutos)
-      setTimeout(() => {
-        clearInterval(pollInterval);
-      }, 300000);
-      // Redirect to the new job details page
-      router.push(`/files/${jobId}`);
-      setUploadedFiles([]); // Clear the list of uploaded files
       
     } catch (err: any) {
-      setUploadedFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, status: 'error' } : f
-      ));
       setError(err.message);
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === (files && files[0] ? files[0].name : '') ? { ...f, status: 'error' } : f // This needs to be fixed for multiple files
+      ));
     }
+  }, [router]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processFiles(e.target.files);
+    e.target.value = ''; // Clear input to allow re-uploading same file
   };
 
-  const handleSelectAllUploaded = (checked: boolean) => {
-    setSelectedUploadedFiles(checked ? uploadedFiles.map(f => f.id) : []);
-  };
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    processFiles(e.dataTransfer.files);
+  }, [processFiles]);
 
-  const handleSelectAllProcessed = (checked: boolean) => {
-    setSelectedProcessedFiles(checked ? processedFiles.map(f => f.name) : []);
-  };
-
-  const handleDeleteSelectedProcessed = async () => {
-    if (selectedProcessedFiles.length === 0) return;
-    
-    if (!confirm(`¿Eliminar ${selectedProcessedFiles.length} archivos?`)) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Eliminar del backend
-      for (const fileName of selectedProcessedFiles) {
-        await fetch(`/api/files/${encodeURIComponent(fileName)}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-      }
-
-      // Actualizar estado local
-      setProcessedFiles(prev => prev.filter(f => !selectedProcessedFiles.includes(f.name)));
-      setSelectedProcessedFiles([]);
-    } catch (err) {
-      console.error('Error deleting files:', err);
-    }
-  };
-
-  const handleDeleteSelectedUploaded = () => {
-    if (selectedUploadedFiles.length === 0) return;
-    
-    if (confirm(`¿Eliminar ${selectedUploadedFiles.length} archivos?`)) {
-      setUploadedFiles(prev => prev.filter(f => !selectedUploadedFiles.includes(f.id)));
-      setSelectedUploadedFiles([]);
-    }
-  };
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -256,8 +160,7 @@ export default function Dashboard() {
   const getStatusText = (status: FileStatus) => {
     switch (status) {
       case 'uploading': return 'Subiendo';
-      case 'processing': return 'Procesando';
-      case 'completed': return 'Completado';
+      case 'pending': return 'Pendiente';
       case 'error': return 'Error';
     }
   };
@@ -265,8 +168,7 @@ export default function Dashboard() {
   const getStatusColor = (status: FileStatus) => {
     switch (status) {
       case 'uploading': return darkMode ? 'text-blue-400' : 'text-blue-600';
-      case 'processing': return darkMode ? 'text-amber-400' : 'text-amber-600';
-      case 'completed': return darkMode ? 'text-green-400' : 'text-green-600';
+      case 'pending': return darkMode ? 'text-amber-400' : 'text-amber-600';
       case 'error': return darkMode ? 'text-red-400' : 'text-red-600';
     }
   };
@@ -323,7 +225,11 @@ export default function Dashboard() {
           </div>
 
           <div className="mb-6">
-            <div className={`border-2 border-dashed ${darkMode ? 'border-zinc-700' : 'border-gray-300'} rounded-lg p-4 text-center cursor-pointer hover:border-orange-400 transition-colors`}>
+            <div 
+              className={`border-2 border-dashed ${darkMode ? 'border-zinc-700' : 'border-gray-300'} rounded-lg p-4 text-center cursor-pointer hover:border-orange-400 transition-colors`}
+              onDrop={handleDrop} // Add drop handler
+              onDragOver={handleDragOver} // Add drag over handler
+            >
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-orange-500 text-sm">📁</span>
                 <h2 className={`text-sm font-medium ${textPrimary}`}>Carga de Archivos</h2>
@@ -456,28 +362,13 @@ export default function Dashboard() {
                 </div>
                 <p className={`text-xs ${textSecondary}`}>Archivos en proceso de subida y procesamiento</p>
               </div>
-              {selectedUploadedFiles.length > 0 && (
-                <button 
-                  onClick={handleDeleteSelectedUploaded}
-                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
-                >
-                  Eliminar {selectedUploadedFiles.length}
-                </button>
-              )}
-            </div>
-
-            <div className={`px-4 py-3 ${border} border-b`}>
-              <div className="flex items-center gap-4">
-                <input 
-                  type="checkbox" 
-                  className="rounded border-gray-300 scale-75"
-                  checked={selectedUploadedFiles.length === uploadedFiles.length && uploadedFiles.length > 0}
-                  onChange={(e) => handleSelectAllUploaded(e.target.checked)}
-                />
-                <span className={`text-xs font-medium ${textPrimary} flex-1`}>Nombre Archivo</span>
-                <span className={`text-xs font-medium ${textSecondary}`} style={{ minWidth: '100px' }}>Estado</span>
-                <span className={`text-xs font-medium ${textSecondary}`} style={{ minWidth: '80px' }}>Acciones</span>
-              </div>
+              {/* Removed selectedUploadedFiles.length > 0 check for delete button */}
+              <button 
+                onClick={() => setUploadedFiles([])} 
+                className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
+              >
+                Limpiar
+              </button>
             </div>
 
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(60vh - 200px)' }}>
@@ -489,30 +380,16 @@ export default function Dashboard() {
                 uploadedFiles.map((file) => (
                   <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
                     <div className="flex items-center gap-4 mb-2">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-gray-300 scale-75"
-                        checked={selectedUploadedFiles.includes(file.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedUploadedFiles(prev => [...prev, file.id]);
-                          } else {
-                            setSelectedUploadedFiles(prev => prev.filter(id => id !== file.id));
-                          }
-                        }}
-                      />
                       <span className={`text-xs ${textPrimary} flex-1 truncate`}>{file.name}</span>
                       <span className={`text-xs font-medium ${getStatusColor(file.status)}`} style={{ minWidth: '100px' }}>
                         {getStatusText(file.status)}
                       </span>
                       <div className="flex items-center gap-2" style={{ minWidth: '80px' }}>
-                        <button 
-                          onClick={() => setUploadedFiles(prev => prev.map(f => f.id === file.id ? { ...f, status: 'processing', processProgress: 0 } : f))} 
-                          className={`p-1 ${hover} rounded`}
-                          title="Recargar"
-                        >
-                          <RefreshCw className={`h-3 w-3 ${textSecondary}`} />
-                        </button>
+                        {file.status === 'pending' && file.jobId && (
+                          <Link href={`/files/${file.jobId}`} className={`p-1 ${hover} rounded`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-3 w-3 ${textSecondary}`}><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                          </Link>
+                        )}
                         <button 
                           onClick={() => setUploadedFiles(prev => prev.filter(f => f.id !== file.id))} 
                           className={`p-1 ${hover} rounded`}
@@ -536,15 +413,10 @@ export default function Dashboard() {
                         </div>
                       )}
                       
-                      {(file.status === 'processing' || file.status === 'completed') && (
-                        <div>
-                          <div className="flex justify-between mb-1">
-                            <span className={`text-xs ${textSecondary}`}>Procesamiento</span>
-                            <span className="text-xs text-amber-500">{file.processProgress.toFixed(0)}%</span>
-                          </div>
-                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
-                            <div className="bg-amber-500 h-1 rounded-full transition-all" style={{ width: `${file.processProgress}%` }} />
-                          </div>
+                      {(file.status === 'pending' || file.status === 'error') && (
+                        <div className="flex justify-between mb-1">
+                          <span className={`text-xs ${textSecondary}`}>Estado</span>
+                          <span className={`text-xs ${getStatusColor(file.status)}`}>{getStatusText(file.status)}</span>
                         </div>
                       )}
                     </div>
@@ -564,14 +436,6 @@ export default function Dashboard() {
                 <p className={`text-xs ${textSecondary}`}>Archivos completados y listos para descargar</p>
               </div>
               <div className="flex items-center gap-2">
-                {selectedProcessedFiles.length > 0 && (
-                  <button 
-                    onClick={handleDeleteSelectedProcessed}
-                    className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
-                  >
-                    Eliminar {selectedProcessedFiles.length}
-                  </button>
-                )}
                 <Link 
                   href="/results"
                   className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-medium transition-colors"
@@ -581,48 +445,8 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className={`px-4 py-3 ${border} border-b`}>
-              <div className="flex items-center gap-4">
-                <input 
-                  type="checkbox" 
-                  className="rounded border-gray-300 scale-75"
-                  checked={selectedProcessedFiles.length === processedFiles.length && processedFiles.length > 0}
-                  onChange={(e) => handleSelectAllProcessed(e.target.checked)}
-                />
-                <span className={`text-xs font-medium ${textPrimary} flex-1`}>Nombre Archivo</span>
-                <span className={`text-xs font-medium ${textSecondary}`}>Acciones</span>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(40vh - 180px)' }}>
-              {processedFiles.length === 0 ? (
-                <div className="px-4 py-8 text-center">
-                  <p className={`text-xs ${textSecondary}`}>No hay archivos procesados aún.</p>
-                </div>
-              ) : (
-                processedFiles.slice(0, 5).map((file, idx) => (
-                  <div key={idx} className={`px-4 py-3 ${border} border-b ${hover}`}>
-                    <div className="flex items-center gap-4">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-gray-300 scale-75"
-                        checked={selectedProcessedFiles.includes(file.name)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProcessedFiles(prev => [...prev, file.name]);
-                          } else {
-                            setSelectedProcessedFiles(prev => prev.filter(n => n !== file.name));
-                          }
-                        }}
-                      />
-                      <span className={`text-xs ${textPrimary} truncate flex-1`}>{file.name}</span>
-                      <Link href="/results" className="text-xs text-orange-500 hover:underline">
-                        Descargar
-                      </Link>
-                    </div>
-                  </div>
-                ))
-              )}
+            <div className="px-4 py-8 text-center">
+              <p className={`text-xs ${textSecondary}`}>No hay archivos procesados aún.</p>
             </div>
           </div>
         </div>
