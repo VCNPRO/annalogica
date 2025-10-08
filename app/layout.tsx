@@ -22,19 +22,19 @@ export default function RootLayout({
     <html lang="es" className={`${orbitron.variable}`}>
       <body>
         {children}
-        <footer className="bg-slate-900 text-slate-400 py-6 px-4 mt-auto">
+        <footer className="bg-slate-900 text-gray-300 py-6 px-4 mt-auto">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm">
               © 2025 Annalogica. Todos los derechos reservados.
             </p>
             <div className="flex gap-6 text-sm">
-              <a href="/privacy" className="hover:text-white transition-colors">
+              <a href="/privacy" className="text-white hover:text-gray-300 transition-colors">
                 Privacidad
               </a>
-              <a href="/terms" className="hover:text-white transition-colors">
+              <a href="/terms" className="text-white hover:text-gray-300 transition-colors">
                 Términos
               </a>
-              <a href="mailto:legal@annalogica.eu" className="hover:text-white transition-colors">
+              <a href="mailto:legal@annalogica.eu" className="text-white hover:text-gray-300 transition-colors">
                 Contacto
               </a>
             </div>
