@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, context: any) {
     return NextResponse.json({ job });
 
   } catch (error: any) {
-    console.error(`[API Job ${params.jobId}] Error:`, error);
+    console.error(`[API Job ${context.params.jobId}] Error:`, error);
     return NextResponse.json({ error: error.message || 'Error al obtener el trabajo' }, { status: 500 });
   }
 }
