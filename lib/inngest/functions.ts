@@ -133,7 +133,7 @@ export const processTranscription = inngest.createFunction(
 
         // Update job with summary URL and all metadata
         await TranscriptionJobDB.updateResults(jobId, {
-          summaryUrl,
+          summaryUrl: summaryUrl || undefined,
           metadata,
         });
         
