@@ -36,10 +36,12 @@
       doc.fontSize(10).text('='.repeat(80));
       doc.moveDown();
 
-      doc.fontSize(11).text(Archivo: ${filename});
-      doc.text(Fecha: ${new Date().toLocaleDateString('es-ES')});
-      doc.text(Hora: ${new Date().toLocaleTimeString('es-ES')});
-     
+      // --- BLOQUE REESCRITO SIN COMILLAS ESPECIALES ---
+      doc.fontSize(11).text('Archivo: ' + filename);
+      doc.text('Fecha: ' + new Date().toLocaleDateString('es-ES'));
+      doc.text('Hora: ' + new Date().toLocaleTimeString('es-ES'));
+      // --- FIN DEL BLOQUE REESCRITO ---
+
       doc.moveDown();
       doc.text('='.repeat(80));
       doc.moveDown();
@@ -61,7 +63,7 @@
       return new Response(new Uint8Array(pdfBuffer), {
         headers: {
           'Content-Type': 'application/pdf',
-          'Content-Disposition': attachment; filename="${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf",
+          'Content-Disposition': 'attachment; filename="' + filename.replace(/\.[^/.]+$/, '') + '-transcripcion.pdf"',
           'Content-Length': pdfBuffer.length.toString(),
           'Cache-Control': 'no-cache, no-store, must-revalidate'
         }
