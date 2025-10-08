@@ -37,11 +37,18 @@ export default function FileDetailsPage(props: any) {
   const [isTaskRunning, setIsTaskRunning] = useState(false);
 
   useEffect(() => {
-    const fetchJob = async () => {
-      try {
-        // The API route for a single job needs to be created.
-        // Assuming it will be /api/jobs/[jobId]
-        const res = await fetch(`/api/jobs/${jobId}`);
+        const fetchJob = async () => {
+          const token = localStorage.getItem('token');
+          if (!token) {
+            setError('No autenticado. Por favor, inicia sesión de nuevo.');
+            router.push('/login');
+            return;
+          }
+
+          try {
+            const res = await fetch(`/api/jobs/${jobId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
         if (!res.ok) {
           const errorData = await res.json();
           throw new Error(errorData.error || 'No se pudieron obtener los detalles del trabajo.');
