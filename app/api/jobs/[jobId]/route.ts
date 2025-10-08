@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 
-export async function GET(request: NextRequest, context: { params: { jobId: string } }) {
+export async function GET(request: NextRequest, context: any) {
   try {
     const user = verifyRequestAuth(request);
     if (!user) {
