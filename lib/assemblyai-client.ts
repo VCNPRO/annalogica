@@ -269,7 +269,7 @@ export async function generateSummary(text: string): Promise<SummaryResult> {
     if (match && match.index) {
       summary = fullText.slice(0, match.index).trim();
       const tagsString = fullText.slice(match.index + match[0].length).trim();
-      tags = tagsString.split(',').map(tag => tag.trim()).filter(Boolean);
+      tags = tagsString.split(',').map((tag: string) => tag.trim()).filter(Boolean);
     }
 
     return { summary, tags };
