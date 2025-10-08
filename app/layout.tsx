@@ -27,6 +27,17 @@ export default function RootLayout({
             <p className="text-sm">
               © 2025 Annalogica. Todos los derechos reservados.
             </p>
+            <div className="flex gap-6 text-sm">
+              <a href="/privacy" className="hover:text-white transition-colors">
+                Privacidad
+              </a>
+              <a href="/terms" className="hover:text-white transition-colors">
+                Términos
+              </a>
+              <a href="mailto:legal@annalogica.eu" className="hover:text-white transition-colors">
+                Contacto
+              </a>
+            </div>
             <p className="text-sm">
               soporte@annalogica.eu
             </p>

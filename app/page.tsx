@@ -271,10 +271,14 @@ export default function Dashboard() {
         >
           {darkMode ? <Sun className="h-4 w-4 text-zinc-400" /> : <Moon className="h-4 w-4 text-gray-600" />}
         </button>
-        <Link href="/settings" className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}>
+        <button
+          onClick={() => router.push('/settings')}
+          className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
+          title="Ajustes"
+        >
           <span className={`text-sm ${textSecondary}`}>Ajustes</span>
           <span>⚙️</span>
-        </Link>
+        </button>
         <button
           onClick={handleLogout}
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
