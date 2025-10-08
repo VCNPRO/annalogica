@@ -301,7 +301,7 @@ export const TranscriptionJobDB = {
         vtt_url = COALESCE(${results.vttUrl || null}, vtt_url),
         summary_url = COALESCE(${results.summaryUrl || null}, summary_url),
         audio_duration_seconds = COALESCE(${results.audioDuration || null}, audio_duration_seconds),
-        metadata = COALESCE(${sql.json(results.metadata || null)}, metadata)
+        metadata = COALESCE(${results.metadata || null}, metadata)
       WHERE id = ${id}
     `;
     return (result.rowCount ?? 0) > 0;
