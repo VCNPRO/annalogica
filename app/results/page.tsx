@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import jsPDF from 'jspdf';
+import Link from 'next/link';
 
+// Simplified component: this page now only lists files and links to their detail/control panel page.
 export default function Results() {
   const [files, setFiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,97 +29,9 @@ export default function Results() {
       const data = await response.json();
       setFiles(data.files || []);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error loading files:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const downloadFile = (url: string) => {
-    window.open(url, '_blank');
-  };
-
-  const downloadPDF = async (txtUrl: string, filename: string) => {
-    try {
-      setLoading(true);
-      const textRes = await fetch(txtUrl);
-      if (!textRes.ok) throw new Error('Failed to fetch transcription text');
-      const text = await textRes.text();
-
-      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-      const margin = 20;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const usableWidth = pageWidth - (margin * 2);
-      
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text('TRANSCRIPCIÓN DE AUDIO', pageWidth / 2, margin, { align: 'center' });
-
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(11);
-      doc.text(`Archivo: ${filename}`, margin, margin + 15);
-      doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, margin, margin + 20);
-      doc.line(margin, margin + 25, pageWidth - margin, margin + 25);
-
-      doc.setFontSize(10);
-      const splitText = doc.splitTextToSize(text, usableWidth);
-      doc.text(splitText, margin, margin + 35);
-
-      doc.save(`${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`);
-    } catch (error) {
-      alert('Error generando PDF de la transcripción.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const downloadSummaryPDF = async (summaryUrl: string, filename: string) => {
-    try {
-      setLoading(true);
-      const textRes = await fetch(summaryUrl);
-      if (!textRes.ok) throw new Error('Failed to fetch summary text');
-      const text = await textRes.text();
-
-      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-      const margin = 20;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const usableWidth = pageWidth - (margin * 2);
-      
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text('RESUMEN DE TRANSCRIPCIÓN', pageWidth / 2, margin, { align: 'center' });
-
-      doc.setFont('Helvetica', 'normal');
-      doc.setFontSize(11);
-      doc.text(`Archivo original: ${filename}`, margin, margin + 15);
-      doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, margin, margin + 20);
-      doc.line(margin, margin + 25, pageWidth - margin, margin + 25);
-
-      doc.setFontSize(10);
-      const splitText = doc.splitTextToSize(text, usableWidth);
-      doc.text(splitText, margin, margin + 35);
-
-      doc.save(`${filename.replace(/\.[^/.]+$/, '')}-resumen.pdf`);
-    } catch (error) {
-      alert('Error generando PDF del resumen.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deleteFile = async (filename: string) => {
-    if (!confirm('¿Eliminar?')) return;
-    
-    try {
-      const token = localStorage.getItem('token');
-      await fetch('/api/files', {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename })
-      });
-      loadFiles();
-    } catch (error) {
-      alert('Error');
     }
   };
 
@@ -146,7 +59,7 @@ export default function Results() {
           ) : (
             <div>
               {files.map((file: any) => (
-                <div key={file.name} className={`px-6 py-4 ${border} border-b hover:bg-zinc-800 transition-colors`}>
+                <Link href={`/files/${file.jobId}`} key={file.jobId} className={`block px-6 py-4 ${border} border-b hover:bg-zinc-800 transition-colors`}>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm ${textPrimary} truncate`}>{file.name}</p>
@@ -170,26 +83,16 @@ export default function Results() {
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <div className="flex gap-2 text-xs">
-                        <button onClick={() => downloadFile(file.txtUrl)} className="text-blue-500 hover:underline">TXT</button>
-                        <span className={textSecondary}>|</span>
-                        <button onClick={() => downloadFile(file.srtUrl)} className="text-green-500 hover:underline">SRT</button>
-                        <span className={textSecondary}>|</span>
-                        {file.vttUrl && <><button onClick={() => downloadFile(file.vttUrl)} className="text-cyan-500 hover:underline">VTT</button><span className={textSecondary}>|</span></>}
-                        <button onClick={() => downloadPDF(file.txtUrl, file.name)} className="text-purple-500 hover:underline">PDF</button>
-                        {file.summaryUrl && <><span className={textSecondary}>|</span><button onClick={() => downloadSummaryPDF(file.summaryUrl, file.name)} className="text-amber-500 hover:underline">Resumen</button></>}
-                        <span className={textSecondary}>|</span>
-                        <button onClick={() => deleteFile(file.name)} className="text-red-500 hover:underline">Eliminar</button>
-                      </div>
-                      {file.audioDuration && (
-                        <span className={`text-xs ${textSecondary}`}>
-                          Duración: {Math.floor(file.audioDuration / 60)}:{String(file.audioDuration % 60).padStart(2, '0')} min
-                        </span>
-                      )}
+                    <div className="flex items-center gap-2 text-zinc-500">
+                        {file.audioDuration && (
+                            <span className={`text-xs`}>
+                            {Math.floor(file.audioDuration / 60)}:{String(Math.round(file.audioDuration % 60)).padStart(2, '0')} min
+                            </span>
+                        )}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
