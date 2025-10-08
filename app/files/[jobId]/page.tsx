@@ -48,6 +48,7 @@ export default function FileDetailsPage(props: any) {
         }
         const data = await res.json();
         setJob(data.job);
+        console.log('Job data received:', data.job); // DEBUG LOG
       } catch (e: any) {
         setError(e.message);
       }
