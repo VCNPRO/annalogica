@@ -30,7 +30,7 @@ export const transcribeFile = inngest.createFunction(
       console.error(`[Inngest] Job ${jobId} not found during transcription task.`);
       return { error: 'Job not found' };
     }
-    const { userId, audioUrl, filename } = job;
+    const { user_id: userId, audioUrl, filename } = job;
 
     console.log(`[Inngest] Starting transcription task for job ${jobId}`);
 
@@ -91,7 +91,7 @@ export const summarizeFile = inngest.createFunction(
       console.error(`[Inngest] Job ${jobId} not found or not transcribed yet for summarization.`);
       return { error: 'Job not found or not transcribed' };
     }
-    const { userId, filename, metadata } = job;
+    const { user_id: userId, filename, metadata } = job;
 
     const transcriptionText = await step.run('fetch-transcription-text', async () => {
         const response = await fetch(job.txt_url!);
