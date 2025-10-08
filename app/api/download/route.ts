@@ -39,7 +39,7 @@
       doc.fontSize(11).text(Archivo: ${filename});
       doc.text(Fecha: ${new Date().toLocaleDateString('es-ES')});
       doc.text(Hora: ${new Date().toLocaleTimeString('es-ES')});
-
+     
       doc.moveDown();
       doc.text('='.repeat(80));
       doc.moveDown();
