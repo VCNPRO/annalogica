@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import jsPDF from 'jspdf';
 
 export default function Results() {
   const [files, setFiles] = useState<any[]>([]);
@@ -39,23 +40,52 @@ export default function Results() {
 
   const downloadPDF = async (txtUrl: string, filename: string) => {
     try {
+      setLoading(true);
+      // 1. Fetch the transcription text
       const textRes = await fetch(txtUrl);
+      if (!textRes.ok) {
+        throw new Error('Failed to fetch transcription text');
+      }
       const text = await textRes.text();
-      
-      const pdfRes = await fetch('/api/download', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, filename })
+
+      // 2. Initialize jsPDF
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
       });
+
+      // 3. Set properties and add content
+      const margin = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const usableWidth = pageWidth - (margin * 2);
       
-      const blob = await pdfRes.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${filename}.pdf`;
-      a.click();
+      // Set font styles for header
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text('TRANSCRIPCIÓN DE AUDIO', pageWidth / 2, margin, { align: 'center' });
+
+      // Set font styles for metadata
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text(`Archivo: ${filename}`, margin, margin + 15);
+      doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, margin, margin + 20);
+      
+      doc.line(margin, margin + 25, pageWidth - margin, margin + 25); // Separator line
+
+      // Set font styles for body and add content with wrapping
+      doc.setFontSize(10);
+      const splitText = doc.splitTextToSize(text, usableWidth);
+      doc.text(splitText, margin, margin + 35);
+
+      // 4. Save the PDF
+      doc.save(`${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`);
+
     } catch (error) {
-      alert('Error generando PDF');
+      console.error('Error generando PDF:', error);
+      alert('Error generando PDF. Por favor, inténtelo de nuevo.');
+    } finally {
+      setLoading(false);
     }
   };
 
