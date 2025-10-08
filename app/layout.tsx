@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
+import { Orbitron } from "next/font/google";
 import "./globals.css";
+
+const orbitron = Orbitron({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-orbitron",
+});
 
 export const metadata: Metadata = {
   title: "Anna Logica - Procesamiento IA",
@@ -12,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${orbitron.variable}`}>
       <body>
         {children}
         <footer className="bg-slate-900 text-slate-400 py-6 px-4 mt-auto border-t border-slate-800">

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { RefreshCw, Trash2, Sun, Moon, HelpCircle } from 'lucide-react';
+import { RefreshCw, Trash2, Sun, Moon, HelpCircle, LogOut } from 'lucide-react';
 
 // AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
@@ -15,6 +15,8 @@ interface UploadedFile {
   uploadProgress: number;
   status: FileStatus;
   date: string;
+  fileType: 'audio' | 'video' | 'text'; // New: Store file type
+  actions: string[]; // New: Store selected actions for the file
   jobId?: string; // Add jobId to link to details page
 }
 
@@ -24,6 +26,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]); // Keep this state
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState('es');
   const [targetLanguage, setTargetLanguage] = useState('en');
@@ -43,6 +46,13 @@ export default function Dashboard() {
     setLoading(false);
   }, [router]);
 
+  const getFileType = (mimeType: string): 'audio' | 'video' | 'text' => {
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('text/') || mimeType === 'application/pdf' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'text';
+    return 'text'; // Default to text if unknown, or handle as error
+  };
+
   const processFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -61,7 +71,9 @@ export default function Dashboard() {
           name: file.name,
           uploadProgress: 0,
           status: 'uploading',
-          date: new Date().toISOString()
+          date: new Date().toISOString(),
+          fileType: getFileType(file.type), // Determine file type
+          actions: [] // Initialize actions as empty
         };
         setUploadedFiles(prev => [...prev, newFile]);
 
@@ -151,6 +163,43 @@ export default function Dashboard() {
     e.stopPropagation();
   }, []);
 
+  const handleFileSelect = (fileId: string) => {
+    setSelectedFileIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(fileId)) {
+        newSet.delete(fileId);
+      } else {
+        newSet.add(fileId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedFileIds.size === uploadedFiles.length) {
+      setSelectedFileIds(new Set()); // Deselect all
+    } else {
+      setSelectedFileIds(new Set(uploadedFiles.map(file => file.id))); // Select all
+    }
+  };
+
+  const handleApplyAction = (actionName: string) => {
+    setUploadedFiles(prevFiles =>
+      prevFiles.map(file =>
+        selectedFileIds.has(file.id)
+          ? {
+              ...file,
+              actions: file.actions.includes(actionName)
+                ? file.actions.filter(a => a !== actionName) // Deselect if already selected
+                : [...file.actions, actionName], // Select if not selected
+            }
+          : file
+      )
+    );
+  };
+
+
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -181,6 +230,9 @@ export default function Dashboard() {
     );
   }
 
+  const selectedFiles = uploadedFiles.filter(file => selectedFileIds.has(file.id));
+  const canTranscribe = selectedFiles.some(file => file.fileType === 'audio' || file.fileType === 'video');
+
   const bgPrimary = darkMode ? 'bg-black' : 'bg-gray-50';
   const bgSecondary = darkMode ? 'bg-zinc-900' : 'bg-white';
   const textPrimary = darkMode ? 'text-white' : 'text-gray-900';
@@ -192,9 +244,6 @@ export default function Dashboard() {
     <div className={`min-h-screen ${bgPrimary}`}>
       <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
         Modo Producción - Usuario: {user?.email || 'Usuario'}
-        <button onClick={handleLogout} className="ml-2 underline hover:no-underline">
-          Cerrar sesión
-        </button>
       </div>
 
       <div className="fixed top-16 right-6 z-40 flex items-center gap-2">
@@ -215,13 +264,20 @@ export default function Dashboard() {
           <span className={`text-sm ${textSecondary}`}>Ajustes</span>
           <span>⚙️</span>
         </Link>
+        <button
+          onClick={handleLogout}
+          className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
+          title="Cerrar sesión"
+        >
+          <LogOut className={`h-4 w-4 ${textSecondary}`} />
+        </button>
       </div>
 
       <div className="flex pt-10" style={{ height: '100vh' }}>
         <div className={`${bgSecondary} ${border} border-r p-6 flex flex-col`} style={{ width: '33.333%', minWidth: '33.333%', maxWidth: '33.333%', height: '100%' }}>
           
           <div className="flex items-center mb-6">
-            <h1 className="text-3xl text-orange-500 tracking-tight font-black">anna logica</h1>
+                        <h1 className="font-orbitron text-[48px] text-orange-500">annalogica</h1>
           </div>
 
           <div className="mb-6">
@@ -235,7 +291,7 @@ export default function Dashboard() {
                 <h2 className={`text-sm font-medium ${textPrimary}`}>Carga de Archivos</h2>
               </div>
               <p className={`text-xs ${textSecondary} mb-3`}>
-                Sube archivos de audio, vídeo o texto (archivos grandes soportados con subida fragmentada).
+                Archivos admitidos: Audio, Video, TXT, DOCX, PDF.
               </p>
               <div className={`${textSecondary} mb-3`}>
                 <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,15 +345,25 @@ export default function Dashboard() {
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <button className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors">
+                <button
+                  onClick={() => handleApplyAction('Transcribir')}
+                  className={`p-2 ${canTranscribe ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
+                  disabled={!canTranscribe}
+                >
                   📝 Transcribir
                 </button>
-                <button className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors">
+                <button
+                  onClick={() => handleApplyAction('Identificar Oradores')}
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
                   👥 Identificar Oradores
                 </button>
               </div>
 
-              <button className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors">
+              <button
+                onClick={() => handleApplyAction('Resumir y Etiquetar')}
+                className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+              >
                 📋 Resumir y Etiquetar
               </button>
 
@@ -332,7 +398,10 @@ export default function Dashboard() {
                 onChange={(e) => setSpeakerHints(e.target.value)}
               />
 
-              <button className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors mb-2">
+              <button
+                onClick={() => handleApplyAction('Traducir')}
+                className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors mb-2"
+              >
                 🌐 Traducir
               </button>
 
@@ -348,6 +417,15 @@ export default function Dashboard() {
               </select>
             </div>
           </div>
+
+          <div className="mt-auto pt-6 text-center">
+            <p className="text-xs text-zinc-500">
+              annalogica by videoconversion digital lab, S.L.
+            </p>
+            <p className="text-xs text-zinc-500">
+              From BCN with love
+            </p>
+          </div>
         </div>
 
         <div className="flex-1 p-6 overflow-y-auto flex flex-col" style={{ height: '100%' }}>
@@ -357,6 +435,12 @@ export default function Dashboard() {
             <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
               <div>
                 <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedFileIds.size === uploadedFiles.length && uploadedFiles.length > 0}
+                    onChange={handleSelectAll}
+                    className="form-checkbox h-4 w-4 text-orange-500 rounded"
+                  />
                   <span className="text-orange-500 text-sm">📁</span>
                   <h2 className={`text-sm font-medium ${textPrimary}`}>Archivos Cargados</h2>
                 </div>
@@ -380,7 +464,22 @@ export default function Dashboard() {
                 uploadedFiles.map((file) => (
                   <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
                     <div className="flex items-center gap-4 mb-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedFileIds.has(file.id)}
+                        onChange={() => handleFileSelect(file.id)}
+                        className="form-checkbox h-4 w-4 text-orange-500 rounded"
+                      />
                       <span className={`text-xs ${textPrimary} flex-1 truncate`}>{file.name}</span>
+                      {file.actions.length > 0 && (
+                        <div className="flex flex-wrap gap-1 ml-auto">
+                          {file.actions.map(action => (
+                            <span key={action} className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                              {action}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <span className={`text-xs font-medium ${getStatusColor(file.status)}`} style={{ minWidth: '100px' }}>
                         {getStatusText(file.status)}
                       </span>
@@ -426,29 +525,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden`} style={{ flex: '1 1 40%', minHeight: '250px' }}>
-            <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-green-500 text-sm">✓</span>
-                  <h2 className={`text-sm font-medium ${textPrimary}`}>Archivos Procesados</h2>
-                </div>
-                <p className={`text-xs ${textSecondary}`}>Archivos completados y listos para descargar</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Link 
-                  href="/results"
-                  className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-medium transition-colors"
-                >
-                  Ver todos →
-                </Link>
-              </div>
-            </div>
 
-            <div className="px-4 py-8 text-center">
-              <p className={`text-xs ${textSecondary}`}>No hay archivos procesados aún.</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
