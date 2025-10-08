@@ -11,163 +11,125 @@ import {
 import { logTranscription, logSummary } from '@/lib/usage-tracking';
 
 /**
- * Process transcription job function
- * Runs asynchronously in background with retry logic
+ * [Task] Transcribe File
+ * Triggered on-demand. Transcribes audio, saves results, extracts speakers.
  */
-export const processTranscription = inngest.createFunction(
+export const transcribeFile = inngest.createFunction(
   {
-    id: 'process-transcription',
-    name: 'Process Transcription Job',
-
-    // Retry configuration
-    retries: 3,
-
-    // Rate limiting: max 5 concurrent jobs
-    concurrency: {
-      limit: 5
-    }
+    id: 'task-transcribe-file',
+    name: 'Task: Transcribe File',
+    retries: 2,
+    concurrency: { limit: 5 }
   },
-  { event: 'transcription/job.created' },
+  { event: 'task/transcribe' },
   async ({ event, step }) => {
-    const { jobId, userId, audioUrl, filename } = event.data;
+    const { jobId } = event.data;
+    const job = await TranscriptionJobDB.findById(jobId);
 
-    console.log(`[Inngest] Processing job ${jobId}`, { filename, audioUrl });
+    if (!job) {
+      console.error(`[Inngest] Job ${jobId} not found during transcription task.`);
+      return { error: 'Job not found' };
+    }
+    const { userId, audioUrl, filename } = job;
 
-    // Step 1: Update status to processing
+    console.log(`[Inngest] Starting transcription task for job ${jobId}`);
+
     await step.run('update-status-processing', async () => {
       await TranscriptionJobDB.updateStatus(jobId, 'processing');
-      return { status: 'processing' };
     });
 
-    // Step 2: Transcribe with AssemblyAI
     const transcriptionResult = await step.run('transcribe-audio', async () => {
-      try {
-        console.log(`[Inngest] Starting AssemblyAI transcription for job ${jobId}`);
-
-        const result = await transcribeAudio({
-          audioUrl,
-          language: 'es',
-          speakerLabels: true
-        });
-
-        console.log(`[Inngest] Transcription completed:`, {
-          id: result.id,
-          textLength: result.text.length,
-          duration: result.audioDuration,
-          speakers: result.utterances?.length || 0
-        });
-
-        // Track transcription usage
-        await logTranscription(userId, filename, result.audioDuration);
-
-        return result;
-      } catch (error: any) {
-        console.error(`[Inngest] Transcription failed for job ${jobId}:`, error.message);
-
-        // Update job as failed
-        await TranscriptionJobDB.updateStatus(jobId, 'failed', error.message);
-        await TranscriptionJobDB.incrementRetry(jobId);
-
-        throw error; // Will trigger Inngest retry
-      }
+      return await transcribeAudio({ audioUrl, language: 'es', speakerLabels: true });
     });
 
-    // Step 3: Save transcription files (TXT, SRT, VTT)
-    const fileUrls = await step.run('save-transcription-files', async () => {
-      try {
-        const urls = await saveTranscriptionResults(transcriptionResult, filename);
-
-        console.log(`[Inngest] Files saved for job ${jobId}:`, urls);
-
-        // Update job with file URLs
-        await TranscriptionJobDB.updateResults(jobId, {
-          assemblyaiId: transcriptionResult.id,
-          txtUrl: urls.txtUrl,
-          srtUrl: urls.srtUrl,
-          vttUrl: urls.vttUrl,
-          audioDuration: transcriptionResult.audioDuration
-        });
-
-        return urls;
-      } catch (error: any) {
-        console.error(`[Inngest] Failed to save files for job ${jobId}:`, error.message);
-        throw error;
-      }
-    });
-
-    // Step 4: Enrich with AI summary/tags and save all metadata
-    const finalData = await step.run('enrich-and-save-metadata', async () => {
-      try {
-        let summaryUrl: string | null = null;
-        let tags: string[] = [];
+    await step.run('save-results-and-metadata', async () => {
+      const urls = await saveTranscriptionResults(transcriptionResult, filename);
+      
+      const speakers = transcriptionResult.utterances
+        ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))].sort()
+        : [];
         
-        // Generate summary and tags if text is long enough
-        if (transcriptionResult.text.length >= 100) {
-          console.log(`[Inngest] Generating summary and tags for job ${jobId}`);
-          const summaryResult = await generateSummary(transcriptionResult.text);
+      const metadata = { speakers };
 
-          if (summaryResult.summary) {
-            summaryUrl = await saveSummary(summaryResult.summary, filename);
-            console.log(`[Inngest] Summary saved for job ${jobId}:`, summaryUrl);
-            
-            // Track summary usage
-            const tokensInput = Math.ceil(transcriptionResult.text.slice(0, 8000).length / 4);
-            const tokensOutput = Math.ceil(summaryResult.summary.length / 4);
-            await logSummary(userId, tokensInput, tokensOutput, 'sonnet');
-          }
-          tags = summaryResult.tags;
-        } else {
-          console.log(`[Inngest] Skipping summary for job ${jobId} (text too short)`);
-        }
-
-        // Extract speakers from transcription
-        const speakers = transcriptionResult.utterances
-          ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))].sort()
-          : [];
-
-        // Prepare metadata object
-        const metadata = {
-          speakers,
-          tags,
-        };
-
-        // Update job with summary URL and all metadata
-        await TranscriptionJobDB.updateResults(jobId, {
-          summaryUrl: summaryUrl || undefined,
-          metadata,
-        });
-        
-        console.log(`[Inngest] Metadata saved for job ${jobId}`, { summaryUrl, speakers, tags });
-
-        return { summaryUrl, metadata };
-      } catch (error: any) {
-        console.error(`[Inngest] Enrichment failed for job ${jobId}:`, error.message);
-        // Do not fail the entire job if this step fails
-        return { summaryUrl: null, metadata: {} };
-      }
-    });
-
-    // Step 5: Mark job as completed
-    await step.run('update-status-completed', async () => {
-      await TranscriptionJobDB.updateStatus(jobId, 'completed');
-
-      console.log(`[Inngest] Job ${jobId} completed successfully`, {
-        txtUrl: fileUrls.txtUrl,
-        srtUrl: fileUrls.srtUrl,
-        vttUrl: fileUrls.vttUrl,
-        summaryUrl: finalData.summaryUrl
+      await TranscriptionJobDB.updateResults(jobId, {
+        assemblyaiId: transcriptionResult.id,
+        txtUrl: urls.txtUrl,
+        srtUrl: urls.srtUrl,
+        vttUrl: urls.vttUrl,
+        audioDuration: transcriptionResult.audioDuration,
+        metadata,
       });
-
-      return { status: 'completed' };
+      
+      await logTranscription(userId, filename, transcriptionResult.audioDuration);
     });
 
-    return {
-      jobId,
-      status: 'completed',
-      results: {
-        ...fileUrls,
-        summaryUrl: finalData.summaryUrl
-      }
-    };
+    await step.run('update-status-transcribed', async () => {
+      await TranscriptionJobDB.updateStatus(jobId, 'transcribed');
+    });
+
+    console.log(`[Inngest] Transcription task for job ${jobId} completed.`);
+    return { status: 'transcribed' };
+  }
+);
+
+/**
+ * [Task] Summarize File
+ * Triggered on-demand. Generates summary and tags for a completed transcription.
+ */
+export const summarizeFile = inngest.createFunction(
+  {
+    id: 'task-summarize-file',
+    name: 'Task: Summarize File',
+    retries: 1,
+  },
+  { event: 'task/summarize' },
+  async ({ event, step }) => {
+    const { jobId } = event.data;
+    const job = await TranscriptionJobDB.findById(jobId);
+
+    if (!job || !job.txt_url) {
+      console.error(`[Inngest] Job ${jobId} not found or not transcribed yet for summarization.`);
+      return { error: 'Job not found or not transcribed' };
+    }
+    const { userId, filename, metadata } = job;
+
+    const transcriptionText = await step.run('fetch-transcription-text', async () => {
+        const response = await fetch(job.txt_url!);
+        if (!response.ok) throw new Error('Failed to fetch transcription text for summary');
+        return await response.text();
+    });
+
+    if (transcriptionText.length < 100) {
+        console.log(`[Inngest] Skipping summary for job ${jobId} (text too short)`);
+        return { status: 'skipped', reason: 'Text too short' };
+    }
+
+    const { summary, tags } = await step.run('generate-summary-and-tags', async () => {
+        return await generateSummary(transcriptionText);
+    });
+
+    if (!summary) {
+        console.warn(`[Inngest] Summary generation returned empty for job ${jobId}. Skipping save.`);
+        return { status: 'skipped', reason: 'Empty summary generated' };
+    }
+
+    const summaryUrl = await step.run('save-summary', async () => {
+        return await saveSummary(summary, filename);
+    });
+
+    await step.run('update-db-with-summary', async () => {
+        const newMetadata = { ...metadata, tags };
+        await TranscriptionJobDB.updateResults(jobId, {
+            summaryUrl,
+            metadata: newMetadata,
+        });
+        
+        const tokensInput = Math.ceil(transcriptionText.slice(0, 8000).length / 4);
+        const tokensOutput = Math.ceil(summary.length / 4);
+        await logSummary(userId, tokensInput, tokensOutput, 'sonnet');
+    });
+
+    console.log(`[Inngest] Summarization task for job ${jobId} completed.`);
+    return { status: 'summarized' };
   }
 );
