@@ -72,15 +72,21 @@ export default function FileDetailsPage(props: any) {
     return () => clearInterval(interval); // Cleanup on unmount
   }, [jobId, router]);
 
-  const startTask = async (task: 'transcribe' | 'summarize') => {
-    setIsTaskRunning(true);
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId, task }),
-      });
-      if (!res.ok) {
+      const startTask = async (task: 'transcribe' | 'summarize') => {
+        setIsTaskRunning(true);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          alert('Sesión expirada. Por favor, inicia sesión de nuevo.');
+          router.push('/login');
+          return;
+        }
+  
+        try {
+          const res = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ jobId, task }),
+          });      if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || 'Error al iniciar la tarea.');
       }
