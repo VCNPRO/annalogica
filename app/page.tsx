@@ -31,7 +31,6 @@ export default function Dashboard() {
   const [language, setLanguage] = useState('es');
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
-  const [tags, setTags] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -289,7 +288,7 @@ export default function Dashboard() {
         <div className={`${bgSecondary} ${border} border-r p-6 flex flex-col`} style={{ width: '33.333%', minWidth: '33.333%', maxWidth: '33.333%', height: '100%' }}>
           
           <div className="flex items-center mb-6">
-                        <h1 className="font-orbitron text-[48px] text-orange-500">annalogica</h1>
+                        <h1 className="font-orbitron text-[36px] text-orange-500">annalogica</h1>
           </div>
 
           <div className="mb-6">
@@ -403,13 +402,12 @@ export default function Dashboard() {
                               </div>
                             </div>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  placeholder="Tags (ej: reunión, marketing)"
-                  className={`w-full p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
-                  value={tags}
-                  onChange={(e) => setTags(e.target.value)}
-                />
+                <button
+                  onClick={() => handleApplyAction('Aplicar Tags')}
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  🏷️ Aplicar Tags
+                </button>
                 <button
                   onClick={() => handleApplyAction('Traducir')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
@@ -431,14 +429,7 @@ export default function Dashboard() {
                           </div>
                         </div>
               
-                        <button
-                          onClick={handleProcessSelectedFiles}
-                          className="w-full p-2 mt-4 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-colors"
-                          disabled={selectedFileIds.size === 0} // Disable if no files are selected
-                        >
-                          🚀 Procesar Archivos Seleccionados
-                        </button>
-          <div className="mt-auto pt-6 text-center">
+                                  <div className="mt-auto pt-6 text-center">
             <p className="text-xs text-zinc-500">
               annalogica by videoconversion digital lab, S.L.
             </p>
