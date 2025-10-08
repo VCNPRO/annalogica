@@ -130,7 +130,9 @@ export default function Results() {
             </div>
           ) : (
             <div>
-              {files.map((file: any) => (
+              {files.map((file: any) => {
+                console.log('File Metadata for:', file.name, file.metadata);
+                return (
                 <div key={file.name} className={`px-6 py-4 ${border} border-b hover:bg-zinc-800 transition-colors`}>
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
