@@ -276,6 +276,7 @@ export default function Dashboard() {
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
           title="Ajustes"
         >
+          <span className={`text-sm ${textSecondary}`}>Ajustes</span>
           <span>⚙️</span>
         </button>
         <button
