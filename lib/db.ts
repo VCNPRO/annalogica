@@ -23,7 +23,7 @@ export interface Transcription {
 export interface TranscriptionJob {
   id: string;
   user_id: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+  status: 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed';
   filename: string;
   audio_url: string;
   audio_size_bytes: number | null;
@@ -245,7 +245,7 @@ export const TranscriptionJobDB = {
   // Update job status
   updateStatus: async (
     id: string,
-    status: 'pending' | 'processing' | 'completed' | 'failed',
+    status: 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed',
     errorMessage?: string
   ): Promise<boolean> => {
     let result;

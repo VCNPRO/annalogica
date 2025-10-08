@@ -85,7 +85,7 @@ export default function FileDetailsPage(props: any) {
   if (error) return <div className="min-h-screen bg-black flex items-center justify-center text-red-500">Error: {error}</div>;
   if (!job) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Trabajo no encontrado.</div>;
 
-  const isTranscribed = job.status === 'transcribed' || job.status === 'completed' || !!job.summary_url;
+  const isTranscribed = job.status === 'transcribed' || job.status === 'summarized' || job.status === 'completed' || !!job.summary_url;
   const isSummarized = !!job.summary_url;
 
   return (
