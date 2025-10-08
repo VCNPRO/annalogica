@@ -289,6 +289,7 @@ export const TranscriptionJobDB = {
       vttUrl?: string;
       summaryUrl?: string;
       audioDuration?: number;
+      metadata?: any;
     }
   ): Promise<boolean> => {
     const result = await sql`
@@ -299,7 +300,8 @@ export const TranscriptionJobDB = {
         srt_url = COALESCE(${results.srtUrl || null}, srt_url),
         vtt_url = COALESCE(${results.vttUrl || null}, vtt_url),
         summary_url = COALESCE(${results.summaryUrl || null}, summary_url),
-        audio_duration_seconds = COALESCE(${results.audioDuration || null}, audio_duration_seconds)
+        audio_duration_seconds = COALESCE(${results.audioDuration || null}, audio_duration_seconds),
+        metadata = COALESCE(${sql.json(results.metadata || null)}, metadata)
       WHERE id = ${id}
     `;
     return (result.rowCount ?? 0) > 0;

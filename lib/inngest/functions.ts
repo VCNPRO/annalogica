@@ -5,7 +5,8 @@ import {
   saveTranscriptionResults,
   generateSummary,
   saveSummary,
-  type TranscriptionResult
+  type TranscriptionResult,
+  type SummaryResult
 } from '@/lib/assemblyai-client';
 import { logTranscription, logSummary } from '@/lib/usage-tracking';
 
@@ -94,41 +95,55 @@ export const processTranscription = inngest.createFunction(
       }
     });
 
-    // Step 4: Generate summary with Claude (optional, non-blocking)
-    const summaryUrl = await step.run('generate-summary', async () => {
+    // Step 4: Enrich with AI summary/tags and save all metadata
+    const finalData = await step.run('enrich-and-save-metadata', async () => {
       try {
-        if (transcriptionResult.text.length < 100) {
+        let summaryUrl: string | null = null;
+        let tags: string[] = [];
+        
+        // Generate summary and tags if text is long enough
+        if (transcriptionResult.text.length >= 100) {
+          console.log(`[Inngest] Generating summary and tags for job ${jobId}`);
+          const summaryResult = await generateSummary(transcriptionResult.text);
+
+          if (summaryResult.summary) {
+            summaryUrl = await saveSummary(summaryResult.summary, filename);
+            console.log(`[Inngest] Summary saved for job ${jobId}:`, summaryUrl);
+            
+            // Track summary usage
+            const tokensInput = Math.ceil(transcriptionResult.text.slice(0, 8000).length / 4);
+            const tokensOutput = Math.ceil(summaryResult.summary.length / 4);
+            await logSummary(userId, tokensInput, tokensOutput, 'sonnet');
+          }
+          tags = summaryResult.tags;
+        } else {
           console.log(`[Inngest] Skipping summary for job ${jobId} (text too short)`);
-          return null;
         }
 
-        console.log(`[Inngest] Generating summary for job ${jobId}`);
+        // Extract speakers from transcription
+        const speakers = transcriptionResult.utterances
+          ? [...new Set(transcriptionResult.utterances.map(u => u.speaker))].sort()
+          : [];
 
-        const summary = await generateSummary(transcriptionResult.text);
+        // Prepare metadata object
+        const metadata = {
+          speakers,
+          tags,
+        };
 
-        if (!summary) {
-          return null;
-        }
-
-        const url = await saveSummary(summary, filename);
-
-        console.log(`[Inngest] Summary saved for job ${jobId}:`, url);
-
-        // Update job with summary URL
+        // Update job with summary URL and all metadata
         await TranscriptionJobDB.updateResults(jobId, {
-          summaryUrl: url
+          summaryUrl,
+          metadata,
         });
+        
+        console.log(`[Inngest] Metadata saved for job ${jobId}`, { summaryUrl, speakers, tags });
 
-        // Track summary usage
-        const tokensInput = Math.ceil(transcriptionResult.text.slice(0, 8000).length / 4);
-        const tokensOutput = Math.ceil(summary.length / 4);
-        await logSummary(userId, tokensInput, tokensOutput, 'sonnet');
-
-        return url;
+        return { summaryUrl, metadata };
       } catch (error: any) {
-        console.error(`[Inngest] Summary generation failed for job ${jobId}:`, error.message);
-        // Don't fail the entire job if summary fails
-        return null;
+        console.error(`[Inngest] Enrichment failed for job ${jobId}:`, error.message);
+        // Do not fail the entire job if this step fails
+        return { summaryUrl: null, metadata: {} };
       }
     });
 

@@ -215,17 +215,22 @@ export async function saveTranscriptionResults(
   };
 }
 
+export interface SummaryResult {
+  summary: string;
+  tags: string[];
+}
+
 /**
- * Generate summary using Claude API
+ * Generate summary and tags using Claude API
  */
-export async function generateSummary(text: string): Promise<string> {
+export async function generateSummary(text: string): Promise<SummaryResult> {
   const apiKey = process.env.CLAUDE_API_KEY;
   if (!apiKey) {
     throw new Error('CLAUDE_API_KEY not configured');
   }
 
   if (text.length < 100) {
-    return ''; // Skip summary for very short texts
+    return { summary: '', tags: [] }; // Skip for very short texts
   }
 
   try {
@@ -241,7 +246,7 @@ export async function generateSummary(text: string): Promise<string> {
         max_tokens: 2000,
         messages: [{
           role: 'user',
-          content: `Resume el siguiente texto en español en 3-4 párrafos. Extrae también 5-7 tags/categorías principales (por ejemplo: tecnología, negocios, educación, etc.):\n\n${text.slice(0, 8000)}`
+          content: `Resume el siguiente texto en español en 3-4 párrafos. Después del resumen, añade una sección llamada "Tags:" seguida de una lista de 5-7 tags/categorías principales separadas por comas (por ejemplo: Tags: tecnología, negocios, educación).\n\nTexto:\n${text.slice(0, 8000)}`
         }]
       })
     });
@@ -252,10 +257,26 @@ export async function generateSummary(text: string): Promise<string> {
     }
 
     const data = await response.json();
-    return data.content[0].text;
+    const fullText = data.content[0].text;
+
+    // Parse summary and tags
+    let summary = fullText;
+    let tags: string[] = [];
+
+    const tagsMarker = /\n(Tags|Categorías):/i;
+    const match = fullText.match(tagsMarker);
+
+    if (match && match.index) {
+      summary = fullText.slice(0, match.index).trim();
+      const tagsString = fullText.slice(match.index + match[0].length).trim();
+      tags = tagsString.split(',').map(tag => tag.trim()).filter(Boolean);
+    }
+
+    return { summary, tags };
+
   } catch (error: any) {
     console.error('[Claude] Summary generation failed:', error.message);
-    return ''; // Don't fail the entire job if summary fails
+    return { summary: '', tags: [] }; // Don't fail the entire job
   }
 }
 
