@@ -122,7 +122,7 @@ export const processTranscription = inngest.createFunction(
 
         // Extract speakers from transcription
         const speakers = transcriptionResult.utterances
-          ? [...new Set(transcriptionResult.utterances.map(u => u.speaker))].sort()
+          ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))].sort()
           : [];
 
         // Prepare metadata object

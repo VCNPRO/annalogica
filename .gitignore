@@ -56,3 +56,6 @@ npm-debug.log*
 
 # Backups
 *.backup
+
+# Special Windows files
+nul
