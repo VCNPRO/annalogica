@@ -1,4 +1,4 @@
- export async function GET() {
+ import PDFDocument from 'pdfkit';
     return Response.json({ error: 'Use POST method' }, { status: 405 });
   }
 
