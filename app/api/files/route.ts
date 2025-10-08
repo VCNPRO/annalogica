@@ -25,7 +25,8 @@ export async function GET(request: Request) {
         summaryUrl: job.summary_url,
         audioUrl: job.audio_url,
         audioDuration: job.audio_duration_seconds,
-        jobId: job.id
+        jobId: job.id,
+        metadata: job.metadata
       }));
 
     return Response.json({ files });

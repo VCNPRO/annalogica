@@ -133,7 +133,28 @@ export default function Results() {
               {files.map((file: any) => (
                 <div key={file.name} className={`px-6 py-4 ${border} border-b hover:bg-zinc-800 transition-colors`}>
                   <div className="flex items-center justify-between gap-4">
-                    <span className={`text-sm ${textPrimary} truncate flex-1`}>{file.name}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm ${textPrimary} truncate`}>{file.name}</p>
+                      {/* METADATA DISPLAY */}
+                      {(file.metadata?.speakers?.length > 0 || file.metadata?.tags?.length > 0) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                          {file.metadata?.speakers?.length > 0 && (
+                            <span className="flex items-center gap-1 text-zinc-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                              {file.metadata.speakers.join(', ')}
+                            </span>
+                          )}
+                          {file.metadata?.speakers?.length > 0 && file.metadata?.tags?.length > 0 && (
+                            <span className="text-zinc-600">|</span>
+                          )}
+                          {file.metadata?.tags?.map((tag: string) => (
+                            <span key={tag} className="px-2 py-0.5 bg-purple-900/50 text-purple-300 rounded-full">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <div className="flex flex-col gap-2">
                       <div className="flex gap-2 text-xs">
                         <button onClick={() => downloadFile(file.txtUrl)} className="text-blue-500 hover:underline">TXT</button>
