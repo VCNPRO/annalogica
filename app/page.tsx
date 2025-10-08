@@ -31,7 +31,7 @@ export default function Dashboard() {
   const [language, setLanguage] = useState('es');
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
-  const [speakerHints, setSpeakerHints] = useState('');
+  const [tags, setTags] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -365,57 +365,58 @@ export default function Dashboard() {
                   📝 Transcribir
                 </button>
                 <button
-                  onClick={() => handleApplyAction('Identificar Oradores')}
-                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                  onClick={() => handleApplyAction('Procesar Archivos')}
+                  className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-colors"
                 >
-                  👥 Identificar Oradores
+                  🚀 Procesar Archivos
                 </button>
               </div>
 
-              <button
-                onClick={() => handleApplyAction('Resumir y Etiquetar')}
-                className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-              >
-                📋 Resumir y Etiquetar
-              </button>
-
-              <div className="flex items-center gap-3 text-xs mb-2">
-                <label className="flex items-center gap-1">
-                  <input 
-                    type="radio" 
-                    className="accent-orange-500 scale-75" 
-                    name="summary"
-                    checked={summaryType === 'short'}
-                    onChange={() => setSummaryType('short')}
-                  />
-                  <span className={textSecondary}>Corto</span>
-                </label>
-                <label className="flex items-center gap-1">
-                  <input 
-                    type="radio" 
-                    className="accent-orange-500 scale-75" 
-                    name="summary"
-                    checked={summaryType === 'detailed'}
-                    onChange={() => setSummaryType('detailed')}
-                  />
-                  <span className={textSecondary}>Detallado</span>
-                </label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => handleApplyAction('Resumir')}
+                                className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                              >
+                                📋 Resumir
+                              </button>
+                              <div className="flex items-center justify-around gap-1 text-xs">
+                                <label className="flex items-center gap-1">
+                                  <input
+                                    type="radio"
+                                    className="accent-orange-500 scale-75"
+                                    name="summary"
+                                    checked={summaryType === 'short'}
+                                    onChange={() => setSummaryType('short')}
+                                  />
+                                  <span className={textSecondary}>Corto</span>
+                                </label>
+                                <label className="flex items-center gap-1">
+                                  <input
+                                    type="radio"
+                                    className="accent-orange-500 scale-75"
+                                    name="summary"
+                                    checked={summaryType === 'detailed'}
+                                    onChange={() => setSummaryType('detailed')}
+                                  />
+                                  <span className={textSecondary}>Detallado</span>
+                                </label>
+                              </div>
+                            </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  placeholder="Tags (ej: reunión, marketing)"
+                  className={`w-full p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
+                  value={tags}
+                  onChange={(e) => setTags(e.target.value)}
+                />
+                <button
+                  onClick={() => handleApplyAction('Traducir')}
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  🌐 Traducir
+                </button>
               </div>
-
-              <input
-                type="text"
-                placeholder="Pistas de oradores (ej: Ana, Juan)"
-                className={`w-full p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 mb-2`}
-                value={speakerHints}
-                onChange={(e) => setSpeakerHints(e.target.value)}
-              />
-
-              <button
-                onClick={() => handleApplyAction('Traducir')}
-                className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors mb-2"
-              >
-                🌐 Traducir
-              </button>
 
                             <select
                               className={`w-full p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
@@ -442,7 +443,7 @@ export default function Dashboard() {
               annalogica by videoconversion digital lab, S.L.
             </p>
             <p className="text-xs text-zinc-500">
-              From BCN with love
+              From Barcelona with love
             </p>
           </div>
         </div>
