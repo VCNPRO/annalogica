@@ -82,7 +82,6 @@ export default function Results() {
       doc.save(`${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`);
 
     } catch (error) {
-      console.error('Error generando PDF:', error);
       alert('Error generando PDF. Por favor, inténtelo de nuevo.');
     } finally {
       setLoading(false);
