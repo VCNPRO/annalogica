@@ -26,6 +26,7 @@
 
       const doc = new PDFDocument({
         size: 'A4',
+        font: 'Courier', // <--- ESTE ES EL ÚNICO CAMBIO
         margins: { top: 50, bottom: 50, left: 50, right: 50 }
       });
 
@@ -57,9 +58,9 @@
       doc.fontSize(10).text(text, { align: 'left' });
       doc.moveDown(2);
 
+
       doc.text('='.repeat(80));
       doc.fontSize(9).text('Generado por Annalogica', { align: 'center' });
-
 
       doc.end();
 
