@@ -30,7 +30,7 @@ export const transcribeFile = inngest.createFunction(
       console.error(`[Inngest] Job ${jobId} not found during transcription task.`);
       return { error: 'Job not found' };
     }
-    const { user_id: userId, audioUrl, filename } = job;
+    const { user_id: userId, audio_url: audioUrl, filename } = job;
 
     console.log(`[Inngest] Starting transcription task for job ${jobId}`);
 
