@@ -1,32 +1,18 @@
- import PDFDocument from 'pdfkit';
-
-  export async function GET() {
+ export async function GET() {
     return Response.json({ error: 'Use POST method' }, { status: 405 });
   }
-
 
   export async function POST(request: Request) {
     try {
       const { text, filename } = await request.json();
 
 
-      // --- INICIO DE LOGS PARA DEPURACIÓN ---
-      console.log('PDF Generation: Received request.');
-      console.log('PDF Generation: Filename:', filename);
-      console.log('PDF Generation: Text length:', text ? text.length : 'undefined or null');
-      console.log('PDF Generation: Text snippet:', text ? text.substring(0, 100) + '...' : 'No text received.');
-      // --- FIN DE LOGS PARA DEPURACIÓN ---
-
-
       if (!text || !filename) {
-        console.error('PDF Generation: Missing required data (text or filename).');
         return Response.json({ error: 'Faltan datos requeridos' }, { status: 400 });
       }
 
-
       const doc = new PDFDocument({
         size: 'A4',
-        font: 'Courier', // <--- ESTE ES EL ÚNICO CAMBIO
         margins: { top: 50, bottom: 50, left: 50, right: 50 }
       });
 
@@ -52,7 +38,6 @@
       doc.text('='.repeat(80));
       doc.moveDown();
 
-
       doc.fontSize(10).text('CONTENIDO:', { underline: true });
       doc.moveDown();
       doc.fontSize(10).text(text, { align: 'left' });
@@ -65,8 +50,6 @@
       doc.end();
 
       const pdfBuffer = await pdfPromise;
-
-      console.log('PDF Generation: Successfully created PDF buffer. Size:', pdfBuffer.length);
 
 
       return new Response(new Uint8Array(pdfBuffer), {
