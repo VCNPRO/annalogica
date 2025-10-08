@@ -198,6 +198,18 @@ export default function Dashboard() {
     );
   };
 
+  const handleProcessSelectedFiles = () => {
+    if (selectedFileIds.size === 0) {
+      alert('Por favor, selecciona al menos un archivo para procesar.');
+      return;
+    }
+    const filesToProcess = uploadedFiles.filter(file => selectedFileIds.has(file.id));
+    console.log('Archivos a procesar:', filesToProcess);
+    alert('Iniciando procesamiento de archivos seleccionados. Revisa la consola para más detalles.');
+    // Here you would typically make an API call to your backend
+    // to start the actual processing based on filesToProcess and their actions.
+  };
+
 
 
   const handleLogout = () => {
@@ -405,19 +417,26 @@ export default function Dashboard() {
                 🌐 Traducir
               </button>
 
-              <select 
-                className={`w-full p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
-                value={targetLanguage}
-                onChange={(e) => setTargetLanguage(e.target.value)}
-              >
-                <option value="en">Inglés</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-                <option value="ca">Català</option>
-              </select>
-            </div>
-          </div>
-
+                            <select
+                              className={`w-full p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
+                              value={targetLanguage}
+                              onChange={(e) => setTargetLanguage(e.target.value)}
+                            >
+                              <option value="en">Inglés</option>
+                              <option value="es">Español</option>
+                              <option value="fr">Français</option>
+                              <option value="ca">Català</option>
+                            </select>
+                          </div>
+                        </div>
+              
+                        <button
+                          onClick={handleProcessSelectedFiles}
+                          className="w-full p-2 mt-4 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-colors"
+                          disabled={selectedFileIds.size === 0} // Disable if no files are selected
+                        >
+                          🚀 Procesar Archivos Seleccionados
+                        </button>
           <div className="mt-auto pt-6 text-center">
             <p className="text-xs text-zinc-500">
               annalogica by videoconversion digital lab, S.L.
