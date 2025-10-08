@@ -155,7 +155,7 @@ export const processTranscription = inngest.createFunction(
         txtUrl: fileUrls.txtUrl,
         srtUrl: fileUrls.srtUrl,
         vttUrl: fileUrls.vttUrl,
-        summaryUrl
+        summaryUrl: finalData.summaryUrl
       });
 
       return { status: 'completed' };
