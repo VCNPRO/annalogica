@@ -1,9 +1,7 @@
- `json
-      {
-        "functions": {
-          "app/api/download/route.ts": {
-            "includeFiles": "node_modules/pdfkit/**"
-          }
-        }
+ {
+    "functions": {
+      "app/api/download/route.ts": {
+        "includeFiles": "node_modules/pdfkit/**"
       }
-      `
+    }
+  }
