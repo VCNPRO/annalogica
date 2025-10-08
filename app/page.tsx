@@ -194,6 +194,9 @@ export default function Dashboard() {
       setTimeout(() => {
         clearInterval(pollInterval);
       }, 300000);
+      // Redirect to the new job details page
+      router.push(`/files/${jobId}`);
+      setUploadedFiles([]); // Clear the list of uploaded files
       
     } catch (err: any) {
       setUploadedFiles(prev => prev.map(f => 
