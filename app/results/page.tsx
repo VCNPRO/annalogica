@@ -41,48 +41,66 @@ export default function Results() {
   const downloadPDF = async (txtUrl: string, filename: string) => {
     try {
       setLoading(true);
-      // 1. Fetch the transcription text
       const textRes = await fetch(txtUrl);
-      if (!textRes.ok) {
-        throw new Error('Failed to fetch transcription text');
-      }
+      if (!textRes.ok) throw new Error('Failed to fetch transcription text');
       const text = await textRes.text();
 
-      // 2. Initialize jsPDF
-      const doc = new jsPDF({
-        orientation: 'p',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      // 3. Set properties and add content
+      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
       const margin = 20;
       const pageWidth = doc.internal.pageSize.getWidth();
       const usableWidth = pageWidth - (margin * 2);
       
-      // Set font styles for header
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(16);
       doc.text('TRANSCRIPCIÓN DE AUDIO', pageWidth / 2, margin, { align: 'center' });
 
-      // Set font styles for metadata
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(11);
       doc.text(`Archivo: ${filename}`, margin, margin + 15);
       doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, margin, margin + 20);
-      
-      doc.line(margin, margin + 25, pageWidth - margin, margin + 25); // Separator line
+      doc.line(margin, margin + 25, pageWidth - margin, margin + 25);
 
-      // Set font styles for body and add content with wrapping
       doc.setFontSize(10);
       const splitText = doc.splitTextToSize(text, usableWidth);
       doc.text(splitText, margin, margin + 35);
 
-      // 4. Save the PDF
       doc.save(`${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`);
-
     } catch (error) {
-      alert('Error generando PDF. Por favor, inténtelo de nuevo.');
+      alert('Error generando PDF de la transcripción.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadSummaryPDF = async (summaryUrl: string, filename: string) => {
+    try {
+      setLoading(true);
+      const textRes = await fetch(summaryUrl);
+      if (!textRes.ok) throw new Error('Failed to fetch summary text');
+      const text = await textRes.text();
+
+      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+      const margin = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const usableWidth = pageWidth - (margin * 2);
+      
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text('RESUMEN DE TRANSCRIPCIÓN', pageWidth / 2, margin, { align: 'center' });
+
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text(`Archivo original: ${filename}`, margin, margin + 15);
+      doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, margin, margin + 20);
+      doc.line(margin, margin + 25, pageWidth - margin, margin + 25);
+
+      doc.setFontSize(10);
+      const splitText = doc.splitTextToSize(text, usableWidth);
+      doc.text(splitText, margin, margin + 35);
+
+      doc.save(`${filename.replace(/\.[^/.]+$/, '')}-resumen.pdf`);
+    } catch (error) {
+      alert('Error generando PDF del resumen.');
     } finally {
       setLoading(false);
     }
@@ -95,10 +113,7 @@ export default function Results() {
       const token = localStorage.getItem('token');
       await fetch('/api/files', {
         method: 'DELETE',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename })
       });
       loadFiles();
@@ -163,7 +178,7 @@ export default function Results() {
                         <span className={textSecondary}>|</span>
                         {file.vttUrl && <><button onClick={() => downloadFile(file.vttUrl)} className="text-cyan-500 hover:underline">VTT</button><span className={textSecondary}>|</span></>}
                         <button onClick={() => downloadPDF(file.txtUrl, file.name)} className="text-purple-500 hover:underline">PDF</button>
-                        {file.summaryUrl && <><span className={textSecondary}>|</span><button onClick={() => downloadFile(file.summaryUrl)} className="text-amber-500 hover:underline">Resumen</button></>}
+                        {file.summaryUrl && <><span className={textSecondary}>|</span><button onClick={() => downloadSummaryPDF(file.summaryUrl, file.name)} className="text-amber-500 hover:underline">Resumen</button></>}
                         <span className={textSecondary}>|</span>
                         <button onClick={() => deleteFile(file.name)} className="text-red-500 hover:underline">Eliminar</button>
                       </div>
