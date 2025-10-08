@@ -28,7 +28,11 @@ const formatDate = (dateString: string) => {
   });
 };
 
-export default function FileDetailsPage({ params }: { params: { jobId: string } }) {
+interface FileDetailsPageProps {
+  params: { jobId: string };
+}
+
+export default function FileDetailsPage({ params }: FileDetailsPageProps) {
   const { jobId } = params;
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
