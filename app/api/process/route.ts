@@ -44,10 +44,9 @@ export async function POST(request: Request) {
 
     console.log('[API Process] Job created:', job.id, { filename, audioUrl });
 
-    // Send job to Inngest queue for async processing - DISABLED FOR ON-DEMAND PROCESSING
-    /*
+    // Send job to Inngest queue for async processing
     await inngest.send({
-      name: 'transcription/job.created',
+      name: 'task/transcribe',
       data: {
         jobId: job.id,
         userId: user.userId,
@@ -57,7 +56,6 @@ export async function POST(request: Request) {
     });
 
     console.log('[API Process] Job sent to Inngest:', job.id);
-    */
 
     // Return immediately with job ID
     // Frontend will poll /api/jobs/:id for status
