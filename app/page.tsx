@@ -247,7 +247,7 @@ export default function Dashboard() {
             const updated = prev.map(f => {
               if (f.id === file.id) {
                 console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
-                return { ...f, jobId, status: 'pending' };
+                return { ...f, jobId, status: 'pending' as const };
               }
               return f;
             });
