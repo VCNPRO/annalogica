@@ -238,12 +238,22 @@ export default function Dashboard() {
 
           const { jobId } = responseData;
           console.log('[Process] ✅ Job created:', jobId, file.name);
+          console.log('[Process] Updating file with ID:', file.id, 'New jobId:', jobId);
           processedCount++;
 
           // Update file with jobId
-          setUploadedFiles(prev => prev.map(f =>
-            f.id === file.id ? { ...f, jobId, status: 'pending' } : f
-          ));
+          setUploadedFiles(prev => {
+            console.log('[Process] Current files before update:', prev.map(f => ({ id: f.id, name: f.name, jobId: f.jobId })));
+            const updated = prev.map(f => {
+              if (f.id === file.id) {
+                console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
+                return { ...f, jobId, status: 'pending' };
+              }
+              return f;
+            });
+            console.log('[Process] Files after update:', updated.map(f => ({ id: f.id, name: f.name, jobId: f.jobId })));
+            return updated;
+          });
         } catch (err: any) {
           console.error('[Process] ❌ Error:', err);
           setError(`Error procesando ${file.name}: ${err.message}`);
