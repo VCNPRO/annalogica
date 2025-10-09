@@ -18,6 +18,7 @@ interface UploadedFile {
   fileType: 'audio' | 'video' | 'text'; // New: Store file type
   actions: string[]; // New: Store selected actions for the file
   jobId?: string; // Add jobId to link to details page
+  blobUrl?: string; // Store blob URL for processing
 }
 
 export default function Dashboard() {
@@ -101,40 +102,9 @@ export default function Dashboard() {
 
         const blobUrl = blob.url;
 
-        // Actualizar progreso de upload
+        // Actualizar progreso de upload y guardar blobUrl
         setUploadedFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, uploadProgress: 100 } : f
-        ));
-
-        // Iniciar procesamiento asíncrono con AssemblyAI (solo crear el job)
-        const filename = file.name;
-        const processRes = await fetch('/api/process', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ audioUrl: blobUrl, filename })
-        });
-
-        if (!processRes.ok) {
-          const text = await processRes.text();
-          let errorMessage = 'Error al procesar';
-          try {
-            const errorData = JSON.parse(text);
-            errorMessage = errorData.error || errorMessage;
-          } catch {
-            errorMessage = text || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
-
-        const { jobId } = await processRes.json();
-        console.log('[Upload] Job created:', jobId);
-
-        // Update status to pending and add jobId
-        setUploadedFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, status: 'pending', jobId: jobId } : f
+          f.id === fileId ? { ...f, uploadProgress: 100, status: 'pending', blobUrl } : f
         ));
       }
       
@@ -197,16 +167,73 @@ export default function Dashboard() {
     );
   };
 
-  const handleProcessSelectedFiles = () => {
+  const handleProcessSelectedFiles = async () => {
     if (selectedFileIds.size === 0) {
       alert('Por favor, selecciona al menos un archivo para procesar.');
       return;
     }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Sesión expirada');
+      return;
+    }
+
     const filesToProcess = uploadedFiles.filter(file => selectedFileIds.has(file.id));
-    console.log('Archivos a procesar:', filesToProcess);
-    alert('Iniciando procesamiento de archivos seleccionados. Revisa la consola para más detalles.');
-    // Here you would typically make an API call to your backend
-    // to start the actual processing based on filesToProcess and their actions.
+
+    // Verificar que tengan acciones seleccionadas
+    const filesWithoutActions = filesToProcess.filter(f => f.actions.length === 0);
+    if (filesWithoutActions.length > 0) {
+      alert('Por favor, selecciona al menos una acción (Transcribir, Resumir, etc.) para los archivos.');
+      return;
+    }
+
+    // Verificar que tengan blobUrl
+    const filesWithoutUrl = filesToProcess.filter(f => !f.blobUrl);
+    if (filesWithoutUrl.length > 0) {
+      alert('Algunos archivos no se cargaron correctamente. Por favor, recárgalos.');
+      return;
+    }
+
+    setError(null);
+
+    // Procesar archivos que tengan "Transcribir" en sus acciones
+    for (const file of filesToProcess) {
+      if (file.actions.includes('Transcribir')) {
+        try {
+          const processRes = await fetch('/api/process', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ audioUrl: file.blobUrl, filename: file.name })
+          });
+
+          if (!processRes.ok) {
+            const errorData = await processRes.json();
+            throw new Error(errorData.error || 'Error al procesar');
+          }
+
+          const { jobId } = await processRes.json();
+          console.log('[Process] Job created:', jobId, file.name);
+
+          // Update file with jobId
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === file.id ? { ...f, jobId, status: 'pending' } : f
+          ));
+        } catch (err: any) {
+          console.error('[Process] Error:', err);
+          setError(`Error procesando ${file.name}: ${err.message}`);
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === file.id ? { ...f, status: 'error' } : f
+          ));
+        }
+      }
+    }
+
+    // Deselect all after processing
+    setSelectedFileIds(new Set());
   };
 
 
@@ -374,7 +401,7 @@ export default function Dashboard() {
                   📝 Transcribir
                 </button>
                 <button
-                  onClick={() => handleApplyAction('Procesar Archivos')}
+                  onClick={handleProcessSelectedFiles}
                   className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-colors"
                 >
                   🚀 Procesar Archivos
