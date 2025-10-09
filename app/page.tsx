@@ -168,6 +168,9 @@ export default function Dashboard() {
   };
 
   const handleProcessSelectedFiles = async () => {
+    console.log('[Process] Button clicked! Selected files:', selectedFileIds.size);
+    console.log('[Process] Uploaded files:', uploadedFiles.map(f => ({ id: f.id, name: f.name, actions: f.actions, blobUrl: f.blobUrl })));
+
     if (selectedFileIds.size === 0) {
       alert('Por favor, selecciona al menos un archivo para procesar.');
       return;
@@ -180,27 +183,39 @@ export default function Dashboard() {
     }
 
     const filesToProcess = uploadedFiles.filter(file => selectedFileIds.has(file.id));
+    console.log('[Process] Files to process (after filter):', filesToProcess.map(f => ({ name: f.name, actions: f.actions })));
 
     // Verificar que tengan acciones seleccionadas
     const filesWithoutActions = filesToProcess.filter(f => f.actions.length === 0);
     if (filesWithoutActions.length > 0) {
-      alert('Por favor, selecciona al menos una acción (Transcribir, Resumir, etc.) para los archivos.');
+      console.log('[Process] Files without actions:', filesWithoutActions.map(f => f.name));
+      alert(`⚠️ ALERTA: Los siguientes archivos no tienen acciones seleccionadas:\n\n${filesWithoutActions.map(f => '• ' + f.name).join('\n')}\n\nPor favor, haz click en "📝 Transcribir" primero.`);
       return;
     }
 
     // Verificar que tengan blobUrl
     const filesWithoutUrl = filesToProcess.filter(f => !f.blobUrl);
     if (filesWithoutUrl.length > 0) {
+      console.log('[Process] Files without blobUrl:', filesWithoutUrl.map(f => f.name));
       alert('Algunos archivos no se cargaron correctamente. Por favor, recárgalos.');
       return;
     }
 
     setError(null);
 
+    console.log('[Process] ✅ All validations passed! Starting processing...');
+    console.log('[Process] Files to process:', filesToProcess.map(f => ({ name: f.name, actions: f.actions, blobUrl: f.blobUrl })));
+
+    let processedCount = 0;
+
     // Procesar archivos que tengan "Transcribir" en sus acciones
     for (const file of filesToProcess) {
+      console.log('[Process] Checking file:', file.name, 'Actions:', file.actions, 'Has Transcribir?', file.actions.includes('Transcribir'));
+
       if (file.actions.includes('Transcribir')) {
         try {
+          console.log('[Process] 🚀 Processing file:', file.name, 'blobUrl:', file.blobUrl);
+
           const processRes = await fetch('/api/process', {
             method: 'POST',
             headers: {
@@ -210,26 +225,43 @@ export default function Dashboard() {
             body: JSON.stringify({ audioUrl: file.blobUrl, filename: file.name })
           });
 
+          console.log('[Process] API Response status:', processRes.status);
+
           if (!processRes.ok) {
             const errorData = await processRes.json();
+            console.error('[Process] API Error:', errorData);
             throw new Error(errorData.error || 'Error al procesar');
           }
 
-          const { jobId } = await processRes.json();
-          console.log('[Process] Job created:', jobId, file.name);
+          const responseData = await processRes.json();
+          console.log('[Process] API Response data:', responseData);
+
+          const { jobId } = responseData;
+          console.log('[Process] ✅ Job created:', jobId, file.name);
+          processedCount++;
 
           // Update file with jobId
           setUploadedFiles(prev => prev.map(f =>
             f.id === file.id ? { ...f, jobId, status: 'pending' } : f
           ));
         } catch (err: any) {
-          console.error('[Process] Error:', err);
+          console.error('[Process] ❌ Error:', err);
           setError(`Error procesando ${file.name}: ${err.message}`);
           setUploadedFiles(prev => prev.map(f =>
             f.id === file.id ? { ...f, status: 'error' } : f
           ));
         }
+      } else {
+        console.log('[Process] ⏭️ Skipping file (no Transcribir action):', file.name);
       }
+    }
+
+    console.log('[Process] 🏁 Finished! Processed', processedCount, 'files');
+
+    if (processedCount > 0) {
+      alert(`✅ ${processedCount} archivo(s) enviado(s) a procesamiento!\n\nPuedes ver el progreso en la tabla de archivos.`);
+    } else {
+      alert('⚠️ No se procesó ningún archivo. Verifica que tengan la acción "Transcribir" seleccionada.');
     }
 
     // Deselect all after processing
