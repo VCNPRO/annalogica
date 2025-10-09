@@ -7,7 +7,7 @@ import { RefreshCw, Trash2, Sun, Moon, HelpCircle, LogOut } from 'lucide-react';
 
 // AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
-type FileStatus = 'uploading' | 'pending' | 'error'; // Simplified statuses for this page
+type FileStatus = 'uploading' | 'pending' | 'processing' | 'completed' | 'error';
 
 interface UploadedFile {
   id: string;
@@ -36,15 +36,68 @@ export default function Dashboard() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    
+
     if (!token || !userData) {
       router.push('/login');
       return;
     }
-    
+
     setUser(JSON.parse(userData));
     setLoading(false);
   }, [router]);
+
+  // Polling para actualizar estado de jobs activos
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    // Filtrar archivos que necesitan polling (tienen jobId y están pending o processing)
+    const activeJobs = uploadedFiles.filter(
+      f => f.jobId && (f.status === 'pending' || f.status === 'processing')
+    );
+
+    if (activeJobs.length === 0) return;
+
+    const pollJobs = async () => {
+      for (const file of activeJobs) {
+        try {
+          const res = await fetch(`/api/jobs/${file.jobId}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (!res.ok) continue;
+
+          const data = await res.json();
+          const job = data.job;
+
+          // Map job status to FileStatus
+          let newStatus: FileStatus = file.status;
+          if (job.status === 'processing') {
+            newStatus = 'processing';
+          } else if (job.status === 'completed' || job.status === 'transcribed' || job.status === 'summarized') {
+            newStatus = 'completed';
+          } else if (job.status === 'failed' || job.status === 'error') {
+            newStatus = 'error';
+          }
+
+          // Update file status if changed
+          if (newStatus !== file.status) {
+            setUploadedFiles(prev => prev.map(f =>
+              f.id === file.id ? { ...f, status: newStatus } : f
+            ));
+          }
+        } catch (err) {
+          console.error('[Polling] Error fetching job:', file.jobId, err);
+        }
+      }
+    };
+
+    // Poll immediately and then every 5 seconds
+    pollJobs();
+    const interval = setInterval(pollJobs, 5000);
+
+    return () => clearInterval(interval);
+  }, [uploadedFiles]);
 
   const getFileType = (mimeType: string): 'audio' | 'video' | 'text' => {
     if (mimeType.startsWith('audio/')) return 'audio';
@@ -290,6 +343,8 @@ export default function Dashboard() {
     switch (status) {
       case 'uploading': return 'Subiendo';
       case 'pending': return 'Pendiente';
+      case 'processing': return 'Procesando';
+      case 'completed': return 'Completado';
       case 'error': return 'Error';
     }
   };
@@ -298,6 +353,8 @@ export default function Dashboard() {
     switch (status) {
       case 'uploading': return darkMode ? 'text-blue-400' : 'text-blue-600';
       case 'pending': return darkMode ? 'text-amber-400' : 'text-amber-600';
+      case 'processing': return darkMode ? 'text-purple-400' : 'text-purple-600';
+      case 'completed': return darkMode ? 'text-green-400' : 'text-green-600';
       case 'error': return darkMode ? 'text-red-400' : 'text-red-600';
     }
   };
@@ -536,13 +593,20 @@ export default function Dashboard() {
                 </div>
                 <p className={`text-xs ${textSecondary}`}>Archivos en proceso de subida y procesamiento</p>
               </div>
-              {/* Removed selectedUploadedFiles.length > 0 check for delete button */}
-              <button 
-                onClick={() => setUploadedFiles([])} 
-                className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
-              >
-                Limpiar
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => router.push('/results')}
+                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
+                >
+                  📊 Ver Resultados
+                </button>
+                <button
+                  onClick={() => setUploadedFiles([])}
+                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
+                >
+                  Limpiar
+                </button>
+              </div>
             </div>
 
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(60vh - 200px)' }}>
@@ -574,13 +638,8 @@ export default function Dashboard() {
                         {getStatusText(file.status)}
                       </span>
                       <div className="flex items-center gap-2" style={{ minWidth: '80px' }}>
-                        {file.status === 'pending' && file.jobId && (
-                          <Link href={`/files/${file.jobId}`} className={`p-1 ${hover} rounded`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-3 w-3 ${textSecondary}`}><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                          </Link>
-                        )}
-                        <button 
-                          onClick={() => setUploadedFiles(prev => prev.filter(f => f.id !== file.id))} 
+                        <button
+                          onClick={() => setUploadedFiles(prev => prev.filter(f => f.id !== file.id))}
                           className={`p-1 ${hover} rounded`}
                           title="Eliminar"
                         >
@@ -588,7 +647,7 @@ export default function Dashboard() {
                         </button>
                       </div>
                     </div>
-                    
+
                     <div className="ml-6 space-y-1">
                       {file.status === 'uploading' && (
                         <div>
@@ -599,13 +658,6 @@ export default function Dashboard() {
                           <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
                             <div className="bg-blue-500 h-1 rounded-full transition-all" style={{ width: `${file.uploadProgress}%` }} />
                           </div>
-                        </div>
-                      )}
-                      
-                      {(file.status === 'pending' || file.status === 'error') && (
-                        <div className="flex justify-between mb-1">
-                          <span className={`text-xs ${textSecondary}`}>Estado</span>
-                          <span className={`text-xs ${getStatusColor(file.status)}`}>{getStatusText(file.status)}</span>
                         </div>
                       )}
                     </div>
