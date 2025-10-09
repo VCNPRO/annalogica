@@ -296,14 +296,8 @@ export default function Dashboard() {
               <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>
               <span className="text-white">trabajando para</span>
             </div>
-            {(user?.companyName || user?.name) && (
-              <p className={`${textPrimary} -mt-1 ml-1`}>{user.companyName || user.name}</p>
-            )}
-            {/* Bloque de depuración temporal */}
-            {user && (
-              <pre className="text-xs text-white bg-gray-800 p-4 rounded mt-4">
-                {JSON.stringify(user, null, 2)}
-              </pre>
+            {user?.email && (
+              <p className={`${textPrimary} -mt-1 ml-1`}>{user.email}</p>
             )}
           </div>
 
