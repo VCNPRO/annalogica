@@ -291,8 +291,14 @@ export default function Dashboard() {
       <div className="flex pt-10" style={{ height: '100vh' }}>
         <div className={`${bgSecondary} ${border} border-r p-6 flex flex-col`} style={{ width: '33.333%', minWidth: '33.333%', maxWidth: '33.333%', height: '100%' }}>
           
-          <div className="flex items-center mb-6">
-                        <h1 className="font-orbitron text-[36px] text-orange-500">annalogica</h1>
+          <div className="flex flex-col mb-6">
+            <div className="flex items-baseline gap-x-3">
+              <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>
+              <span className="text-white">trabajando para</span>
+            </div>
+            {(user?.companyName || user?.name) && (
+              <p className={`${textPrimary} -mt-1 ml-1`}>{user.companyName || user.name}</p>
+            )}
           </div>
 
           <div className="mb-6">
