@@ -255,7 +255,7 @@ export default function Dashboard() {
 
           const blob = await upload(uniqueFilename, file, {
             access: 'public',
-            handleUploadUrl: '/api/blob-upload',
+            handleUploadUrl: '/api/blob-upload-test',
             clientPayload: JSON.stringify({
               size: file.size,
               type: file.type,
