@@ -9,4 +9,5 @@ export const { GET, POST, PUT } = serve({
     transcribeFile, // New on-demand transcription task
     summarizeFile,  // New on-demand summarization task
   ],
+  signingKey: process.env.INNGEST_SIGNING_KEY,
 });
