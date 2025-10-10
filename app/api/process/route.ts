@@ -12,8 +12,14 @@ import { inngest } from '@/lib/inngest/client';
 export async function POST(request: Request) {
   try {
     // SECURITY: Verify authentication
+    console.log('[API Process] Verificando autenticación...');
+    console.log('[API Process] Authorization header:', request.headers.get('Authorization')?.substring(0, 50) + '...');
+
     const user = verifyRequestAuth(request);
+    console.log('[API Process] Usuario verificado:', user ? { userId: user.userId, email: user.email } : null);
+
     if (!user) {
+      console.error('[API Process] Autenticación fallida');
       return Response.json({ error: 'No autorizado' }, { status: 401 });
     }
 

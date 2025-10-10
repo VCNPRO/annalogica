@@ -9,15 +9,22 @@ export interface JWTPayload {
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
+    console.log('[verifyToken] Verificando token...');
+    console.log('[verifyToken] Token (primeros 20 chars):', token.substring(0, 20) + '...');
+
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
+      console.error('[verifyToken] JWT_SECRET no configurado');
       throw new Error('JWT_SECRET not configured');
     }
 
+    console.log('[verifyToken] JWT_SECRET existe:', !!jwtSecret);
+
     const decoded = jwt.verify(token, jwtSecret) as JWTPayload;
+    console.log('[verifyToken] Token decodificado exitosamente:', { userId: decoded.userId, email: decoded.email });
     return decoded;
   } catch (error) {
-    console.error('Token verification failed:', error);
+    console.error('[verifyToken] Error al verificar token:', error);
     return null;
   }
 }
