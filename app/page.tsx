@@ -78,15 +78,23 @@ export default function Dashboard() {
           let newStatus: FileStatus = file.status;
           let processingProgress = file.processingProgress || 0;
 
-          if (job.status === 'processing') {
+          if (job.status === 'processing' || job.status === 'transcribed') {
             newStatus = 'processing';
-            // Estimate progress based on time elapsed (rough estimate: 1 minute processing = 10% progress)
+            // Estimate progress based on time elapsed
             const createdAt = new Date(job.created_at).getTime();
             const now = Date.now();
             const elapsed = (now - createdAt) / 1000; // seconds
             const estimatedDuration = job.audio_duration_seconds || 60; // fallback to 60s
-            processingProgress = Math.min(95, Math.floor((elapsed / (estimatedDuration * 0.3)) * 100)); // Processing takes ~30% of audio duration
-          } else if (job.status === 'completed' || job.status === 'transcribed' || job.status === 'summarized') {
+
+            // Better progress calculation: transcribed means almost done
+            if (job.status === 'transcribed') {
+              processingProgress = 98; // Almost complete, waiting for summary
+            } else {
+              // Progressive increase, but cap at 90 to avoid stuck at 95
+              const baseProgress = Math.floor((elapsed / (estimatedDuration * 0.5)) * 100);
+              processingProgress = Math.min(90, baseProgress);
+            }
+          } else if (job.status === 'completed' || job.status === 'summarized') {
             newStatus = 'completed';
             processingProgress = 100;
           } else if (job.status === 'failed' || job.status === 'error') {
@@ -782,29 +790,52 @@ export default function Dashboard() {
                             </div>
               <div className="grid grid-cols-2 gap-2">
                 <button
+                  onClick={() => handleApplyAction('SRT')}
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  📄 Generar SRT
+                </button>
+                <button
+                  onClick={() => handleApplyAction('VTT')}
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  📄 Generar VTT
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleApplyAction('Oradores')}
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  🎙️ Detectar Oradores
+                </button>
+                <button
                   onClick={() => handleApplyAction('Aplicar Tags')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
                 >
                   🏷️ Aplicar Tags
                 </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleApplyAction('Traducir')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
                 >
                   🌐 Traducir
                 </button>
+                <select
+                  className={`p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                >
+                  <option value="en">Inglés</option>
+                  <option value="es">Español</option>
+                  <option value="fr">Français</option>
+                  <option value="ca">Català</option>
+                </select>
               </div>
-
-                            <select
-                              className={`w-full p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
-                              value={targetLanguage}
-                              onChange={(e) => setTargetLanguage(e.target.value)}
-                            >
-                              <option value="en">Inglés</option>
-                              <option value="es">Español</option>
-                              <option value="fr">Français</option>
-                              <option value="ca">Català</option>
-                            </select>
                           </div>
                         </div>
               
@@ -838,10 +869,18 @@ export default function Dashboard() {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => setUploadedFiles([])}
-                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
+                  onClick={() => {
+                    if (uploadedFiles.length > 0 && confirm('¿Limpiar todos los archivos y empezar de nuevo?')) {
+                      setUploadedFiles([]);
+                      setSelectedFileIds(new Set());
+                      setError(null);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
+                  title="Limpiar todo y reiniciar"
                 >
-                  Limpiar
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Limpiar y Reiniciar
                 </button>
               </div>
             </div>
@@ -888,9 +927,15 @@ export default function Dashboard() {
                     <div className="ml-6 space-y-1">
                       {file.status === 'uploading' && (
                         <div>
-                          <div className="flex justify-between mb-1">
+                          <div className="flex justify-between items-center mb-1">
                             <span className={`text-xs ${textSecondary}`}>Subida</span>
-                            <span className="text-xs text-blue-500">{file.uploadProgress.toFixed(0)}%</span>
+                            <div className="flex items-center gap-2">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                              </span>
+                              <span className="text-xs text-blue-500">{file.uploadProgress.toFixed(0)}%</span>
+                            </div>
                           </div>
                           <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
                             <div className="bg-blue-500 h-1 rounded-full transition-all" style={{ width: `${file.uploadProgress}%` }} />
@@ -899,9 +944,22 @@ export default function Dashboard() {
                       )}
                       {file.status === 'processing' && (
                         <div>
-                          <div className="flex justify-between mb-1">
+                          <div className="flex justify-between items-center mb-1">
                             <span className={`text-xs ${textSecondary}`}>Procesando</span>
-                            <span className="text-xs text-purple-500">{file.processingProgress || 0}%</span>
+                            <div className="flex items-center gap-2">
+                              {(file.processingProgress || 0) >= 90 ? (
+                                <span className="relative flex h-2 w-2" title="Finalizando...">
+                                  <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                                </span>
+                              ) : (
+                                <span className="relative flex h-2 w-2" title="Procesando...">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                </span>
+                              )}
+                              <span className="text-xs text-purple-500">{file.processingProgress || 0}%</span>
+                            </div>
                           </div>
                           <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
                             <div className="bg-purple-500 h-1 rounded-full transition-all" style={{ width: `${file.processingProgress || 0}%` }} />
