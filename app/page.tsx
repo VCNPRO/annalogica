@@ -969,15 +969,22 @@ export default function Dashboard() {
                       {file.status === 'processing' && (
                         <div>
                           <div className="flex justify-between items-center mb-1">
-                            <span className={`text-xs ${textSecondary}`}>Procesando</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-xs ${textSecondary}`}>
+                                {(file.processingProgress || 0) >= 90 ? '🟡 Finalizando...' : 'Procesando'}
+                              </span>
+                              {(file.processingProgress || 0) >= 90 && (
+                                <span className={`text-xs ${textSecondary} italic`}>(Generando resumen)</span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2">
                               {(file.processingProgress || 0) >= 90 ? (
-                                <span className="relative flex h-2 w-2" title="Finalizando...">
+                                <span className="relative flex h-2 w-2" title="Finalizando - Generando resumen y oradores">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
                                   <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
                                 </span>
                               ) : (
-                                <span className="relative flex h-2 w-2" title="Procesando...">
+                                <span className="relative flex h-2 w-2" title="Procesando - Transcribiendo audio">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                                   <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                                 </span>
