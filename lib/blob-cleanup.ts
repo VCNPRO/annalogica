@@ -79,7 +79,7 @@ export async function cleanupOldFilesAndRecords(daysOld = 30): Promise<{
     // We need a custom query to fetch old jobs with their blob URLs
     const { sql } = await import('@vercel/postgres');
     const result = await sql`
-      SELECT id, txt_url, srt_url, vtt_url, speakers_url, summary_url, audio_url
+      SELECT id, txt_url, srt_url, vtt_url, speakers_url, summary_url
       FROM transcription_jobs
       WHERE status IN ('completed', 'failed')
       AND completed_at < NOW() - INTERVAL '${daysOld} days'
@@ -91,9 +91,9 @@ export async function cleanupOldFilesAndRecords(daysOld = 30): Promise<{
 
     console.log(`[Cleanup] Found ${jobsProcessed} old jobs to clean up`);
 
-    // Delete blob files for each job
+    // Delete blob files for each job (NOTE: audio_url excluded - originals deleted immediately after processing)
     for (const job of oldJobs) {
-      const urls = [job.txt_url, job.srt_url, job.vtt_url, job.speakers_url, job.summary_url, job.audio_url].filter(Boolean);
+      const urls = [job.txt_url, job.srt_url, job.vtt_url, job.speakers_url, job.summary_url].filter(Boolean);
 
       for (const url of urls) {
         try {

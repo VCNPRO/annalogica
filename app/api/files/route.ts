@@ -26,7 +26,7 @@ export async function GET(request: Request) {
         srtUrl: job.srt_url,
         vttUrl: job.vtt_url,
         summaryUrl: job.summary_url,
-        audioUrl: job.audio_url,
+        // audioUrl: REMOVED - original files deleted immediately after processing
         audioDuration: job.audio_duration_seconds,
         jobId: job.id,
         status: job.status, // Include status for UI

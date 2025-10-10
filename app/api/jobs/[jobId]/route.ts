@@ -21,7 +21,10 @@ export async function GET(request: NextRequest, context: any) {
       return NextResponse.json({ error: 'Trabajo no encontrado o no autorizado' }, { status: 404 });
     }
 
-    return NextResponse.json({ job });
+    // Don't expose audio_url (original file deleted after processing)
+    const { audio_url, ...jobWithoutAudioUrl } = job;
+
+    return NextResponse.json({ job: jobWithoutAudioUrl });
 
   } catch (error: any) {
     console.error(`[API Job ${context.params.jobId}] Error:`, error);

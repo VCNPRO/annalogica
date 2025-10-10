@@ -75,6 +75,18 @@ export const transcribeFile = inngest.createFunction(
       await logTranscription(userId, filename, transcriptionResult.audioDuration);
     });
 
+    // CLEANUP: Delete original audio file from Vercel Blob after successful transcription
+    await step.run('delete-original-audio', async () => {
+      try {
+        const { del } = await import('@vercel/blob');
+        await del(audioUrl);
+        console.log(`[Inngest] ✅ Deleted original audio file: ${audioUrl}`);
+      } catch (error: any) {
+        console.error(`[Inngest] ⚠️ Failed to delete original audio file (non-fatal):`, error.message);
+        // Don't fail the job - file deletion is cleanup only
+      }
+    });
+
     await step.run('update-status-transcribed', async () => {
       await TranscriptionJobDB.updateStatus(jobId, 'transcribed');
     });

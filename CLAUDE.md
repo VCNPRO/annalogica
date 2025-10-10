@@ -54,18 +54,22 @@ Editar `.env.local` con tus tokens:
 - `CRON_SECRET` → Generar token aleatorio para seguridad del cron job
 
 ### Retención de Archivos
-**IMPORTANTE**: Los archivos se eliminan automáticamente después de 30 días.
+**IMPORTANTE**: Política de almacenamiento actualizada (2025-10-10)
 
-**Archivos guardados en Vercel Blob:**
-- Transcripciones (TXT)
-- Subtítulos (SRT y VTT)
-- Resúmenes (TXT)
-- Tags y metadatos
+**Archivos guardados en Vercel Blob (30 días):**
+- ✅ Transcripciones (TXT)
+- ✅ Subtítulos (SRT y VTT)
+- ✅ Resúmenes (TXT)
+- ✅ Reportes de hablantes
+- ✅ Tags y metadatos
 
-**NO se guardan:**
-- Archivos de audio/video originales (se eliminan tras procesamiento)
+**Archivos que NO se guardan:**
+- ❌ **Archivos de audio/video originales** → Eliminados inmediatamente tras transcripción exitosa
+- ⚡ Implementado en: `lib/inngest/functions.ts` (step: 'delete-original-audio')
+- 💰 Ahorro: ~95% de espacio de almacenamiento
 
 **Limpieza automática:**
 - Cron job diario (2:00 AM UTC) → `/api/cron/cleanup`
 - Configurado en `vercel.json`
 - Requiere `CRON_SECRET` en variables de entorno de Vercel
+- Ver detalles completos en `INSTRUCCIONES-ALMACENAMIENTO.md`

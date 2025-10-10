@@ -29,14 +29,14 @@ export async function GET(
       return Response.json({ error: 'No tienes permiso para ver este job' }, { status: 403 });
     }
 
-    // Return job status and results
+    // Return job status and results (audioUrl excluded - original file deleted after processing)
     return Response.json({
       success: true,
       job: {
         id: job.id,
         status: job.status,
         filename: job.filename,
-        audioUrl: job.audio_url,
+        // audioUrl: REMOVED - original files deleted immediately after processing
         txtUrl: job.txt_url,
         srtUrl: job.srt_url,
         vttUrl: job.vtt_url,
