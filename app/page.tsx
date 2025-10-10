@@ -595,12 +595,6 @@ export default function Dashboard() {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => router.push('/results')}
-                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
-                >
-                  📊 Ver Resultados
-                </button>
-                <button
                   onClick={() => setUploadedFiles([])}
                   className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
                 >
@@ -660,6 +654,16 @@ export default function Dashboard() {
                           </div>
                         </div>
                       )}
+                      {file.status === 'processing' && (
+                        <div>
+                          <div className="flex justify-between mb-1">
+                            <span className={`text-xs ${textSecondary}`}>Procesando...</span>
+                          </div>
+                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
+                            <div className="bg-purple-500 h-1 rounded-full animate-pulse" style={{ width: '100%' }} />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
@@ -667,6 +671,128 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden`} style={{ flex: '1 1 40%', minHeight: '300px' }}>
+            <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={uploadedFiles.filter(f => f.status === 'completed').length > 0 && selectedFileIds.size === uploadedFiles.filter(f => f.status === 'completed').length}
+                    onChange={() => {
+                      const completedFiles = uploadedFiles.filter(f => f.status === 'completed');
+                      if (selectedFileIds.size === completedFiles.length) {
+                        setSelectedFileIds(new Set());
+                      } else {
+                        setSelectedFileIds(new Set(completedFiles.map(f => f.id)));
+                      }
+                    }}
+                    className="form-checkbox h-4 w-4 text-orange-500 rounded"
+                  />
+                  <span className="text-green-500 text-sm">✅</span>
+                  <h2 className={`text-sm font-medium ${textPrimary}`}>Todos los Archivos Completados</h2>
+                </div>
+                <p className={`text-xs ${textSecondary}`}>Archivos procesados listos para descargar</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const completedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedFileIds.has(f.id));
+                    if (completedFiles.length === 0) {
+                      alert('Selecciona al menos un archivo completado para descargar.');
+                      return;
+                    }
+
+                    const token = localStorage.getItem('token');
+                    if (!token) return;
+
+                    for (const file of completedFiles) {
+                      if (file.jobId) {
+                        try {
+                          const res = await fetch(`/api/jobs/${file.jobId}`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            const job = data.job;
+
+                            if (job.txt_url) window.open(job.txt_url, '_blank');
+                            if (job.srt_url) window.open(job.srt_url, '_blank');
+                            if (job.vtt_url) window.open(job.vtt_url, '_blank');
+                            if (job.summary_url) window.open(job.summary_url, '_blank');
+                          }
+                        } catch (err) {
+                          console.error('Error downloading files:', err);
+                        }
+                      }
+                    }
+                  }}
+                  disabled={uploadedFiles.filter(f => f.status === 'completed' && selectedFileIds.has(f.id)).length === 0}
+                  className="px-3 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
+                >
+                  📥 Descargar Seleccionados
+                </button>
+                <button
+                  onClick={() => router.push('/')}
+                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
+                >
+                  🏠 Dashboard
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(40vh - 200px)' }}>
+              {uploadedFiles.filter(f => f.status === 'completed').length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <p className={`text-xs ${textSecondary}`}>No hay archivos completados aún.</p>
+                </div>
+              ) : (
+                uploadedFiles.filter(f => f.status === 'completed').map((file) => (
+                  <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedFileIds.has(file.id)}
+                        onChange={() => handleFileSelect(file.id)}
+                        className="form-checkbox h-4 w-4 text-orange-500 rounded"
+                      />
+                      <span className={`text-xs ${textPrimary} flex-1 truncate`}>{file.name}</span>
+                      <span className={`text-xs font-medium ${getStatusColor(file.status)}`}>
+                        ✓ Completado
+                      </span>
+                      <button
+                        onClick={async () => {
+                          if (!file.jobId) return;
+
+                          const token = localStorage.getItem('token');
+                          if (!token) return;
+
+                          try {
+                            const res = await fetch(`/api/jobs/${file.jobId}`, {
+                              headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            if (res.ok) {
+                              const data = await res.json();
+                              const job = data.job;
+
+                              if (job.txt_url) window.open(job.txt_url, '_blank');
+                              if (job.srt_url) window.open(job.srt_url, '_blank');
+                              if (job.vtt_url) window.open(job.vtt_url, '_blank');
+                              if (job.summary_url) window.open(job.summary_url, '_blank');
+                            }
+                          } catch (err) {
+                            console.error('Error downloading file:', err);
+                          }
+                        }}
+                        className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        📥 Descargar
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
         </div>
       </div>
