@@ -46,8 +46,15 @@ export const transcribeFile = inngest.createFunction(
     await step.run('save-results-and-metadata', async () => {
       const urls = await saveTranscriptionResults(transcriptionResult, filename);
 
-      // Generate and save speakers report
-      const speakersUrl = await saveSpeakersReport(transcriptionResult, filename);
+      // Generate and save speakers report (with error handling to avoid breaking transcription)
+      let speakersUrl: string | undefined = undefined;
+      try {
+        speakersUrl = await saveSpeakersReport(transcriptionResult, filename);
+        console.log('[Inngest] Speakers report saved successfully:', speakersUrl);
+      } catch (error: any) {
+        console.error('[Inngest] Failed to save speakers report (non-fatal):', error.message);
+        // Don't fail the entire job - speakers report is supplementary
+      }
 
       const speakers = transcriptionResult.utterances
         ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))].sort()

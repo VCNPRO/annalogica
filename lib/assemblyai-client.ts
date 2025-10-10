@@ -312,17 +312,29 @@ export function generateSpeakersReport(result: TranscriptionResult): string {
     return 'No se detectaron oradores en esta transcripción.';
   }
 
-  // Extract unique speakers
-  const speakers = [...new Set(result.utterances.map(u => u.speaker))].sort();
+  // Extract unique speakers, filtering out undefined/null values
+  const speakers = [...new Set(result.utterances.map(u => u.speaker).filter(Boolean))].sort();
 
   if (speakers.length === 0) {
     return 'No se detectaron oradores en esta transcripción.';
   }
 
+  // Validate audioDuration to avoid division by zero
+  if (!result.audioDuration || result.audioDuration <= 0) {
+    return 'Error: La duración del audio no es válida para generar el reporte.';
+  }
+
   // Calculate statistics for each speaker
   const speakerStats = speakers.map(speaker => {
     const utterances = result.utterances!.filter(u => u.speaker === speaker);
-    const totalWords = utterances.reduce((sum, u) => sum + u.text.split(/\s+/).length, 0);
+
+    // Calculate total words, filtering empty text
+    const totalWords = utterances.reduce((sum, u) => {
+      const text = u.text?.trim() || '';
+      if (text.length === 0) return sum;
+      return sum + text.split(/\s+/).length;
+    }, 0);
+
     const totalDuration = utterances.reduce((sum, u) => sum + (u.end - u.start), 0);
     const interventions = utterances.length;
 
@@ -351,13 +363,21 @@ export function generateSpeakersReport(result: TranscriptionResult): string {
   report += '-'.repeat(60) + '\n\n';
 
   speakerStats.forEach((stats, index) => {
-    const percentage = ((stats.totalDuration / result.audioDuration) * 100).toFixed(1);
+    // Safe percentage calculation
+    const percentage = result.audioDuration > 0
+      ? ((stats.totalDuration / result.audioDuration) * 100).toFixed(1)
+      : '0.0';
+
+    // Safe average calculation
+    const avgDuration = stats.interventions > 0
+      ? formatDuration(stats.totalDuration / stats.interventions)
+      : '0:00';
 
     report += `${index + 1}. ${stats.speaker}\n`;
     report += `   Intervenciones: ${stats.interventions}\n`;
     report += `   Palabras pronunciadas: ${stats.totalWords}\n`;
     report += `   Tiempo total: ${formatDuration(stats.totalDuration)} (${percentage}% del total)\n`;
-    report += `   Promedio por intervención: ${formatDuration(stats.totalDuration / stats.interventions)}\n\n`;
+    report += `   Promedio por intervención: ${avgDuration}\n\n`;
   });
 
   // Detailed timeline
