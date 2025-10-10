@@ -43,12 +43,9 @@ export async function POST(request: Request): Promise<Response> {
 
         const fileSize = payload?.size || 0;
         const fileType = payload?.type || '';
+        const token = payload?.token || '';
 
-        // SECURITY: Verify user authentication from HTTP-only cookies
-        const { parse } = await import('cookie');
-        const cookies = parse(request.headers.get('cookie') || '');
-        const token = cookies['auth_token'];
-
+        // SECURITY: Verify user authentication from clientPayload
         if (!token) {
           throw new Error('No autorizado. Debes iniciar sesión para subir archivos.');
         }
