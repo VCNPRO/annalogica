@@ -13,12 +13,14 @@ interface UploadedFile {
   id: string;
   name: string;
   uploadProgress: number;
+  processingProgress?: number; // Add processing progress
   status: FileStatus;
   date: string;
   fileType: 'audio' | 'video' | 'text'; // New: Store file type
   actions: string[]; // New: Store selected actions for the file
   jobId?: string; // Add jobId to link to details page
   blobUrl?: string; // Store blob URL for processing
+  audioDuration?: number; // Store audio duration for progress calculation
 }
 
 export default function Dashboard() {
@@ -72,18 +74,27 @@ export default function Dashboard() {
 
           // Map job status to FileStatus
           let newStatus: FileStatus = file.status;
+          let processingProgress = file.processingProgress || 0;
+
           if (job.status === 'processing') {
             newStatus = 'processing';
+            // Estimate progress based on time elapsed (rough estimate: 1 minute processing = 10% progress)
+            const createdAt = new Date(job.created_at).getTime();
+            const now = Date.now();
+            const elapsed = (now - createdAt) / 1000; // seconds
+            const estimatedDuration = job.audio_duration_seconds || 60; // fallback to 60s
+            processingProgress = Math.min(95, Math.floor((elapsed / (estimatedDuration * 0.3)) * 100)); // Processing takes ~30% of audio duration
           } else if (job.status === 'completed' || job.status === 'transcribed' || job.status === 'summarized') {
             newStatus = 'completed';
+            processingProgress = 100;
           } else if (job.status === 'failed' || job.status === 'error') {
             newStatus = 'error';
           }
 
-          // Update file status if changed
-          if (newStatus !== file.status) {
+          // Update file status and progress if changed
+          if (newStatus !== file.status || processingProgress !== file.processingProgress) {
             setUploadedFiles(prev => prev.map(f =>
-              f.id === file.id ? { ...f, status: newStatus } : f
+              f.id === file.id ? { ...f, status: newStatus, processingProgress, audioDuration: job.audio_duration_seconds } : f
             ));
           }
         } catch (err) {
@@ -115,51 +126,61 @@ export default function Dashboard() {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('Sesión expirada');
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        
-        const fileId = Date.now().toString() + i; // Unique ID for each file
+      // Create all file entries first
+      const filesToUpload = Array.from(files).map((file, i) => {
+        const fileId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`;
         const newFile: UploadedFile = {
           id: fileId,
           name: file.name,
           uploadProgress: 0,
           status: 'uploading',
           date: new Date().toISOString(),
-          fileType: getFileType(file.type), // Determine file type
-          actions: [] // Initialize actions as empty
+          fileType: getFileType(file.type),
+          actions: []
         };
-        setUploadedFiles(prev => [...prev, newFile]);
+        return { file, fileId, newFile };
+      });
 
-        // Upload directo a Blob (bypass function size limit)
-        const { upload } = await import('@vercel/blob/client');
+      // Add all files to state at once
+      setUploadedFiles(prev => [...prev, ...filesToUpload.map(f => f.newFile)]);
 
-        // Generate unique filename to avoid conflicts
-        const timestamp = Date.now();
-        const randomSuffix = Math.random().toString(36).substring(2, 8);
-        const uniqueFilename = `${timestamp}-${randomSuffix}-${file.name}`;
+      // Upload all files in parallel
+      const { upload } = await import('@vercel/blob/client');
 
-        const blob = await upload(uniqueFilename, file, {
-          access: 'public',
-          handleUploadUrl: '/api/blob-upload',
-          clientPayload: JSON.stringify({
-            size: file.size,
-            type: file.type,
-            token: token, // Pass token in payload
-          }),
-          onUploadProgress: ({ percentage }) => {
-            setUploadedFiles(prev => prev.map(f =>
-              f.id === fileId ? { ...f, uploadProgress: percentage } : f
-            ));
-          },
-        });
+      const uploadPromises = filesToUpload.map(async ({ file, fileId }) => {
+        try {
+          const timestamp = Date.now();
+          const randomSuffix = Math.random().toString(36).substring(2, 8);
+          const uniqueFilename = `${timestamp}-${randomSuffix}-${file.name}`;
 
-        const blobUrl = blob.url;
+          const blob = await upload(uniqueFilename, file, {
+            access: 'public',
+            handleUploadUrl: '/api/blob-upload',
+            clientPayload: JSON.stringify({
+              size: file.size,
+              type: file.type,
+              token: token,
+            }),
+            onUploadProgress: ({ percentage }) => {
+              setUploadedFiles(prev => prev.map(f =>
+                f.id === fileId ? { ...f, uploadProgress: percentage } : f
+              ));
+            },
+          });
 
-        // Actualizar progreso de upload y guardar blobUrl
-        setUploadedFiles(prev => prev.map(f =>
-          f.id === fileId ? { ...f, uploadProgress: 100, status: 'pending', blobUrl } : f
-        ));
-      }
+          // Update with blobUrl
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === fileId ? { ...f, uploadProgress: 100, status: 'pending', blobUrl: blob.url } : f
+          ));
+        } catch (err: any) {
+          console.error(`Error uploading ${file.name}:`, err);
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === fileId ? { ...f, status: 'error' } : f
+          ));
+        }
+      });
+
+      await Promise.all(uploadPromises);
       
     } catch (err: any) {
       setError(err.message);
@@ -657,10 +678,11 @@ export default function Dashboard() {
                       {file.status === 'processing' && (
                         <div>
                           <div className="flex justify-between mb-1">
-                            <span className={`text-xs ${textSecondary}`}>Procesando...</span>
+                            <span className={`text-xs ${textSecondary}`}>Procesando</span>
+                            <span className="text-xs text-purple-500">{file.processingProgress || 0}%</span>
                           </div>
                           <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
-                            <div className="bg-purple-500 h-1 rounded-full animate-pulse" style={{ width: '100%' }} />
+                            <div className="bg-purple-500 h-1 rounded-full transition-all" style={{ width: `${file.processingProgress || 0}%` }} />
                           </div>
                         </div>
                       )}
@@ -732,10 +754,19 @@ export default function Dashboard() {
                   📥 Descargar Seleccionados
                 </button>
                 <button
-                  onClick={() => router.push('/')}
+                  onClick={async () => {
+                    try {
+                      const dirHandle = await (window as any).showDirectoryPicker();
+                      localStorage.setItem('downloadPath', dirHandle.name);
+                      alert(`Carpeta seleccionada: ${dirHandle.name}\n\nLos archivos se descargarán en esta carpeta.`);
+                    } catch (err) {
+                      console.log('User cancelled directory picker');
+                    }
+                  }}
                   className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
+                  title="Elegir carpeta de descarga"
                 >
-                  🏠 Dashboard
+                  📁 Carpeta Descarga
                 </button>
               </div>
             </div>

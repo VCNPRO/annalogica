@@ -67,6 +67,15 @@ export const transcribeFile = inngest.createFunction(
       await TranscriptionJobDB.updateStatus(jobId, 'transcribed');
     });
 
+    // Automatically trigger summarization after transcription completes
+    await step.run('trigger-summarization', async () => {
+      await inngest.send({
+        name: 'task/summarize',
+        data: { jobId }
+      });
+      console.log(`[Inngest] Triggered summarization for job ${jobId}`);
+    });
+
     console.log(`[Inngest] Transcription task for job ${jobId} completed.`);
     return { status: 'transcribed' };
   }
@@ -123,13 +132,17 @@ export const summarizeFile = inngest.createFunction(
             summaryUrl,
             metadata: newMetadata,
         });
-        
+
         const tokensInput = Math.ceil(transcriptionText.slice(0, 8000).length / 4);
         const tokensOutput = Math.ceil(summary.length / 4);
         await logSummary(userId, tokensInput, tokensOutput, 'sonnet');
     });
 
+    await step.run('update-status-completed', async () => {
+      await TranscriptionJobDB.updateStatus(jobId, 'completed');
+    });
+
     console.log(`[Inngest] Summarization task for job ${jobId} completed.`);
-    return { status: 'summarized' };
+    return { status: 'completed' };
   }
 );
