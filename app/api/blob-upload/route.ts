@@ -36,26 +36,35 @@ export async function POST(request: Request): Promise<Response> {
       body,
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
-        // Extract file info from clientPayload
-        const payload = typeof clientPayload === 'string'
-          ? JSON.parse(clientPayload)
-          : clientPayload;
+        try {
+          console.log('[blob-upload] onBeforeGenerateToken called');
 
-        const fileSize = payload?.size || 0;
-        const fileType = payload?.type || '';
-        const token = payload?.token || '';
+          // Extract file info from clientPayload
+          const payload = typeof clientPayload === 'string'
+            ? JSON.parse(clientPayload)
+            : clientPayload;
 
-        // SECURITY: Verify user authentication from clientPayload
-        if (!token) {
-          throw new Error('No autorizado. Debes iniciar sesión para subir archivos.');
-        }
+          console.log('[blob-upload] Payload:', { hasToken: !!payload?.token, size: payload?.size, type: payload?.type });
 
-        const { verifyToken } = await import('@/lib/auth');
-        const user = verifyToken(token);
+          const fileSize = payload?.size || 0;
+          const fileType = payload?.type || '';
+          const token = payload?.token || '';
 
-        if (!user) {
-          throw new Error('No autorizado. Token inválido.');
-        }
+          // SECURITY: Verify user authentication from clientPayload
+          if (!token) {
+            console.error('[blob-upload] No token found in payload');
+            throw new Error('No autorizado. Debes iniciar sesión para subir archivos.');
+          }
+
+          const { verifyToken } = await import('@/lib/auth');
+          const user = verifyToken(token);
+
+          console.log('[blob-upload] Token verified:', { hasUser: !!user, userId: user?.userId });
+
+          if (!user) {
+            console.error('[blob-upload] Token verification failed');
+            throw new Error('No autorizado. Token inválido.');
+          }
 
         // SECURITY: Rate limiting
         const identifier = getClientIdentifier(request, user.userId);
@@ -84,17 +93,23 @@ export async function POST(request: Request): Promise<Response> {
           );
         }
 
-        return {
-          allowedContentTypes: [...ALLOWED_AUDIO_TYPES, ...ALLOWED_VIDEO_TYPES],
-          addRandomSuffix: true,
-          maximumSizeInBytes: MAX_FILE_SIZE_VIDEO,
-          tokenPayload: JSON.stringify({
-            userId: user.userId,
-            email: user.email,
-            fileSize: fileSize,
-            timestamp: new Date().toISOString(),
-          }),
-        };
+          console.log('[blob-upload] All validations passed, returning config');
+
+          return {
+            allowedContentTypes: [...ALLOWED_AUDIO_TYPES, ...ALLOWED_VIDEO_TYPES],
+            addRandomSuffix: true,
+            maximumSizeInBytes: MAX_FILE_SIZE_VIDEO,
+            tokenPayload: JSON.stringify({
+              userId: user.userId,
+              email: user.email,
+              fileSize: fileSize,
+              timestamp: new Date().toISOString(),
+            }),
+          };
+        } catch (error) {
+          console.error('[blob-upload] Error in onBeforeGenerateToken:', error);
+          throw error;
+        }
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
         console.log('Archivo subido exitosamente:', blob.url);
