@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const rateLimitResponse = await checkRateLimit(registerRateLimit, identifier, 'registros');
     if (rateLimitResponse) return rateLimitResponse;
 
-    const { email, password } = await request.json();
+    const { email, password, name } = await request.json();
 
     // Validaciones básicas
     if (!email || !password) {
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
     // Crear usuario en la base de datos
-    const user = await UserDB.create(email, hashedPassword);
+    const user = await UserDB.create(email, hashedPassword, name || undefined);
 
     // Generar JWT
     const jwtSecret = process.env.JWT_SECRET;
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
+        name: user.name,
         createdAt: user.created_at
       }
     });

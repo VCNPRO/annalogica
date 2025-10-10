@@ -4,6 +4,7 @@ export interface User {
   id: string;
   email: string;
   password: string;
+  name?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -46,11 +47,11 @@ export interface TranscriptionJob {
 
 export const UserDB = {
   // Create new user
-  create: async (email: string, hashedPassword: string): Promise<User> => {
+  create: async (email: string, hashedPassword: string, name?: string): Promise<User> => {
     const result = await sql<User>`
-      INSERT INTO users (email, password)
-      VALUES (${email.toLowerCase()}, ${hashedPassword})
-      RETURNING id, email, password, created_at, updated_at
+      INSERT INTO users (email, password, name)
+      VALUES (${email.toLowerCase()}, ${hashedPassword}, ${name || null})
+      RETURNING id, email, password, name, created_at, updated_at
     `;
     return result.rows[0];
   },
@@ -58,7 +59,7 @@ export const UserDB = {
   // Find user by email
   findByEmail: async (email: string): Promise<User | null> => {
     const result = await sql<User>`
-      SELECT id, email, password, created_at, updated_at
+      SELECT id, email, password, name, created_at, updated_at
       FROM users
       WHERE email = ${email.toLowerCase()}
       LIMIT 1
@@ -69,7 +70,7 @@ export const UserDB = {
   // Find user by ID
   findById: async (id: string): Promise<User | null> => {
     const result = await sql<User>`
-      SELECT id, email, password, created_at, updated_at
+      SELECT id, email, password, name, created_at, updated_at
       FROM users
       WHERE id = ${id}
       LIMIT 1
@@ -78,37 +79,37 @@ export const UserDB = {
   },
 
   // Update user
-  update: async (id: string, updates: Partial<Pick<User, 'email' | 'password'>>): Promise<User | null> => {
-    if (updates.email && updates.password) {
-      const result = await sql<User>`
-        UPDATE users
-        SET email = ${updates.email.toLowerCase()},
-            password = ${updates.password},
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING id, email, password, created_at, updated_at
-      `;
-      return result.rows[0] || null;
-    } else if (updates.email) {
-      const result = await sql<User>`
-        UPDATE users
-        SET email = ${updates.email.toLowerCase()},
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING id, email, password, created_at, updated_at
-      `;
-      return result.rows[0] || null;
-    } else if (updates.password) {
-      const result = await sql<User>`
-        UPDATE users
-        SET password = ${updates.password},
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${id}
-        RETURNING id, email, password, created_at, updated_at
-      `;
-      return result.rows[0] || null;
+  update: async (id: string, updates: Partial<Pick<User, 'email' | 'password' | 'name'>>): Promise<User | null> => {
+    const setClauses: string[] = [];
+    const values: any[] = [];
+
+    if (updates.email !== undefined) {
+      setClauses.push('email = $' + (values.length + 1));
+      values.push(updates.email.toLowerCase());
     }
-    return null;
+    if (updates.password !== undefined) {
+      setClauses.push('password = $' + (values.length + 1));
+      values.push(updates.password);
+    }
+    if (updates.name !== undefined) {
+      setClauses.push('name = $' + (values.length + 1));
+      values.push(updates.name);
+    }
+
+    if (setClauses.length === 0) return null;
+
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+
+    const result = await sql<User>`
+      UPDATE users
+      SET email = COALESCE(${updates.email?.toLowerCase() || null}, email),
+          password = COALESCE(${updates.password || null}, password),
+          name = COALESCE(${updates.name !== undefined ? updates.name : null}, name),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+      RETURNING id, email, password, name, created_at, updated_at
+    `;
+    return result.rows[0] || null;
   },
 
   // Delete user
@@ -123,7 +124,7 @@ export const UserDB = {
   // Get all users (admin only - for debugging)
   getAll: async (): Promise<User[]> => {
     const result = await sql<User>`
-      SELECT id, email, created_at, updated_at
+      SELECT id, email, name, created_at, updated_at
       FROM users
       ORDER BY created_at DESC
     `;

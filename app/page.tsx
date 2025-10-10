@@ -22,6 +22,9 @@ interface UploadedFile {
   jobId?: string; // Add jobId to link to details page
   blobUrl?: string; // Store blob URL for processing
   audioDuration?: number; // Store audio duration for progress calculation
+  fileSize?: number; // Store original file size in bytes
+  processingStartTime?: number; // Store when processing started (timestamp)
+  estimatedTimeRemaining?: number; // Estimated seconds remaining
 }
 
 export default function Dashboard() {
@@ -36,6 +39,7 @@ export default function Dashboard() {
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
   const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf'>('txt');
+  const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -49,6 +53,18 @@ export default function Dashboard() {
     setUser(JSON.parse(userData));
     setLoading(false);
   }, [router]);
+
+  // Update timer every second for files being processed
+  useEffect(() => {
+    const hasProcessingFiles = uploadedFiles.some(f => f.status === 'processing' && f.processingStartTime);
+    if (!hasProcessingFiles) return;
+
+    const interval = setInterval(() => {
+      setTimerTick(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [uploadedFiles]);
 
   // Polling para actualizar estado de jobs activos
   useEffect(() => {
@@ -74,37 +90,81 @@ export default function Dashboard() {
           const data = await res.json();
           const job = data.job;
 
+          // Auto-restart logic: Check if job is stuck (no progress for too long)
+          if (file.processingStartTime) {
+            const timeSinceStart = (Date.now() - file.processingStartTime) / 1000; // seconds
+            const audioDuration = job.audio_duration_seconds || 60;
+            const maxExpectedTime = audioDuration * 0.5; // 0.5x multiplier (very generous timeout)
+            const timeoutThreshold = Math.max(maxExpectedTime, 300); // At least 5 minutes
+
+            // If job is stuck for too long (beyond reasonable processing time)
+            if (timeSinceStart > timeoutThreshold && (job.status === 'processing' || job.status === 'pending')) {
+              console.warn(`[Auto-restart] Job ${file.jobId} appears stuck (${Math.floor(timeSinceStart)}s elapsed, expected ~${Math.floor(maxExpectedTime)}s)`);
+
+              // TODO: Implement retry/restart API endpoint
+              // For now, just log it
+              setError(`Archivo "${file.name}" parece estar bloqueado. Por favor, intenta procesarlo de nuevo.`);
+            }
+          }
+
           // Map job status to FileStatus
           let newStatus: FileStatus = file.status;
           let processingProgress = file.processingProgress || 0;
+          let processingStartTime = file.processingStartTime;
+          let estimatedTimeRemaining = file.estimatedTimeRemaining;
 
           if (job.status === 'processing' || job.status === 'transcribed') {
             newStatus = 'processing';
-            // Estimate progress based on time elapsed
+
+            // Set processing start time if not already set
+            if (!processingStartTime) {
+              processingStartTime = Date.now();
+            }
+
+            // Estimate progress based on audio duration
             const createdAt = new Date(job.created_at).getTime();
             const now = Date.now();
             const elapsed = (now - createdAt) / 1000; // seconds
-            const estimatedDuration = job.audio_duration_seconds || 60; // fallback to 60s
+
+            // Use actual audio duration for better time estimation
+            const audioDuration = job.audio_duration_seconds || 60; // fallback to 60s
+
+            // Time estimation: Whisper processes roughly 0.2-0.3x real-time
+            // (i.e., 10 minutes of audio takes ~2-3 minutes to process)
+            const estimatedTotalTime = audioDuration * 0.25; // 0.25x real-time multiplier
 
             // Better progress calculation: transcribed means almost done
             if (job.status === 'transcribed') {
               processingProgress = 98; // Almost complete, waiting for summary
+              estimatedTimeRemaining = 5; // ~5 seconds remaining for summary
             } else {
-              // Progressive increase, but cap at 90 to avoid stuck at 95
-              const baseProgress = Math.floor((elapsed / (estimatedDuration * 0.5)) * 100);
+              // Progressive increase based on audio duration, but cap at 90
+              const baseProgress = Math.floor((elapsed / estimatedTotalTime) * 100);
               processingProgress = Math.min(90, baseProgress);
+
+              // Calculate remaining time
+              const remainingProgress = 100 - processingProgress;
+              estimatedTimeRemaining = Math.ceil((remainingProgress / 100) * estimatedTotalTime);
             }
           } else if (job.status === 'completed' || job.status === 'summarized') {
             newStatus = 'completed';
             processingProgress = 100;
+            estimatedTimeRemaining = 0;
           } else if (job.status === 'failed' || job.status === 'error') {
             newStatus = 'error';
           }
 
           // Update file status and progress if changed
-          if (newStatus !== file.status || processingProgress !== file.processingProgress) {
+          if (newStatus !== file.status || processingProgress !== file.processingProgress || estimatedTimeRemaining !== file.estimatedTimeRemaining) {
             setUploadedFiles(prev => prev.map(f =>
-              f.id === file.id ? { ...f, status: newStatus, processingProgress, audioDuration: job.audio_duration_seconds } : f
+              f.id === file.id ? {
+                ...f,
+                status: newStatus,
+                processingProgress,
+                audioDuration: job.audio_duration_seconds,
+                processingStartTime,
+                estimatedTimeRemaining
+              } : f
             ));
           }
         } catch (err) {
@@ -127,6 +187,35 @@ export default function Dashboard() {
     return 'text'; // Default to text if unknown, or handle as error
   };
 
+  // Helper function to format file size
+  const formatFileSize = (bytes?: number): string => {
+    if (!bytes) return '0 KB';
+    const kb = bytes / 1024;
+    const mb = kb / 1024;
+    const gb = mb / 1024;
+
+    if (gb >= 1) return `${gb.toFixed(2)} GB`;
+    if (mb >= 1) return `${mb.toFixed(2)} MB`;
+    return `${kb.toFixed(2)} KB`;
+  };
+
+  // Helper function to format elapsed time
+  const formatElapsedTime = (startTime?: number): string => {
+    if (!startTime) return '0:00';
+    const elapsed = Math.floor((Date.now() - startTime) / 1000); // seconds
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  // Helper function to format time remaining
+  const formatTimeRemaining = (seconds?: number): string => {
+    if (!seconds || seconds <= 0) return '0:00';
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const processFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
@@ -146,7 +235,8 @@ export default function Dashboard() {
           status: 'uploading',
           date: new Date().toISOString(),
           fileType: getFileType(file.type),
-          actions: []
+          actions: [],
+          fileSize: file.size // Capture file size in bytes
         };
         return { file, fileId, newFile };
       });
@@ -631,7 +721,7 @@ export default function Dashboard() {
   return (
     <div className={`min-h-screen ${bgPrimary}`}>
       <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
-        Modo Producción - Usuario: {user?.email || 'Usuario'}
+        Pre-producción Beta-tester - Usuario: {user?.name || user?.email || 'Usuario'}
       </div>
 
       <div className="fixed top-16 right-6 z-40 flex items-center gap-2">
@@ -673,8 +763,8 @@ export default function Dashboard() {
               <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>
               <span className="text-white">trabajando para</span>
             </div>
-            {user?.email && (
-              <p className={`${textPrimary} -mt-1 ml-1`}>{user.email}</p>
+            {(user?.name || user?.email) && (
+              <p className={`${textPrimary} -mt-1 ml-1`}>{user.name || user.email}</p>
             )}
           </div>
 
@@ -992,6 +1082,24 @@ export default function Dashboard() {
                               <span className="text-xs text-purple-500">{file.processingProgress || 0}%</span>
                             </div>
                           </div>
+
+                          {/* Timer, file size, and estimated time info */}
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="flex items-center gap-3">
+                              <span className={`text-xs ${textSecondary}`} title="Tiempo transcurrido">
+                                ⏱️ {formatElapsedTime(file.processingStartTime)}
+                              </span>
+                              <span className={`text-xs ${textSecondary}`} title="Tamaño del archivo">
+                                📦 {formatFileSize(file.fileSize)}
+                              </span>
+                            </div>
+                            {file.estimatedTimeRemaining !== undefined && file.estimatedTimeRemaining > 0 && (
+                              <span className={`text-xs ${textSecondary}`} title="Tiempo estimado restante">
+                                ⏳ ~{formatTimeRemaining(file.estimatedTimeRemaining)}
+                              </span>
+                            )}
+                          </div>
+
                           <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
                             <div className="bg-purple-500 h-1 rounded-full transition-all" style={{ width: `${file.processingProgress || 0}%` }} />
                           </div>
