@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, HelpCircle, LogOut } from 'lucide-react';
+import jsPDF from 'jspdf';
 
 // AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const [language, setLanguage] = useState('es');
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
+  const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf'>('txt');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -358,6 +360,53 @@ export default function Dashboard() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     router.push('/login');
+  };
+
+  const downloadPDF = async (txtUrl: string, filename: string) => {
+    try {
+      // Fetch the transcription text
+      const textRes = await fetch(txtUrl);
+      if (!textRes.ok) {
+        throw new Error('Failed to fetch transcription text');
+      }
+      const text = await textRes.text();
+
+      // Initialize jsPDF
+      const doc = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Set properties and add content
+      const margin = 20;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const usableWidth = pageWidth - (margin * 2);
+
+      // Header
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.text('TRANSCRIPCIÓN DE AUDIO', pageWidth / 2, margin, { align: 'center' });
+
+      // Metadata
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(11);
+      doc.text(`Archivo: ${filename}`, margin, margin + 15);
+      doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, margin, margin + 20);
+
+      doc.line(margin, margin + 25, pageWidth - margin, margin + 25);
+
+      // Body
+      doc.setFontSize(10);
+      const splitText = doc.splitTextToSize(text, usableWidth);
+      doc.text(splitText, margin, margin + 35);
+
+      // Save
+      doc.save(`${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`);
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      alert('Error generando PDF. Por favor, inténtelo de nuevo.');
+    }
   };
 
   const getStatusText = (status: FileStatus) => {
@@ -695,7 +744,7 @@ export default function Dashboard() {
 
           <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden`} style={{ flex: '1 1 40%', minHeight: '300px' }}>
             <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
-              <div>
+              <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
@@ -714,6 +763,30 @@ export default function Dashboard() {
                   <h2 className={`text-sm font-medium ${textPrimary}`}>Todos los Archivos Completados</h2>
                 </div>
                 <p className={`text-xs ${textSecondary}`}>Archivos procesados listos para descargar</p>
+
+                <div className="flex items-center gap-2 mt-2">
+                  <span className={`text-xs ${textSecondary}`}>Formato:</span>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      className="accent-orange-500 scale-75"
+                      name="downloadFormat"
+                      checked={downloadFormat === 'txt'}
+                      onChange={() => setDownloadFormat('txt')}
+                    />
+                    <span className={`text-xs ${textSecondary}`}>TXT</span>
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      className="accent-orange-500 scale-75"
+                      name="downloadFormat"
+                      checked={downloadFormat === 'pdf'}
+                      onChange={() => setDownloadFormat('pdf')}
+                    />
+                    <span className={`text-xs ${textSecondary}`}>PDF</span>
+                  </label>
+                </div>
               </div>
               <div className="flex gap-2">
                 <button
@@ -737,7 +810,14 @@ export default function Dashboard() {
                             const data = await res.json();
                             const job = data.job;
 
-                            if (job.txt_url) window.open(job.txt_url, '_blank');
+                            // Download transcription in selected format
+                            if (downloadFormat === 'pdf' && job.txt_url) {
+                              await downloadPDF(job.txt_url, file.name);
+                            } else if (downloadFormat === 'txt' && job.txt_url) {
+                              window.open(job.txt_url, '_blank');
+                            }
+
+                            // Always download other formats
                             if (job.srt_url) window.open(job.srt_url, '_blank');
                             if (job.vtt_url) window.open(job.vtt_url, '_blank');
                             if (job.summary_url) window.open(job.summary_url, '_blank');
@@ -805,7 +885,14 @@ export default function Dashboard() {
                               const data = await res.json();
                               const job = data.job;
 
-                              if (job.txt_url) window.open(job.txt_url, '_blank');
+                              // Download transcription in selected format
+                              if (downloadFormat === 'pdf' && job.txt_url) {
+                                await downloadPDF(job.txt_url, file.name);
+                              } else if (downloadFormat === 'txt' && job.txt_url) {
+                                window.open(job.txt_url, '_blank');
+                              }
+
+                              // Always download other formats
                               if (job.srt_url) window.open(job.srt_url, '_blank');
                               if (job.vtt_url) window.open(job.vtt_url, '_blank');
                               if (job.summary_url) window.open(job.summary_url, '_blank');
