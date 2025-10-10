@@ -513,6 +513,16 @@ export default function Dashboard() {
             await writable.close();
           }
 
+          // Download Speakers Report
+          if (job.speakers_url) {
+            const speakersRes = await fetch(job.speakers_url);
+            const speakersBlob = await speakersRes.blob();
+            const fileHandle = await folderHandle.getFileHandle(`${baseName}-oradores.txt`, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(speakersBlob);
+            await writable.close();
+          }
+
           // Save tags as separate file if available
           if (job.metadata?.tags && job.metadata.tags.length > 0) {
             const tagsText = `Tags para: ${file.name}\n\n${job.metadata.tags.join('\n')}`;
@@ -569,6 +579,7 @@ export default function Dashboard() {
     if (job.srt_url) window.open(job.srt_url, '_blank');
     if (job.vtt_url) window.open(job.vtt_url, '_blank');
     if (job.summary_url) window.open(job.summary_url, '_blank');
+    if (job.speakers_url) window.open(job.speakers_url, '_blank');
   };
 
   const getStatusText = (status: FileStatus) => {

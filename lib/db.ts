@@ -32,6 +32,7 @@ export interface TranscriptionJob {
   txt_url: string | null;
   srt_url: string | null;
   vtt_url: string | null;
+  speakers_url: string | null;
   summary_url: string | null;
   error_message: string | null;
   retry_count: number;
@@ -287,6 +288,7 @@ export const TranscriptionJobDB = {
       txtUrl?: string;
       srtUrl?: string;
       vttUrl?: string;
+      speakersUrl?: string;
       summaryUrl?: string;
       audioDuration?: number;
       metadata?: any;
@@ -299,6 +301,7 @@ export const TranscriptionJobDB = {
         txt_url = COALESCE(${results.txtUrl || null}, txt_url),
         srt_url = COALESCE(${results.srtUrl || null}, srt_url),
         vtt_url = COALESCE(${results.vttUrl || null}, vtt_url),
+        speakers_url = COALESCE(${results.speakersUrl || null}, speakers_url),
         summary_url = COALESCE(${results.summaryUrl || null}, summary_url),
         audio_duration_seconds = COALESCE(${results.audioDuration || null}, audio_duration_seconds),
         metadata = COALESCE(${results.metadata || null}, metadata)

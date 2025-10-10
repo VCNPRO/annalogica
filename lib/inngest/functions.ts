@@ -3,6 +3,7 @@ import { TranscriptionJobDB } from '@/lib/db';
 import {
   transcribeAudio,
   saveTranscriptionResults,
+  saveSpeakersReport,
   generateSummary,
   saveSummary,
   type TranscriptionResult,
@@ -44,11 +45,14 @@ export const transcribeFile = inngest.createFunction(
 
     await step.run('save-results-and-metadata', async () => {
       const urls = await saveTranscriptionResults(transcriptionResult, filename);
-      
+
+      // Generate and save speakers report
+      const speakersUrl = await saveSpeakersReport(transcriptionResult, filename);
+
       const speakers = transcriptionResult.utterances
         ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))].sort()
         : [];
-        
+
       const metadata = { speakers };
 
       await TranscriptionJobDB.updateResults(jobId, {
@@ -56,10 +60,11 @@ export const transcribeFile = inngest.createFunction(
         txtUrl: urls.txtUrl,
         srtUrl: urls.srtUrl,
         vttUrl: urls.vttUrl,
+        speakersUrl: speakersUrl,
         audioDuration: transcriptionResult.audioDuration,
         metadata,
       });
-      
+
       await logTranscription(userId, filename, transcriptionResult.audioDuration);
     });
 

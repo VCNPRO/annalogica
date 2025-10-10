@@ -303,3 +303,127 @@ export async function saveSummary(
 
   return summaryBlob.url;
 }
+
+/**
+ * Generate speakers/participants report from transcription
+ */
+export function generateSpeakersReport(result: TranscriptionResult): string {
+  if (!result.utterances || result.utterances.length === 0) {
+    return 'No se detectaron oradores en esta transcripción.';
+  }
+
+  // Extract unique speakers
+  const speakers = [...new Set(result.utterances.map(u => u.speaker))].sort();
+
+  if (speakers.length === 0) {
+    return 'No se detectaron oradores en esta transcripción.';
+  }
+
+  // Calculate statistics for each speaker
+  const speakerStats = speakers.map(speaker => {
+    const utterances = result.utterances!.filter(u => u.speaker === speaker);
+    const totalWords = utterances.reduce((sum, u) => sum + u.text.split(/\s+/).length, 0);
+    const totalDuration = utterances.reduce((sum, u) => sum + (u.end - u.start), 0);
+    const interventions = utterances.length;
+
+    return {
+      speaker,
+      interventions,
+      totalWords,
+      totalDuration,
+      utterances
+    };
+  });
+
+  // Sort by total duration (most active speaker first)
+  speakerStats.sort((a, b) => b.totalDuration - a.totalDuration);
+
+  // Generate report
+  let report = '='.repeat(60) + '\n';
+  report += 'ANÁLISIS DE ORADORES / INTERVINIENTES\n';
+  report += '='.repeat(60) + '\n\n';
+
+  report += `Total de oradores detectados: ${speakers.length}\n`;
+  report += `Duración total del audio: ${formatDuration(result.audioDuration)}\n\n`;
+
+  report += '-'.repeat(60) + '\n';
+  report += 'RESUMEN POR ORADOR\n';
+  report += '-'.repeat(60) + '\n\n';
+
+  speakerStats.forEach((stats, index) => {
+    const percentage = ((stats.totalDuration / result.audioDuration) * 100).toFixed(1);
+
+    report += `${index + 1}. ${stats.speaker}\n`;
+    report += `   Intervenciones: ${stats.interventions}\n`;
+    report += `   Palabras pronunciadas: ${stats.totalWords}\n`;
+    report += `   Tiempo total: ${formatDuration(stats.totalDuration)} (${percentage}% del total)\n`;
+    report += `   Promedio por intervención: ${formatDuration(stats.totalDuration / stats.interventions)}\n\n`;
+  });
+
+  // Detailed timeline
+  report += '-'.repeat(60) + '\n';
+  report += 'LÍNEA DE TIEMPO DETALLADA\n';
+  report += '-'.repeat(60) + '\n\n';
+
+  result.utterances.forEach((utterance, index) => {
+    const startTime = formatTimestampSimple(utterance.start);
+    const endTime = formatTimestampSimple(utterance.end);
+    const duration = formatDuration(utterance.end - utterance.start);
+
+    report += `[${startTime} → ${endTime}] (${duration})\n`;
+    report += `${utterance.speaker}: ${utterance.text.trim()}\n\n`;
+  });
+
+  return report;
+}
+
+/**
+ * Format milliseconds to readable duration (MM:SS)
+ */
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${pad(seconds)}`;
+}
+
+/**
+ * Format timestamp for simple display (HH:MM:SS)
+ */
+function formatTimestampSimple(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+  }
+  return `${minutes}:${pad(seconds)}`;
+}
+
+/**
+ * Save speakers report to Vercel Blob
+ */
+export async function saveSpeakersReport(
+  result: TranscriptionResult,
+  filename: string
+): Promise<string> {
+  const baseName = filename.replace(/\.[^/.]+$/, '');
+  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+
+  if (!blobToken) {
+    throw new Error('BLOB_READ_WRITE_TOKEN not configured');
+  }
+
+  const report = generateSpeakersReport(result);
+
+  const speakersBlob = await put(`${baseName}-oradores.txt`, report, {
+    access: 'public',
+    contentType: 'text/plain; charset=utf-8',
+    token: blobToken,
+    addRandomSuffix: true
+  });
+
+  return speakersBlob.url;
+}
