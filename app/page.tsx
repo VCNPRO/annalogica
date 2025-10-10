@@ -870,17 +870,41 @@ export default function Dashboard() {
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    if (uploadedFiles.length > 0 && confirm('¿Limpiar todos los archivos y empezar de nuevo?')) {
+                    if (uploadedFiles.some(f => f.status === 'processing' || f.status === 'pending')) {
+                      if (confirm('Hay archivos procesándose. ¿Reiniciar de todos modos?')) {
+                        setUploadedFiles([]);
+                        setSelectedFileIds(new Set());
+                        setError(null);
+                      }
+                    } else if (uploadedFiles.length > 0) {
                       setUploadedFiles([]);
                       setSelectedFileIds(new Set());
                       setError(null);
                     }
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
-                  title="Limpiar todo y reiniciar"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
+                  title="Reiniciar - Limpiar todo y empezar de nuevo"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  Limpiar y Reiniciar
+                  Reiniciar
+                </button>
+                <button
+                  onClick={() => {
+                    const selectedFiles = uploadedFiles.filter(f => selectedFileIds.has(f.id));
+                    if (selectedFiles.length === 0) {
+                      alert('Selecciona archivos para eliminar');
+                      return;
+                    }
+                    if (confirm(`¿Eliminar ${selectedFiles.length} archivo(s) seleccionado(s)?`)) {
+                      setUploadedFiles(prev => prev.filter(f => !selectedFileIds.has(f.id)));
+                      setSelectedFileIds(new Set());
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
+                  title="Eliminar archivos seleccionados"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Eliminar
                 </button>
               </div>
             </div>
