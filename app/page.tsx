@@ -451,7 +451,7 @@ export default function Dashboard() {
           const baseName = file.name.replace(/\.[^/.]+$/, '');
           const folderHandle = await dirHandle.getDirectoryHandle(baseName, { create: true });
 
-          // Download transcription (txt or pdf)
+          // Download transcription (txt, pdf, or both)
           if (options.downloadFormat === 'pdf' && job.txt_url) {
             const tags = job.metadata?.tags || [];
             const pdfBlob = await downloadPDF(job.txt_url, file.name, tags);
@@ -459,13 +459,28 @@ export default function Dashboard() {
             const writable = await fileHandle.createWritable();
             await writable.write(pdfBlob);
             await writable.close();
-          } else if (job.txt_url) {
+          } else if (options.downloadFormat === 'txt' && job.txt_url) {
             const txtRes = await fetch(job.txt_url);
             const txtBlob = await txtRes.blob();
             const fileHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
             const writable = await fileHandle.createWritable();
             await writable.write(txtBlob);
             await writable.close();
+          } else if (options.downloadFormat === 'both' && job.txt_url) {
+            // Download both TXT and PDF
+            const txtRes = await fetch(job.txt_url);
+            const txtBlob = await txtRes.blob();
+            const txtFileHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
+            const txtWritable = await txtFileHandle.createWritable();
+            await txtWritable.write(txtBlob);
+            await txtWritable.close();
+
+            const tags = job.metadata?.tags || [];
+            const pdfBlob = await downloadPDF(job.txt_url, file.name, tags);
+            const pdfFileHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
+            const pdfWritable = await pdfFileHandle.createWritable();
+            await pdfWritable.write(pdfBlob);
+            await pdfWritable.close();
           }
 
           // Download SRT
@@ -524,7 +539,7 @@ export default function Dashboard() {
     }
   };
 
-  const downloadFilesIndividually = async (file: UploadedFile, job: any, format: 'txt' | 'pdf') => {
+  const downloadFilesIndividually = async (file: UploadedFile, job: any, format: 'txt' | 'pdf' | 'both') => {
     // Download transcription in selected format
     if (format === 'pdf' && job.txt_url) {
       const tags = job.metadata?.tags || [];
@@ -537,6 +552,17 @@ export default function Dashboard() {
       URL.revokeObjectURL(url);
     } else if (format === 'txt' && job.txt_url) {
       window.open(job.txt_url, '_blank');
+    } else if (format === 'both' && job.txt_url) {
+      // Download both TXT and PDF
+      window.open(job.txt_url, '_blank');
+      const tags = job.metadata?.tags || [];
+      const pdfBlob = await downloadPDF(job.txt_url, file.name, tags);
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${file.name.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
     }
 
     // Always download other formats

@@ -15,7 +15,7 @@ export default function Settings() {
     autoGeneratePDF: true,
     autoGenerateSRT: true,
     organizeInFolders: true,
-    downloadFormat: 'txt' as 'txt' | 'pdf'
+    downloadFormat: 'txt' as 'txt' | 'pdf' | 'both'
   });
 
   useEffect(() => {
@@ -115,7 +115,7 @@ export default function Settings() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <SettingsIcon className="h-8 w-8 text-orange-500" />
-            <h1 className="font-orbitron text-3xl text-orange-500 font-bold">Ajustes</h1>
+            <h1 className="font-orbitron text-3xl text-orange-500 font-bold">ajustes</h1>
           </div>
           <p className={`${textSecondary} text-sm`}>Personaliza tu experiencia con annalogica</p>
         </div>
@@ -191,8 +191,8 @@ export default function Settings() {
 
                 <div>
                   <label className={`block text-sm font-medium mb-3 ${textPrimary}`}>Formato de transcripción</label>
-                  <div className="flex gap-3">
-                    <label className={`flex-1 flex items-center justify-center gap-2 p-3 border ${border} rounded-lg cursor-pointer transition-all ${defaultOptions.downloadFormat === 'txt' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : ''}`}>
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className={`flex items-center justify-center gap-2 p-3 border ${border} rounded-lg cursor-pointer transition-all ${defaultOptions.downloadFormat === 'txt' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : ''}`}>
                       <input
                         type="radio"
                         name="downloadFormat"
@@ -201,9 +201,9 @@ export default function Settings() {
                         onChange={() => setDefaultOptions({...defaultOptions, downloadFormat: 'txt'})}
                         className="w-4 h-4 text-orange-500 accent-orange-500"
                       />
-                      <span className={`text-sm font-medium ${defaultOptions.downloadFormat === 'txt' ? 'text-orange-600 dark:text-orange-400' : textPrimary}`}>TXT</span>
+                      <span className={`text-xs font-medium ${defaultOptions.downloadFormat === 'txt' ? 'text-orange-600 dark:text-orange-400' : textPrimary}`}>TXT</span>
                     </label>
-                    <label className={`flex-1 flex items-center justify-center gap-2 p-3 border ${border} rounded-lg cursor-pointer transition-all ${defaultOptions.downloadFormat === 'pdf' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : ''}`}>
+                    <label className={`flex items-center justify-center gap-2 p-3 border ${border} rounded-lg cursor-pointer transition-all ${defaultOptions.downloadFormat === 'pdf' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : ''}`}>
                       <input
                         type="radio"
                         name="downloadFormat"
@@ -212,7 +212,18 @@ export default function Settings() {
                         onChange={() => setDefaultOptions({...defaultOptions, downloadFormat: 'pdf'})}
                         className="w-4 h-4 text-orange-500 accent-orange-500"
                       />
-                      <span className={`text-sm font-medium ${defaultOptions.downloadFormat === 'pdf' ? 'text-orange-600 dark:text-orange-400' : textPrimary}`}>PDF</span>
+                      <span className={`text-xs font-medium ${defaultOptions.downloadFormat === 'pdf' ? 'text-orange-600 dark:text-orange-400' : textPrimary}`}>PDF</span>
+                    </label>
+                    <label className={`flex items-center justify-center gap-2 p-3 border ${border} rounded-lg cursor-pointer transition-all ${defaultOptions.downloadFormat === 'both' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : ''}`}>
+                      <input
+                        type="radio"
+                        name="downloadFormat"
+                        value="both"
+                        checked={defaultOptions.downloadFormat === 'both'}
+                        onChange={() => setDefaultOptions({...defaultOptions, downloadFormat: 'both'})}
+                        className="w-4 h-4 text-orange-500 accent-orange-500"
+                      />
+                      <span className={`text-xs font-medium ${defaultOptions.downloadFormat === 'both' ? 'text-orange-600 dark:text-orange-400' : textPrimary}`}>Ambos</span>
                     </label>
                   </div>
                 </div>
