@@ -44,7 +44,7 @@ export const transcribeFile = inngest.createFunction(
     });
 
     await step.run('save-results-and-metadata', async () => {
-      const urls = await saveTranscriptionResults(transcriptionResult, filename);
+      const urls = await saveTranscriptionResults(transcriptionResult, filename, audioUrl);
 
       // Generate and save speakers report (with error handling to avoid breaking transcription)
       let speakersUrl: string | undefined = undefined;
