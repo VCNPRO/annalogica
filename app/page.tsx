@@ -362,7 +362,7 @@ export default function Dashboard() {
     router.push('/login');
   };
 
-  const downloadPDF = async (txtUrl: string, filename: string) => {
+  const downloadPDF = async (txtUrl: string, filename: string, tags?: string[]) => {
     try {
       // Fetch the transcription text
       const textRes = await fetch(txtUrl);
@@ -381,32 +381,168 @@ export default function Dashboard() {
       // Set properties and add content
       const margin = 20;
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       const usableWidth = pageWidth - (margin * 2);
+      let yPosition = margin;
 
       // Header
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(16);
-      doc.text('TRANSCRIPCIÓN DE AUDIO', pageWidth / 2, margin, { align: 'center' });
+      doc.text('TRANSCRIPCIÓN DE AUDIO', pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 10;
 
       // Metadata
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(11);
-      doc.text(`Archivo: ${filename}`, margin, margin + 15);
-      doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, margin, margin + 20);
+      doc.text(`Archivo: ${filename}`, margin, yPosition);
+      yPosition += 5;
+      doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, margin, yPosition);
+      yPosition += 5;
 
-      doc.line(margin, margin + 25, pageWidth - margin, margin + 25);
+      // Tags if available
+      if (tags && tags.length > 0) {
+        doc.setFont('Helvetica', 'bold');
+        doc.text('Tags:', margin, yPosition);
+        doc.setFont('Helvetica', 'normal');
+        const tagsText = tags.join(', ');
+        const splitTags = doc.splitTextToSize(tagsText, usableWidth - 20);
+        doc.text(splitTags, margin + 15, yPosition);
+        yPosition += splitTags.length * 5;
+      }
 
-      // Body
+      yPosition += 5;
+      doc.line(margin, yPosition, pageWidth - margin, yPosition);
+      yPosition += 10;
+
+      // Body with automatic page breaks
       doc.setFontSize(10);
       const splitText = doc.splitTextToSize(text, usableWidth);
-      doc.text(splitText, margin, margin + 35);
+
+      for (let i = 0; i < splitText.length; i++) {
+        if (yPosition > pageHeight - margin) {
+          doc.addPage();
+          yPosition = margin;
+        }
+        doc.text(splitText[i], margin, yPosition);
+        yPosition += 5;
+      }
 
       // Save
-      doc.save(`${filename.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`);
+      const pdfBlob = doc.output('blob');
+      return pdfBlob;
     } catch (error) {
       console.error('Error generando PDF:', error);
-      alert('Error generando PDF. Por favor, inténtelo de nuevo.');
+      throw error;
     }
+  };
+
+  const downloadFilesOrganized = async (file: UploadedFile, job: any) => {
+    try {
+      const savedOptions = localStorage.getItem('defaultOptions');
+      const options = savedOptions ? JSON.parse(savedOptions) : { organizeInFolders: true, downloadFormat: 'txt' };
+
+      // Check if File System Access API is supported
+      if (options.organizeInFolders && 'showDirectoryPicker' in window) {
+        try {
+          // Request directory permission
+          const dirHandle = await (window as any).showDirectoryPicker();
+
+          // Create folder for this file
+          const baseName = file.name.replace(/\.[^/.]+$/, '');
+          const folderHandle = await dirHandle.getDirectoryHandle(baseName, { create: true });
+
+          // Download transcription (txt or pdf)
+          if (options.downloadFormat === 'pdf' && job.txt_url) {
+            const tags = job.metadata?.tags || [];
+            const pdfBlob = await downloadPDF(job.txt_url, file.name, tags);
+            const fileHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(pdfBlob);
+            await writable.close();
+          } else if (job.txt_url) {
+            const txtRes = await fetch(job.txt_url);
+            const txtBlob = await txtRes.blob();
+            const fileHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(txtBlob);
+            await writable.close();
+          }
+
+          // Download SRT
+          if (job.srt_url) {
+            const srtRes = await fetch(job.srt_url);
+            const srtBlob = await srtRes.blob();
+            const fileHandle = await folderHandle.getFileHandle(`${baseName}.srt`, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(srtBlob);
+            await writable.close();
+          }
+
+          // Download VTT
+          if (job.vtt_url) {
+            const vttRes = await fetch(job.vtt_url);
+            const vttBlob = await vttRes.blob();
+            const fileHandle = await folderHandle.getFileHandle(`${baseName}.vtt`, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(vttBlob);
+            await writable.close();
+          }
+
+          // Download Summary
+          if (job.summary_url) {
+            const summaryRes = await fetch(job.summary_url);
+            const summaryBlob = await summaryRes.blob();
+            const fileHandle = await folderHandle.getFileHandle(`${baseName}-resumen.txt`, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(summaryBlob);
+            await writable.close();
+          }
+
+          // Save tags as separate file if available
+          if (job.metadata?.tags && job.metadata.tags.length > 0) {
+            const tagsText = `Tags para: ${file.name}\n\n${job.metadata.tags.join('\n')}`;
+            const tagsBlob = new Blob([tagsText], { type: 'text/plain' });
+            const fileHandle = await folderHandle.getFileHandle(`${baseName}-tags.txt`, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(tagsBlob);
+            await writable.close();
+          }
+
+          alert(`✅ Archivos guardados en carpeta: ${baseName}`);
+        } catch (err: any) {
+          // User cancelled or permission denied - fallback to individual downloads
+          console.log('Folder creation cancelled or denied, falling back to individual downloads');
+          await downloadFilesIndividually(file, job, options.downloadFormat);
+        }
+      } else {
+        // Fallback to individual downloads
+        await downloadFilesIndividually(file, job, options.downloadFormat);
+      }
+    } catch (error) {
+      console.error('Error downloading organized files:', error);
+      alert('Error al descargar archivos. Inténtalo de nuevo.');
+    }
+  };
+
+  const downloadFilesIndividually = async (file: UploadedFile, job: any, format: 'txt' | 'pdf') => {
+    // Download transcription in selected format
+    if (format === 'pdf' && job.txt_url) {
+      const tags = job.metadata?.tags || [];
+      const pdfBlob = await downloadPDF(job.txt_url, file.name, tags);
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${file.name.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else if (format === 'txt' && job.txt_url) {
+      window.open(job.txt_url, '_blank');
+    }
+
+    // Always download other formats
+    if (job.srt_url) window.open(job.srt_url, '_blank');
+    if (job.vtt_url) window.open(job.vtt_url, '_blank');
+    if (job.summary_url) window.open(job.summary_url, '_blank');
   };
 
   const getStatusText = (status: FileStatus) => {
@@ -809,18 +945,7 @@ export default function Dashboard() {
                           if (res.ok) {
                             const data = await res.json();
                             const job = data.job;
-
-                            // Download transcription in selected format
-                            if (downloadFormat === 'pdf' && job.txt_url) {
-                              await downloadPDF(job.txt_url, file.name);
-                            } else if (downloadFormat === 'txt' && job.txt_url) {
-                              window.open(job.txt_url, '_blank');
-                            }
-
-                            // Always download other formats
-                            if (job.srt_url) window.open(job.srt_url, '_blank');
-                            if (job.vtt_url) window.open(job.vtt_url, '_blank');
-                            if (job.summary_url) window.open(job.summary_url, '_blank');
+                            await downloadFilesOrganized(file, job);
                           }
                         } catch (err) {
                           console.error('Error downloading files:', err);
@@ -884,18 +1009,7 @@ export default function Dashboard() {
                             if (res.ok) {
                               const data = await res.json();
                               const job = data.job;
-
-                              // Download transcription in selected format
-                              if (downloadFormat === 'pdf' && job.txt_url) {
-                                await downloadPDF(job.txt_url, file.name);
-                              } else if (downloadFormat === 'txt' && job.txt_url) {
-                                window.open(job.txt_url, '_blank');
-                              }
-
-                              // Always download other formats
-                              if (job.srt_url) window.open(job.srt_url, '_blank');
-                              if (job.vtt_url) window.open(job.vtt_url, '_blank');
-                              if (job.summary_url) window.open(job.summary_url, '_blank');
+                              await downloadFilesOrganized(file, job);
                             }
                           } catch (err) {
                             console.error('Error downloading file:', err);

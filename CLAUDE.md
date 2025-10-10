@@ -51,3 +51,21 @@ Editar `.env.local` con tus tokens:
 - `REPLICATE_API_TOKEN` → https://replicate.com/account/api-tokens
 - `CLAUDE_API_KEY` → https://console.anthropic.com/settings/keys
 - `JWT_SECRET` → ✅ Ya generado automáticamente
+- `CRON_SECRET` → Generar token aleatorio para seguridad del cron job
+
+### Retención de Archivos
+**IMPORTANTE**: Los archivos se eliminan automáticamente después de 30 días.
+
+**Archivos guardados en Vercel Blob:**
+- Transcripciones (TXT)
+- Subtítulos (SRT y VTT)
+- Resúmenes (TXT)
+- Tags y metadatos
+
+**NO se guardan:**
+- Archivos de audio/video originales (se eliminan tras procesamiento)
+
+**Limpieza automática:**
+- Cron job diario (2:00 AM UTC) → `/api/cron/cleanup`
+- Configurado en `vercel.json`
+- Requiere `CRON_SECRET` en variables de entorno de Vercel

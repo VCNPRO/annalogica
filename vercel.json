@@ -1,7 +1,1 @@
- {
-    "functions": {
-      "app/api/download/route.ts": {
-        "includeFiles": "node_modules/pdfkit/**"
-      }
-    }
-  }
+{"crons":[{"path":"/api/cron/cleanup","schedule":"0 2 * * *"}]}
