@@ -1,5 +1,5 @@
 import { AssemblyAI } from 'assemblyai';
-import { put } from '@vercel/blob';
+import { put, del } from '@vercel/blob';
 
 // Initialize AssemblyAI client
 export function getAssemblyAIClient() {
@@ -169,7 +169,8 @@ function pad(num: number, size = 2): string {
  */
 export async function saveTranscriptionResults(
   result: TranscriptionResult,
-  filename: string
+  filename: string,
+  originalFileUrl: string // Add this parameter
 ): Promise<{
   txtUrl: string;
   srtUrl: string;
@@ -213,6 +214,14 @@ export async function saveTranscriptionResults(
     srtUrl: srtBlob.url,
     vttUrl: vttBlob.url
   };
+
+  // Delete original file after successful processing
+  try {
+    await del(originalFileUrl, { token: blobToken });
+    console.log(`[Vercel Blob] Deleted original file: ${originalFileUrl}`);
+  } catch (deleteError: any) {
+    console.error(`[Vercel Blob] Failed to delete original file ${originalFileUrl}:`, deleteError.message);
+  }
 }
 
 export interface SummaryResult {

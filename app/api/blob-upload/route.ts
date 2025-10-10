@@ -1,11 +1,8 @@
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
-import { verifyRequestAuth } from '@/lib/auth';
-import { uploadRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
-import { logUpload } from '@/lib/usage-tracking';
 
 // File size limits (in bytes)
-const MAX_FILE_SIZE_AUDIO = 500 * 1024 * 1024; // 500 MB - ~8 horas podcast
-const MAX_FILE_SIZE_VIDEO = 2 * 1024 * 1024 * 1024; // 2 GB - 1-2 horas HD
+const MAX_FILE_SIZE_AUDIO = 500 * 1024 * 1024; // 500 MB
+const MAX_FILE_SIZE_VIDEO = 2 * 1024 * 1024 * 1024; // 2 GB
 
 // Allowed MIME types
 const ALLOWED_AUDIO_TYPES = [
@@ -36,44 +33,19 @@ export async function POST(request: Request): Promise<Response> {
       body,
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
-        try {
-          console.log('[blob-upload] onBeforeGenerateToken called');
+        console.log('[blob-upload] onBeforeGenerateToken called');
 
-          // Extract file info from clientPayload
-          const payload = typeof clientPayload === 'string'
-            ? JSON.parse(clientPayload)
-            : clientPayload;
+        // Extract file info from clientPayload
+        const payload = typeof clientPayload === 'string'
+          ? JSON.parse(clientPayload)
+          : clientPayload;
 
-          console.log('[blob-upload] Payload:', { hasToken: !!payload?.token, size: payload?.size, type: payload?.type });
+        const fileSize = payload?.size || 0;
+        const fileType = payload?.type || '';
 
-          const fileSize = payload?.size || 0;
-          const fileType = payload?.type || '';
-          const token = payload?.token || '';
+        console.log('[blob-upload] File info:', { size: fileSize, type: fileType });
 
-          // SECURITY: Verify user authentication from clientPayload
-          if (!token) {
-            console.error('[blob-upload] No token found in payload');
-            throw new Error('No autorizado. Debes iniciar sesión para subir archivos.');
-          }
-
-          const { verifyToken } = await import('@/lib/auth');
-          const user = verifyToken(token);
-
-          console.log('[blob-upload] Token verified:', { hasUser: !!user, userId: user?.userId });
-
-          if (!user) {
-            console.error('[blob-upload] Token verification failed');
-            throw new Error('No autorizado. Token inválido.');
-          }
-
-        // SECURITY: Rate limiting
-        const identifier = getClientIdentifier(request, user.userId);
-        const rateLimitResponse = await checkRateLimit(uploadRateLimit, identifier, 'archivos subidos');
-        if (rateLimitResponse) {
-          throw new Error('Demasiados archivos subidos. Intenta de nuevo más tarde.');
-        }
-
-        // SECURITY: Validate file type first
+        // Validate file type
         const isAudioAllowed = ALLOWED_AUDIO_TYPES.includes(fileType);
         const isVideoAllowed = ALLOWED_VIDEO_TYPES.includes(fileType);
 
@@ -83,7 +55,7 @@ export async function POST(request: Request): Promise<Response> {
           );
         }
 
-        // SECURITY: Validate file size based on type
+        // Validate file size
         const maxSize = isAudioAllowed ? MAX_FILE_SIZE_AUDIO : MAX_FILE_SIZE_VIDEO;
         if (fileSize > maxSize) {
           const maxSizeMB = maxSize / 1024 / 1024;
@@ -93,44 +65,25 @@ export async function POST(request: Request): Promise<Response> {
           );
         }
 
-          console.log('[blob-upload] All validations passed, returning config');
+        console.log('[blob-upload] All validations passed');
 
-          return {
-            allowedContentTypes: [...ALLOWED_AUDIO_TYPES, ...ALLOWED_VIDEO_TYPES],
-            addRandomSuffix: true,
-            maximumSizeInBytes: MAX_FILE_SIZE_VIDEO,
-            tokenPayload: JSON.stringify({
-              userId: user.userId,
-              email: user.email,
-              fileSize: fileSize,
-              timestamp: new Date().toISOString(),
-            }),
-          };
-        } catch (error) {
-          console.error('[blob-upload] Error in onBeforeGenerateToken:', error);
-          throw error;
-        }
+        return {
+          allowedContentTypes: [...ALLOWED_AUDIO_TYPES, ...ALLOWED_VIDEO_TYPES],
+          addRandomSuffix: true,
+          maximumSizeInBytes: MAX_FILE_SIZE_VIDEO,
+        };
       },
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        console.log('Archivo subido exitosamente:', blob.url);
-
-        // TRACKING: Log upload
-        try {
-          const payload = JSON.parse(tokenPayload as string);
-          // Note: blob.size doesn't exist in PutBlobResult, we'll track size from clientPayload if needed
-          await logUpload(payload.userId, payload.fileSize || 0, blob.pathname, blob.contentType || 'unknown');
-        } catch (e) {
-          console.error('Failed to log upload:', e);
-        }
+      onUploadCompleted: async ({ blob }) => {
+        console.log('[blob-upload] Upload completed:', blob.url);
       },
     });
 
     return Response.json(jsonResponse);
   } catch (error) {
-    console.error('Error en blob-upload:', error);
+    console.error('[blob-upload] Error:', error);
     return Response.json(
       { error: (error as Error).message },
-      { status: error instanceof Error && error.message.includes('autorizado') ? 401 : 400 }
+      { status: 400 }
     );
   }
 }

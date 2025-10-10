@@ -1,5 +1,5 @@
 import Replicate from "replicate";
-import { put } from '@vercel/blob';
+import { put, del } from '@vercel/blob';
 import { verifyRequestAuth } from '@/lib/auth';
 import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 import { logTranscription, logSummary } from '@/lib/usage-tracking';
@@ -99,6 +99,19 @@ export async function POST(request: Request) {
       srtUrl: srtBlob.url,
       summaryUrl
     });
+
+    // Delete original audio file after successful processing
+    try {
+      const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+      if (blobToken) {
+        await del(audioUrl, { token: blobToken });
+        console.log(`[Vercel Blob] Deleted original audio file: ${audioUrl}`);
+      } else {
+        console.warn('[Vercel Blob] BLOB_READ_WRITE_TOKEN not configured, skipping original file deletion.');
+      }
+    } catch (deleteError: any) {
+      console.error(`[Vercel Blob] Failed to delete original audio file ${audioUrl}:`, deleteError.message);
+    }
     
   } catch (error: any) {
     console.error('Process error:', error);
