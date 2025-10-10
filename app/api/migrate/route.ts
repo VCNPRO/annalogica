@@ -3,13 +3,14 @@ import { sql } from '@vercel/postgres';
 
 export async function GET(request: NextRequest) {
   try {
-    // Security: Check for a secret token
-    const authHeader = request.headers.get('authorization');
+    // Security: Check for a secret token in query params
+    const { searchParams } = new URL(request.url);
+    const token = searchParams.get('token');
     const secret = process.env.MIGRATION_SECRET || 'temp-secret-2025';
 
-    if (authHeader !== `Bearer ${secret}`) {
+    if (token !== secret) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized - Invalid token' },
         { status: 401 }
       );
     }
