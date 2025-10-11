@@ -5,6 +5,7 @@ export interface User {
   email: string;
   password: string;
   name?: string | null;
+  role: 'user' | 'admin';
   created_at: Date;
   updated_at: Date;
 }
@@ -47,11 +48,11 @@ export interface TranscriptionJob {
 
 export const UserDB = {
   // Create new user
-  create: async (email: string, hashedPassword: string, name?: string): Promise<User> => {
+  create: async (email: string, hashedPassword: string, name?: string, role: 'user' | 'admin' = 'user'): Promise<User> => {
     const result = await sql<User>`
-      INSERT INTO users (email, password, name)
-      VALUES (${email.toLowerCase()}, ${hashedPassword}, ${name || null})
-      RETURNING id, email, password, name, created_at, updated_at
+      INSERT INTO users (email, password, name, role)
+      VALUES (${email.toLowerCase()}, ${hashedPassword}, ${name || null}, ${role})
+      RETURNING id, email, password, name, role, created_at, updated_at
     `;
     return result.rows[0];
   },
@@ -59,7 +60,7 @@ export const UserDB = {
   // Find user by email
   findByEmail: async (email: string): Promise<User | null> => {
     const result = await sql<User>`
-      SELECT id, email, password, name, created_at, updated_at
+      SELECT id, email, password, name, role, created_at, updated_at
       FROM users
       WHERE email = ${email.toLowerCase()}
       LIMIT 1
@@ -70,7 +71,7 @@ export const UserDB = {
   // Find user by ID
   findById: async (id: string): Promise<User | null> => {
     const result = await sql<User>`
-      SELECT id, email, password, name, created_at, updated_at
+      SELECT id, email, password, name, role, created_at, updated_at
       FROM users
       WHERE id = ${id}
       LIMIT 1
@@ -124,7 +125,7 @@ export const UserDB = {
   // Get all users (admin only - for debugging)
   getAll: async (): Promise<User[]> => {
     const result = await sql<User>`
-      SELECT id, email, name, created_at, updated_at
+      SELECT id, email, name, role, created_at, updated_at
       FROM users
       ORDER BY created_at DESC
     `;

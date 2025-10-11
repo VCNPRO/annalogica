@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, role: user.role },
       jwtSecret,
       { expiresIn: '7d' }
     );
@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
         id: user.id,
         email: user.email,
         name: user.name,
+        role: user.role,
         createdAt: user.created_at
       }
     });

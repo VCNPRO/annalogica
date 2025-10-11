@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyRequestAuth } from '@/lib/auth';
+import { verifyRequestAuth, verifyAdmin } from '@/lib/auth';
 import {
   getUserUsageSummary,
   getAllUsersUsage,
@@ -22,9 +22,27 @@ export async function GET(request: NextRequest) {
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const endDate = new Date();
 
-    // TODO: Add admin check here
-    // For now, users can only see their own stats
-    // In production, add: if (mode !== 'user' && !user.isAdmin) return 403
+    // SECURITY: Verificar permisos de admin para modos restringidos
+    if (mode === 'all' || mode === 'platform') {
+      const isAdmin = await verifyAdmin(request);
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: 'Acceso denegado: se requieren permisos de administrador' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // SECURITY: Los usuarios solo pueden ver sus propias estadísticas
+    if (mode === 'user' && userId !== user.userId) {
+      const isAdmin = await verifyAdmin(request);
+      if (!isAdmin) {
+        return NextResponse.json(
+          { error: 'Acceso denegado: no puedes ver estadísticas de otros usuarios' },
+          { status: 403 }
+        );
+      }
+    }
 
     let data;
 
@@ -34,12 +52,10 @@ export async function GET(request: NextRequest) {
         break;
 
       case 'all':
-        // TODO: Require admin role
         data = await getAllUsersUsage(startDate, endDate);
         break;
 
       case 'platform':
-        // TODO: Require admin role
         data = await getPlatformStats(startDate, endDate);
         break;
 

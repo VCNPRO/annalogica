@@ -1,8 +1,10 @@
 import jwt from 'jsonwebtoken';
+import { UserDB } from './db';
 
 export interface JWTPayload {
   userId: string;
   email: string;
+  role?: 'user' | 'admin';
   iat?: number;
   exp?: number;
 }
@@ -55,4 +57,22 @@ export function verifyRequestAuth(request: Request): JWTPayload | null {
   if (!token) return null;
 
   return verifyToken(token);
+}
+
+// SECURITY: Verificar si el usuario autenticado es admin
+export async function verifyAdmin(request: Request): Promise<boolean> {
+  const auth = verifyRequestAuth(request);
+  if (!auth) return false;
+
+  // Verificar role en el token
+  if (auth.role === 'admin') return true;
+
+  // Si el token no tiene role, verificar en la base de datos
+  try {
+    const user = await UserDB.findById(auth.userId);
+    return user?.role === 'admin';
+  } catch (error) {
+    console.error('[verifyAdmin] Error verificando admin:', error);
+    return false;
+  }
 }
