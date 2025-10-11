@@ -223,6 +223,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   });
 
   const customerId = invoice.customer as string;
+  // @ts-ignore - Stripe types issue
   const subscriptionId = invoice.subscription as string;
 
   // Obtener usuario
