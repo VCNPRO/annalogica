@@ -37,6 +37,7 @@ export default function Login() {
       // SECURITY: El token ahora se guarda en httpOnly cookie automáticamente
       // Solo guardamos datos no sensibles del usuario en localStorage
       localStorage.setItem('user', JSON.stringify(data.user || { email }));
+      console.log('[LOGIN] Login exitoso, cookie httpOnly establecida');
 
       router.push('/');
     } catch (err: any) {
