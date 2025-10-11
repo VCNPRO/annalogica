@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cleanupOldFilesAndRecords } from '@/lib/blob-cleanup';
+import { logger } from '@/lib/logger';
 
 /**
  * Cron job endpoint to clean up old files
@@ -8,13 +9,15 @@ import { cleanupOldFilesAndRecords } from '@/lib/blob-cleanup';
  * Security: Uses Authorization header to prevent unauthorized access
  */
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
     // Verify cron secret to prevent unauthorized access
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
 
     if (!cronSecret) {
-      console.error('[Cron] CRON_SECRET not configured');
+      logger.error('CRON_SECRET not configured');
       return NextResponse.json(
         { error: 'Cron job not configured' },
         { status: 500 }
@@ -22,7 +25,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (authHeader !== `Bearer ${cronSecret}`) {
-      console.error('[Cron] Unauthorized access attempt');
+      logger.security('Unauthorized cron access attempt', {
+        ip: request.headers.get('x-forwarded-for') || 'unknown'
+      });
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -30,10 +35,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Run cleanup
-    console.log('[Cron] Starting cleanup job...');
+    logger.info('Starting cleanup job');
     const result = await cleanupOldFilesAndRecords(30);
 
-    console.log('[Cron] Cleanup job completed:', result);
+    const duration = Date.now() - startTime;
+    logger.performance('Cleanup job completed', duration, result);
 
     return NextResponse.json({
       success: true,
@@ -42,7 +48,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[Cron] Error in cleanup job:', error);
+    logger.error('Error in cleanup job', error);
     return NextResponse.json(
       { error: 'Cleanup failed', details: error.message },
       { status: 500 }

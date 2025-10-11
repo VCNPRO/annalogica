@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserDB } from '@/lib/db';
 import { loginRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,6 +25,7 @@ export async function POST(request: NextRequest) {
     // Buscar usuario
     const user = await UserDB.findByEmail(email);
     if (!user) {
+      logger.security('Failed login attempt - user not found', { email });
       return NextResponse.json(
         { error: 'Credenciales inválidas' },
         { status: 401 }
@@ -33,6 +35,7 @@ export async function POST(request: NextRequest) {
     // Verificar contraseña
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
+      logger.security('Failed login attempt - invalid password', { email, userId: user.id });
       return NextResponse.json(
         { error: 'Credenciales inválidas' },
         { status: 401 }
@@ -73,10 +76,12 @@ export async function POST(request: NextRequest) {
       path: '/'
     });
 
+    logger.security('Successful login', { userId: user.id, email: user.email, role: user.role });
+
     return response;
 
   } catch (error) {
-    console.error('Error en login:', error);
+    logger.error('Error in login endpoint', error);
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
