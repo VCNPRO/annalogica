@@ -12,24 +12,26 @@ export default function Results() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
     loadFiles();
   }, []);
 
   const loadFiles = async () => {
     try {
-      const token = localStorage.getItem('token');
+      // SECURITY: Cookie httpOnly se envía automáticamente
       const response = await fetch('/api/files', {
-        headers: { 'Authorization': `Bearer ${token}` }
+        credentials: 'include'
       });
+
+      if (!response.ok) {
+        router.push('/login');
+        return;
+      }
+
       const data = await response.json();
       setFiles(data.files || []);
     } catch (error) {
       console.error('Error loading files:', error);
+      router.push('/login');
     } finally {
       setLoading(false);
     }
