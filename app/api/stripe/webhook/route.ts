@@ -241,6 +241,13 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const user = userResult.rows[0];
 
   // Guardar en historial de pagos
+  // @ts-ignore - Stripe types issue
+  const paymentIntentId = (invoice.payment_intent as string) || invoice.id;
+  // @ts-ignore - Stripe types issue
+  const periodStart = invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null;
+  // @ts-ignore - Stripe types issue
+  const periodEnd = invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null;
+
   await sql`
     INSERT INTO payment_history (
       user_id,
@@ -255,15 +262,15 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
       period_end
     ) VALUES (
       ${user.id},
-      ${invoice.payment_intent as string},
+      ${paymentIntentId},
       ${invoice.id},
       ${invoice.amount_paid / 100},
       ${invoice.currency.toUpperCase()},
       'paid',
       ${user.subscription_plan},
       ${new Date(invoice.created * 1000).toISOString()},
-      ${invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null},
-      ${invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null}
+      ${periodStart},
+      ${periodEnd}
     )
     ON CONFLICT (stripe_payment_id) DO NOTHING
   `;
