@@ -34,9 +34,10 @@ export default function Login() {
         throw new Error(data.error || 'Error en la autenticación');
       }
 
-      localStorage.setItem('token', data.token);
+      // SECURITY: El token ahora se guarda en httpOnly cookie automáticamente
+      // Solo guardamos datos no sensibles del usuario en localStorage
       localStorage.setItem('user', JSON.stringify(data.user || { email }));
-      
+
       router.push('/');
     } catch (err: any) {
       setError(err.message);

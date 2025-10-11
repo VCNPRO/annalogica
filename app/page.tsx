@@ -42,16 +42,30 @@ export default function Dashboard() {
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
+    // SECURITY: Verificar autenticación mediante cookie httpOnly
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me', {
+          credentials: 'include' // Importante: incluir cookies
+        });
 
-    if (!token || !userData) {
-      router.push('/login');
-      return;
-    }
+        if (!res.ok) {
+          router.push('/login');
+          return;
+        }
 
-    setUser(JSON.parse(userData));
-    setLoading(false);
+        const data = await res.json();
+        setUser(data.user);
+        // Guardar datos del usuario en localStorage (no sensible)
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setLoading(false);
+      } catch (error) {
+        console.error('Error verificando autenticación:', error);
+        router.push('/login');
+      }
+    };
+
+    checkAuth();
   }, [router]);
 
   // Update timer every second for files being processed
@@ -68,9 +82,6 @@ export default function Dashboard() {
 
   // Polling para actualizar estado de jobs activos
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
     // Filtrar archivos que necesitan polling (tienen jobId y están pending o processing)
     const activeJobs = uploadedFiles.filter(
       f => f.jobId && (f.status === 'pending' || f.status === 'processing')
@@ -81,8 +92,9 @@ export default function Dashboard() {
     const pollJobs = async () => {
       for (const file of activeJobs) {
         try {
+          // SECURITY: Cookie httpOnly se envía automáticamente
           const res = await fetch(`/api/jobs/${file.jobId}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
+            credentials: 'include'
           });
 
           if (!res.ok) continue;
@@ -220,10 +232,9 @@ export default function Dashboard() {
     if (!files || files.length === 0) return;
 
     setError(null);
-    
+
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Sesión expirada');
+      // SECURITY: No necesitamos token, la cookie httpOnly se envía automáticamente
 
       // Create all file entries first
       const filesToUpload = Array.from(files).map((file, i) => {
@@ -349,12 +360,6 @@ export default function Dashboard() {
       return;
     }
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('Sesión expirada');
-      return;
-    }
-
     const filesToProcess = uploadedFiles.filter(file => selectedFileIds.has(file.id));
     console.log('[Process] Files to process (after filter):', filesToProcess.map(f => ({ name: f.name, actions: f.actions })));
 
@@ -389,12 +394,13 @@ export default function Dashboard() {
         try {
           console.log('[Process] 🚀 Processing file:', file.name, 'blobUrl:', file.blobUrl);
 
+          // SECURITY: Cookie httpOnly se envía automáticamente
           const processRes = await fetch('/api/process', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
+              'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify({ audioUrl: file.blobUrl, filename: file.name })
           });
 
@@ -453,10 +459,20 @@ export default function Dashboard() {
 
 
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      // SECURITY: Llamar a endpoint de logout para limpiar cookie httpOnly
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Error en logout:', error);
+    } finally {
+      // Limpiar datos locales no sensibles
+      localStorage.removeItem('user');
+      router.push('/login');
+    }
   };
 
   const downloadPDF = async (txtUrl: string, filename: string, tags?: string[]) => {
@@ -1166,14 +1182,12 @@ export default function Dashboard() {
                       return;
                     }
 
-                    const token = localStorage.getItem('token');
-                    if (!token) return;
-
                     for (const file of completedFiles) {
                       if (file.jobId) {
                         try {
+                          // SECURITY: Cookie httpOnly se envía automáticamente
                           const res = await fetch(`/api/jobs/${file.jobId}`, {
-                            headers: { 'Authorization': `Bearer ${token}` }
+                            credentials: 'include'
                           });
                           if (res.ok) {
                             const data = await res.json();
@@ -1232,12 +1246,10 @@ export default function Dashboard() {
                         onClick={async () => {
                           if (!file.jobId) return;
 
-                          const token = localStorage.getItem('token');
-                          if (!token) return;
-
                           try {
+                            // SECURITY: Cookie httpOnly se envía automáticamente
                             const res = await fetch(`/api/jobs/${file.jobId}`, {
-                              headers: { 'Authorization': `Bearer ${token}` }
+                              credentials: 'include'
                             });
                             if (res.ok) {
                               const data = await res.json();

@@ -65,11 +65,10 @@ export async function POST(request: NextRequest) {
       { expiresIn: '7d' }
     );
 
-    // Respuesta exitosa
-    return NextResponse.json({
+    // SECURITY: Establecer token en httpOnly cookie
+    const response = NextResponse.json({
       success: true,
       message: 'Usuario registrado exitosamente',
-      token,
       user: {
         id: user.id,
         email: user.email,
@@ -77,6 +76,17 @@ export async function POST(request: NextRequest) {
         createdAt: user.created_at
       }
     });
+
+    // Set httpOnly cookie with security flags
+    response.cookies.set('auth-token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60, // 7 días en segundos
+      path: '/'
+    });
+
+    return response;
 
   } catch (error: any) {
     console.error('Error en registro:', error);

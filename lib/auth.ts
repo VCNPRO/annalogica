@@ -30,6 +30,18 @@ export function verifyToken(token: string): JWTPayload | null {
 }
 
 export function getTokenFromRequest(request: Request): string | null {
+  // SECURITY: Priorizar cookie httpOnly sobre Authorization header
+  // Intentar obtener token desde cookie primero
+  const cookieHeader = request.headers.get('cookie');
+  if (cookieHeader) {
+    const cookies = cookieHeader.split(';').map(c => c.trim());
+    const authCookie = cookies.find(c => c.startsWith('auth-token='));
+    if (authCookie) {
+      return authCookie.split('=')[1];
+    }
+  }
+
+  // Fallback: Authorization header (para retrocompatibilidad)
   const authHeader = request.headers.get('Authorization');
   if (!authHeader) return null;
 
