@@ -2,6 +2,7 @@
 
 **Fecha:** 2025-10-11
 **Estado:** ✅ Mejoras de seguridad implementadas
+**Base de datos:** annalogica_01 (migración ejecutada correctamente)
 
 ---
 
