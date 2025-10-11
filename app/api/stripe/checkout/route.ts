@@ -17,7 +17,7 @@ const JWT_SECRET = process.env.JWT_SECRET!;
 export async function POST(request: NextRequest) {
   try {
     // 1. Verificar autenticación
-    const token = request.cookies.get('token')?.value;
+    const token = request.cookies.get('auth-token')?.value || request.cookies.get('token')?.value;
 
     if (!token) {
       return NextResponse.json(
@@ -26,11 +26,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let userId: number;
+    let userId: string | number;
     let userEmail: string;
 
     try {
-      const decoded = verify(token, JWT_SECRET) as { userId: number; email: string };
+      const decoded = verify(token, JWT_SECRET) as { userId: string | number; email: string };
       userId = decoded.userId;
       userEmail = decoded.email;
     } catch (error) {
