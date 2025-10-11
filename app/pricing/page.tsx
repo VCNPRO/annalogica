@@ -56,12 +56,38 @@ export default function PricingPage() {
     // Si no está autenticado, guardar el plan seleccionado y redirigir a login
     if (!user) {
       localStorage.setItem('selectedPlan', planId);
-      router.push('/login?redirect=checkout');
+      router.push('/login?redirect=pricing');
       return;
     }
 
-    // Redirigir a checkout
-    router.push(`/checkout?plan=${planId}`);
+    // Crear sesión de checkout llamando a la API
+    try {
+      setLoading(true);
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ planId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al crear sesión de pago');
+      }
+
+      // Redirigir a Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error al iniciar el proceso de pago. Por favor, inténtalo de nuevo.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredPlans = Object.values(PRICING_PLANS).filter(plan => {
