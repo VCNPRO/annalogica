@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Moon, Sun, Globe, Settings as SettingsIcon, Download, Clock, Info, HelpCircle, LogOut } from 'lucide-react';
+import { Moon, Sun, Globe, Settings as SettingsIcon, Download, Clock, Info, HelpCircle, LogOut, CreditCard, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 export default function Settings() {
   const router = useRouter();
@@ -87,6 +87,31 @@ export default function Settings() {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       alert('No se pudo copiar el ID');
+    }
+  };
+
+  const [loadingPortal, setLoadingPortal] = useState(false);
+  const openCustomerPortal = async () => {
+    try {
+      setLoadingPortal(true);
+      const response = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(error.error || 'Error al abrir el portal');
+        return;
+      }
+
+      const data = await response.json();
+      window.location.href = data.url;
+    } catch (error) {
+      console.error('Error opening portal:', error);
+      alert('Error al abrir el portal de gestión');
+    } finally {
+      setLoadingPortal(false);
     }
   };
 
@@ -238,6 +263,148 @@ export default function Settings() {
               <p className={`text-xs mt-3 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
                 📧 Contacto: <a href="mailto:soporte@annalogica.eu" className="underline hover:text-blue-500">soporte@annalogica.eu</a>
               </p>
+            </div>
+          </div>
+
+          {/* Suscripción y Plan */}
+          <div className={`${bgSecondary} rounded-lg ${border} border p-6 lg:col-span-2`}>
+            <div className="flex items-center gap-3 mb-4">
+              <CreditCard className="h-5 w-5 text-purple-500" />
+              <h2 className={`text-lg font-semibold ${textPrimary}`}>Suscripción y Plan</h2>
+            </div>
+
+            <div className="space-y-4">
+              {/* Current Plan */}
+              <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-5">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-2xl font-bold ${darkMode ? 'text-purple-300' : 'text-purple-900'}`}>
+                        {user?.subscription_plan ? user.subscription_plan.charAt(0).toUpperCase() + user.subscription_plan.slice(1) : 'Free'}
+                      </span>
+                      {user?.subscription_status === 'active' && (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      )}
+                      {user?.subscription_status === 'past_due' && (
+                        <AlertCircle className="h-5 w-5 text-yellow-500" />
+                      )}
+                      {user?.subscription_status === 'canceled' && (
+                        <AlertCircle className="h-5 w-5 text-red-500" />
+                      )}
+                    </div>
+                    <p className={`text-sm ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
+                      {user?.subscription_status === 'active' ? 'Suscripción activa' :
+                       user?.subscription_status === 'past_due' ? 'Pago pendiente' :
+                       user?.subscription_status === 'canceled' ? 'Suscripción cancelada' :
+                       'Plan gratuito'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-xs ${darkMode ? 'text-purple-400' : 'text-purple-600'} mb-1`}>
+                      Cuota mensual
+                    </p>
+                    <p className={`text-xl font-bold ${darkMode ? 'text-purple-300' : 'text-purple-900'}`}>
+                      {user?.monthly_quota || 10} archivos
+                    </p>
+                  </div>
+                </div>
+
+                {/* Usage Bar */}
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className={darkMode ? 'text-purple-300' : 'text-purple-700'}>
+                      Uso mensual: {user?.monthly_usage || 0} / {user?.monthly_quota || 10}
+                    </span>
+                    <span className={darkMode ? 'text-purple-400' : 'text-purple-600'}>
+                      {Math.round(((user?.monthly_usage || 0) / (user?.monthly_quota || 10)) * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-300 dark:bg-gray-700 rounded-full h-2.5">
+                    <div
+                      className="bg-gradient-to-r from-purple-500 to-blue-500 h-2.5 rounded-full transition-all"
+                      style={{ width: `${Math.min(((user?.monthly_usage || 0) / (user?.monthly_quota || 10)) * 100, 100)}%` }}
+                    ></div>
+                  </div>
+                </div>
+
+                {/* Renewal Date */}
+                {user?.quota_reset_date && (
+                  <p className={`text-xs ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                    Renovación: {new Date(user.quota_reset_date).toLocaleDateString('es-ES', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </p>
+                )}
+
+                {/* Cancel notice */}
+                {user?.subscription_cancel_at_period_end && (
+                  <div className="mt-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg p-3">
+                    <p className={`text-xs ${darkMode ? 'text-yellow-300' : 'text-yellow-800'}`}>
+                      ⚠️ Tu suscripción se cancelará el {new Date(user.subscription_end_date).toLocaleDateString('es-ES')}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {user?.subscription_plan === 'free' || !user?.stripe_customer_id ? (
+                  <>
+                    <button
+                      onClick={() => router.push('/pricing')}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all"
+                    >
+                      ✨ Actualizar Plan
+                    </button>
+                    <button
+                      onClick={() => router.push('/pricing')}
+                      className={`px-6 py-3 border-2 ${border} ${textPrimary} font-semibold rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all`}
+                    >
+                      Ver Planes
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={openCustomerPortal}
+                      disabled={loadingPortal}
+                      className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
+                    >
+                      {loadingPortal ? 'Abriendo...' : '⚙️ Gestionar Suscripción'}
+                    </button>
+                    <button
+                      onClick={() => router.push('/pricing')}
+                      className={`px-6 py-3 border-2 ${border} ${textPrimary} font-semibold rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800 transition-all`}
+                    >
+                      Cambiar Plan
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Info box */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className={`text-sm ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>
+                      {user?.stripe_customer_id ? (
+                        <>
+                          Desde el portal de cliente puedes actualizar tu método de pago,
+                          ver tu historial de facturas, y cancelar tu suscripción.
+                        </>
+                      ) : (
+                        <>
+                          Actualiza a un plan de pago para obtener más archivos mensuales,
+                          soporte prioritario y funciones avanzadas.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
