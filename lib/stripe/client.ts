@@ -205,12 +205,15 @@ export async function getSubscriptionStatus(subscriptionId: string): Promise<{
 
   const isActive = ['active', 'trialing'].includes(subscription.status);
 
+  // @ts-ignore - Stripe types issue with current_period_end
+  const currentPeriodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000)
+    : null;
+
   return {
     isActive,
     status: subscription.status,
-    currentPeriodEnd: subscription.current_period_end
-      ? new Date(subscription.current_period_end * 1000)
-      : null,
+    currentPeriodEnd,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
     plan: subscription.items.data[0]?.price.id || null,
   };
