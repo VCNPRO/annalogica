@@ -128,6 +128,18 @@ export default function Login() {
         <p className="text-center mt-6 text-sm text-gray-600 dark:text-gray-400">
           Plan gratuito: 10 archivos/mes
         </p>
+
+        <div className="text-center mt-4">
+          <p className="text-xs text-gray-500 dark:text-gray-500">
+            ¿Necesitas ayuda?{' '}
+            <a
+              href="mailto:soporte@annalogica.eu"
+              className="text-orange-600 dark:text-orange-400 hover:underline"
+            >
+              soporte@annalogica.eu
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );

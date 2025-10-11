@@ -19,27 +19,39 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-
-    if (!token || !userData) {
-      router.push('/login');
-      return;
-    }
-
-    setUser(JSON.parse(userData));
-
-    // Load saved settings
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'dark';
-    const savedLang = localStorage.getItem('language') || 'es';
-    const savedOptions = localStorage.getItem('defaultOptions');
-
-    setDarkMode(savedTheme === 'dark');
-    setLanguage(savedLang);
-    if (savedOptions) setDefaultOptions(JSON.parse(savedOptions));
-
-    setLoading(false);
+    loadUserData();
   }, [router]);
+
+  const loadUserData = async () => {
+    try {
+      // Verify auth with cookies
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        router.push('/login');
+        return;
+      }
+
+      const data = await response.json();
+      setUser(data.user);
+
+      // Load saved settings
+      const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'dark';
+      const savedLang = localStorage.getItem('language') || 'es';
+      const savedOptions = localStorage.getItem('defaultOptions');
+
+      setDarkMode(savedTheme === 'dark');
+      setLanguage(savedLang);
+      if (savedOptions) setDefaultOptions(JSON.parse(savedOptions));
+
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading user:', error);
+      router.push('/login');
+    }
+  };
 
   const toggleTheme = () => {
     const newTheme = !darkMode;
@@ -58,10 +70,24 @@ export default function Settings() {
     alert('✅ Preferencias guardadas correctamente');
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include'
+    });
     localStorage.removeItem('user');
     router.push('/login');
+  };
+
+  const [copied, setCopied] = useState(false);
+  const copyUserId = async () => {
+    try {
+      await navigator.clipboard.writeText(user?.id || '');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      alert('No se pudo copiar el ID');
+    }
   };
 
   if (loading) {
@@ -165,6 +191,54 @@ export default function Settings() {
               <option value="ca">🇪🇸 Català</option>
               <option value="en">🇬🇧 English</option>
             </select>
+          </div>
+
+          {/* ID de Cliente */}
+          <div className={`${bgSecondary} rounded-lg ${border} border p-6 lg:col-span-2`}>
+            <div className="flex items-center gap-3 mb-4">
+              <Info className="h-5 w-5 text-blue-500" />
+              <h2 className={`text-lg font-semibold ${textPrimary}`}>ID de Cliente</h2>
+            </div>
+
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-5">
+              <p className={`text-sm mb-4 ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>
+                Este es tu identificador único. Úsalo si necesitas contactar con soporte técnico.
+              </p>
+              <div className="flex items-center gap-3">
+                <code className={`flex-1 px-4 py-3 ${darkMode ? 'bg-black' : 'bg-white'} border ${border} rounded-lg text-xs font-mono ${textPrimary} break-all`}>
+                  {user?.id || 'Cargando...'}
+                </code>
+                <button
+                  onClick={copyUserId}
+                  className={`px-4 py-3 rounded-lg transition-colors flex items-center gap-2 ${
+                    copied
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-orange-600 hover:bg-orange-700'
+                  } text-white`}
+                  title="Copiar ID"
+                >
+                  {copied ? (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      <span className="text-sm">Copiado</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                      </svg>
+                      <span className="text-sm">Copiar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className={`text-xs mt-3 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
+                📧 Contacto: <a href="mailto:soporte@annalogica.eu" className="underline hover:text-blue-500">soporte@annalogica.eu</a>
+              </p>
+            </div>
           </div>
 
           {/* Opciones de Descarga */}
