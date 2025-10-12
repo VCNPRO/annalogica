@@ -2,6 +2,7 @@ import { verifyRequestAuth } from '@/lib/auth';
 import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client';
+import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guard';
 
 // API endpoint for creating async transcription jobs
 /**
@@ -22,6 +23,31 @@ export async function POST(request: Request) {
       console.error('[API Process] Autenticación fallida');
       return Response.json({ error: 'No autorizado' }, { status: 401 });
     }
+
+    // QUOTA: Check subscription status and quota
+    console.log('[API Process] Verificando cuota de suscripción...');
+    const subscriptionStatus = await checkSubscriptionStatus(user.userId);
+
+    if (!subscriptionStatus.canUpload) {
+      console.error('[API Process] Cuota excedida:', {
+        userId: user.userId,
+        usage: subscriptionStatus.usage,
+        quota: subscriptionStatus.quota
+      });
+      return Response.json(
+        {
+          error: subscriptionStatus.message || 'Has alcanzado el límite de tu plan',
+          code: 'QUOTA_EXCEEDED',
+          quota: subscriptionStatus.quota,
+          usage: subscriptionStatus.usage,
+          remaining: subscriptionStatus.remaining,
+          upgradeUrl: subscriptionStatus.upgradeUrl
+        },
+        { status: 403 }
+      );
+    }
+
+    console.log('[API Process] Cuota verificada - Archivos disponibles:', subscriptionStatus.remaining);
 
     // SECURITY: Rate limiting
     const identifier = getClientIdentifier(request, user.userId);
@@ -62,6 +88,15 @@ export async function POST(request: Request) {
     });
 
     console.log('[API Process] Job sent to Inngest:', job.id);
+
+    // QUOTA: Increment usage counter after successful job creation
+    try {
+      await incrementUsage(user.userId);
+      console.log('[API Process] Uso incrementado para usuario:', user.userId);
+    } catch (error) {
+      console.error('[API Process] Error incrementando uso:', error);
+      // Don't fail the request if usage increment fails
+    }
 
     // Return immediately with job ID
     // Frontend will poll /api/jobs/:id for status
