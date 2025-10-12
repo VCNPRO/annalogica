@@ -6,8 +6,7 @@ import { Sun, Moon, HelpCircle, LogOut } from 'lucide-react';
 import QuotaExceededModal from '@/components/QuotaExceededModal';
 import FileUploadZone from '@/components/FileUploadZone';
 import ActionsPanel from '@/components/ActionsPanel';
-import FileListTable from '@/components/FileListTable';
-import CompletedFilesTable from '@/components/CompletedFilesTable';
+import AllFilesTable from '@/components/AllFilesTable';
 import {
   useAuth,
   useSubscription,
@@ -69,7 +68,9 @@ export default function Dashboard() {
 
   // Handlers
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[DEBUG] handleFileChange triggered', e.target.files);
     if (e.target.files) {
+      console.log('[DEBUG] Calling uploadFiles with', e.target.files.length, 'files');
       uploadFiles(e.target.files);
       e.target.value = '';
     }
@@ -257,29 +258,23 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Right Content - File Tables */}
+        {/* Right Content - All Files Table */}
         <div className="flex-1 p-6 overflow-y-auto flex flex-col" style={{ height: '100%' }}>
           <div className="mb-6" style={{ height: '28px' }}></div>
 
-          {/* Pending/Processing Files Table */}
-          <FileListTable
+          {/* All Files Table (Unified) */}
+          <AllFilesTable
             files={uploadedFiles}
             selectedFileIds={selectedFileIds}
             darkMode={darkMode}
+            downloadFormat={downloadFormat}
             onSelectFile={selectFile}
             onSelectAll={() => selectAll(uploadedFiles)}
             onDeselectAll={deselectAll}
             onRemoveFile={removeFile}
-          />
-
-          {/* Completed Files Table */}
-          <CompletedFilesTable
-            files={uploadedFiles}
-            darkMode={darkMode}
-            downloadFormat={downloadFormat}
-            onDownloadFormatChange={setDownloadFormat}
             onDownload={handleDownload}
-            onRemoveFile={removeFile}
+            onDownloadFormatChange={setDownloadFormat}
+            onReset={handleReset}
           />
         </div>
       </div>

@@ -40,12 +40,14 @@ export function useFileUpload(): UseFileUploadReturn {
   const [error, setError] = useState<string | null>(null);
 
   const uploadFiles = useCallback(async (fileList: FileList) => {
+    console.log('[useFileUpload] uploadFiles called with', fileList.length, 'files');
     if (!fileList || fileList.length === 0) return;
 
     setError(null);
     setUploading(true);
 
     try {
+      console.log('[useFileUpload] Starting upload process...');
       const { upload } = await import('@vercel/blob/client');
 
       // Create file entries for all files
@@ -64,7 +66,12 @@ export function useFileUpload(): UseFileUploadReturn {
       });
 
       // Add all files to state
-      setFiles(prev => [...prev, ...filesToUpload.map(f => f.newFile)]);
+      console.log('[useFileUpload] Adding files to state:', filesToUpload.map(f => f.newFile));
+      setFiles(prev => {
+        const updated = [...prev, ...filesToUpload.map(f => f.newFile)];
+        console.log('[useFileUpload] Files state updated. New length:', updated.length);
+        return updated;
+      });
 
       // Upload files in parallel
       const uploadPromises = filesToUpload.map(async ({ file, fileId }) => {
