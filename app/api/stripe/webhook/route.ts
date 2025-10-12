@@ -216,71 +216,88 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 
 // Handler: Factura pagada exitosamente
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  logger.info('Processing invoice.payment_succeeded', {
-    invoiceId: invoice.id,
-    customerId: invoice.customer,
-    amount: invoice.amount_paid / 100,
-  });
+  try {
+    logger.info('Processing invoice.payment_succeeded', {
+      invoiceId: invoice.id,
+      customerId: invoice.customer,
+      amount: invoice.amount_paid / 100,
+    });
 
-  const customerId = invoice.customer as string;
-  // @ts-ignore - Stripe types issue
-  const subscriptionId = invoice.subscription as string;
+    const customerId = invoice.customer as string;
+    // @ts-ignore - Stripe types issue
+    const subscriptionId = invoice.subscription as string;
 
-  // Obtener usuario
-  const userResult = await sql`
-    SELECT id, email, subscription_plan
-    FROM users
-    WHERE stripe_customer_id = ${customerId}
-  `;
+    // Obtener usuario
+    const userResult = await sql`
+      SELECT id, email, subscription_plan
+      FROM users
+      WHERE stripe_customer_id = ${customerId}
+    `;
 
-  if (userResult.rows.length === 0) {
-    logger.error('User not found for customer', { customerId });
-    return;
+    if (userResult.rows.length === 0) {
+      logger.error('User not found for customer', { customerId });
+      return;
+    }
+
+    const user = userResult.rows[0];
+
+    // Guardar en historial de pagos
+    // @ts-ignore - Stripe types issue
+    const paymentIntentId = (invoice.payment_intent as string) || invoice.id;
+    // @ts-ignore - Stripe types issue
+    const periodStart = invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null;
+    // @ts-ignore - Stripe types issue
+    const periodEnd = invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null;
+
+    try {
+      await sql`
+        INSERT INTO payment_history (
+          user_id,
+          stripe_payment_id,
+          stripe_invoice_id,
+          amount,
+          currency,
+          status,
+          plan,
+          payment_date,
+          period_start,
+          period_end
+        ) VALUES (
+          ${user.id},
+          ${paymentIntentId},
+          ${invoice.id},
+          ${invoice.amount_paid / 100},
+          ${invoice.currency.toUpperCase()},
+          'paid',
+          ${user.subscription_plan},
+          ${new Date(invoice.created * 1000).toISOString()},
+          ${periodStart},
+          ${periodEnd}
+        )
+        ON CONFLICT (stripe_payment_id) DO NOTHING
+      `;
+
+      logger.info('Payment recorded in history', {
+        userId: user.id,
+        invoiceId: invoice.id,
+        amount: invoice.amount_paid / 100,
+        currency: invoice.currency,
+      });
+    } catch (dbError) {
+      // Si falla el insert al historial, solo logueamos pero no fallamos el webhook
+      logger.error('Error saving payment to history (non-critical)', {
+        error: dbError,
+        userId: user.id,
+        invoiceId: invoice.id,
+      });
+    }
+  } catch (error) {
+    logger.error('Error processing invoice.payment_succeeded', {
+      error,
+      invoiceId: invoice.id,
+    });
+    // No throw - no queremos que el webhook falle completamente
   }
-
-  const user = userResult.rows[0];
-
-  // Guardar en historial de pagos
-  // @ts-ignore - Stripe types issue
-  const paymentIntentId = (invoice.payment_intent as string) || invoice.id;
-  // @ts-ignore - Stripe types issue
-  const periodStart = invoice.period_start ? new Date(invoice.period_start * 1000).toISOString() : null;
-  // @ts-ignore - Stripe types issue
-  const periodEnd = invoice.period_end ? new Date(invoice.period_end * 1000).toISOString() : null;
-
-  await sql`
-    INSERT INTO payment_history (
-      user_id,
-      stripe_payment_id,
-      stripe_invoice_id,
-      amount,
-      currency,
-      status,
-      plan,
-      payment_date,
-      period_start,
-      period_end
-    ) VALUES (
-      ${user.id},
-      ${paymentIntentId},
-      ${invoice.id},
-      ${invoice.amount_paid / 100},
-      ${invoice.currency.toUpperCase()},
-      'paid',
-      ${user.subscription_plan},
-      ${new Date(invoice.created * 1000).toISOString()},
-      ${periodStart},
-      ${periodEnd}
-    )
-    ON CONFLICT (stripe_payment_id) DO NOTHING
-  `;
-
-  logger.info('Payment recorded in history', {
-    userId: user.id,
-    invoiceId: invoice.id,
-    amount: invoice.amount_paid / 100,
-    currency: invoice.currency,
-  });
 }
 
 // Handler: Fallo en pago de factura
