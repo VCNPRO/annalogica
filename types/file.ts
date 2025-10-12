@@ -9,37 +9,51 @@ export type FileStatus = 'uploading' | 'pending' | 'processing' | 'completed' | 
 export type DownloadFormat = 'txt' | 'pdf' | 'both';
 
 /**
- * Base file metadata shared across all states
+ * Uploaded file with all possible fields
+ * Use type guards to narrow to specific states
  */
-export interface FileMetadata {
+export interface UploadedFile {
+  // Base metadata (always present)
   id: string;
   name: string;
   fileType: FileType;
   fileSize: number;
   date: string;
+  status: FileStatus;
+
+  // Upload state
+  uploadProgress?: number;
+
+  // Pending state
+  blobUrl?: string;
+  actions?: string[];
+
+  // Processing state
+  jobId?: string;
+  processingProgress?: number;
+  processingStartTime?: number;
+  estimatedTimeRemaining?: number;
+  audioDuration?: number;
+
+  // Error state
+  errorMessage?: string;
 }
 
 /**
- * File in uploading state
+ * Type aliases for specific states (for documentation)
  */
-export interface FileUploadingState extends FileMetadata {
+export type FileUploadingState = UploadedFile & {
   status: 'uploading';
   uploadProgress: number;
-}
+};
 
-/**
- * File uploaded, pending processing
- */
-export interface FilePendingState extends FileMetadata {
+export type FilePendingState = UploadedFile & {
   status: 'pending';
   blobUrl: string;
   actions: string[];
-}
+};
 
-/**
- * File being processed
- */
-export interface FileProcessingState extends FileMetadata {
+export type FileProcessingState = UploadedFile & {
   status: 'processing';
   blobUrl: string;
   jobId: string;
@@ -47,36 +61,17 @@ export interface FileProcessingState extends FileMetadata {
   processingProgress: number;
   processingStartTime: number;
   estimatedTimeRemaining: number;
-  audioDuration?: number;
-}
+};
 
-/**
- * File processing completed
- */
-export interface FileCompletedState extends FileMetadata {
+export type FileCompletedState = UploadedFile & {
   status: 'completed';
   jobId: string;
-  processingProgress: 100;
-}
+};
 
-/**
- * File processing failed
- */
-export interface FileErrorState extends FileMetadata {
+export type FileErrorState = UploadedFile & {
   status: 'error';
   errorMessage?: string;
-}
-
-/**
- * Union type of all file states
- * TypeScript can narrow the type based on status field
- */
-export type UploadedFile =
-  | FileUploadingState
-  | FilePendingState
-  | FileProcessingState
-  | FileCompletedState
-  | FileErrorState;
+};
 
 /**
  * Type guard to check if file is uploading
