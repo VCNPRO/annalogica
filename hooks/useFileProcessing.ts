@@ -141,7 +141,14 @@ export function useFileProcessing(): UseFileProcessingReturn {
         }
 
         const data = await response.json();
-        const jobId = data.jobId || data.data?.jobId;
+        console.log('[useFileProcessing] Full API response:', data);
+
+        // API wraps response in { success, data, message }
+        const jobId = data.data?.jobId || data.jobId;
+
+        console.log('[useFileProcessing] Extracted jobId:', jobId);
+        console.log('[useFileProcessing] data.data:', data.data);
+        console.log('[useFileProcessing] data.jobId:', data.jobId);
 
         if (!jobId) {
           throw new Error('No se recibió jobId del servidor');
