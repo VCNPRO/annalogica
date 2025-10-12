@@ -80,6 +80,13 @@ export function useFileUpload(): UseFileUploadReturn {
           const randomSuffix = Math.random().toString(36).substring(2, 8);
           const uniqueFilename = `${timestamp}-${randomSuffix}-${file.name}`;
 
+          console.log('[useFileUpload] Starting upload for:', {
+            filename: file.name,
+            size: file.size,
+            type: file.type,
+            sizeMB: (file.size / 1024 / 1024).toFixed(2) + ' MB'
+          });
+
           const blob = await upload(uniqueFilename, file, {
             access: 'public',
             handleUploadUrl: '/api/blob-upload',
@@ -88,11 +95,14 @@ export function useFileUpload(): UseFileUploadReturn {
               type: file.type,
             }),
             onUploadProgress: ({ percentage }) => {
+              console.log(`[useFileUpload] Upload progress for ${file.name}:`, percentage + '%');
               setFiles(prev => prev.map(f =>
                 f.id === fileId ? { ...f, uploadProgress: percentage } : f
               ));
             },
           });
+
+          console.log('[useFileUpload] Upload completed:', blob.url);
 
           // Update file with blob URL and change to pending
           setFiles(prev => prev.map(f =>
@@ -111,6 +121,15 @@ export function useFileUpload(): UseFileUploadReturn {
             size: file.size
           });
         } catch (err) {
+          console.error('[useFileUpload] Upload error for', file.name, ':', err);
+          console.error('[useFileUpload] Error details:', {
+            message: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+            type: typeof err,
+            fileId,
+            filename: file.name
+          });
+
           logger.error('File upload failed', err, {
             fileId,
             filename: file.name
