@@ -455,8 +455,14 @@ export default function Dashboard() {
           const responseData = await processRes.json();
           console.log('[Process] API Response data:', responseData);
 
-          const { jobId } = responseData;
+          // API wraps response in { success, data: { jobId, status, message } }
+          const jobId = responseData.data?.jobId || responseData.jobId;
           console.log('[Process] ✅ Job created:', jobId, file.name);
+          console.log('[Process] Response structure:', {
+            hasData: !!responseData.data,
+            dataJobId: responseData.data?.jobId,
+            directJobId: responseData.jobId
+          });
           console.log('[Process] Updating file with ID:', file.id, 'New jobId:', jobId);
           processedCount++;
 
