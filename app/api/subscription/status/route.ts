@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET!;
 export async function GET(request: NextRequest) {
   try {
     // Verificar autenticación
-    const token = request.cookies.get('token')?.value;
+    const token = request.cookies.get('auth-token')?.value || request.cookies.get('token')?.value;
 
     if (!token) {
       return NextResponse.json(
@@ -18,10 +18,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    let userId: number;
+    let userId: string | number;
 
     try {
-      const decoded = verify(token, JWT_SECRET) as { userId: number };
+      const decoded = verify(token, JWT_SECRET) as { userId: string | number };
       userId = decoded.userId;
     } catch (error) {
       logger.security('Invalid JWT token in subscription status check', { error });

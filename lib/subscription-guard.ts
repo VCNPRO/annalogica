@@ -17,7 +17,7 @@ export interface SubscriptionStatus {
 /**
  * Verifica el estado de la suscripción de un usuario y si puede subir archivos
  */
-export async function checkSubscriptionStatus(userId: number): Promise<SubscriptionStatus> {
+export async function checkSubscriptionStatus(userId: string | number): Promise<SubscriptionStatus> {
   try {
     // Obtener datos del usuario
     const result = await sql`
@@ -105,7 +105,7 @@ export async function checkSubscriptionStatus(userId: number): Promise<Subscript
 /**
  * Incrementa el uso mensual del usuario
  */
-export async function incrementUsage(userId: number): Promise<void> {
+export async function incrementUsage(userId: string | number): Promise<void> {
   try {
     await sql`
       UPDATE users
@@ -123,7 +123,7 @@ export async function incrementUsage(userId: number): Promise<void> {
 /**
  * Resetea el uso mensual de un usuario (para testing o ajustes manuales)
  */
-export async function resetUsage(userId: number): Promise<void> {
+export async function resetUsage(userId: string | number): Promise<void> {
   try {
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -176,7 +176,7 @@ export async function resetAllUsages(): Promise<{ count: number }> {
 /**
  * Obtiene estadísticas de uso para un usuario
  */
-export async function getUserUsageStats(userId: number): Promise<{
+export async function getUserUsageStats(userId: string | number): Promise<{
   plan: string;
   quota: number;
   usage: number;
