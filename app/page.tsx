@@ -5,8 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, HelpCircle, LogOut } from 'lucide-react';
 import jsPDF from 'jspdf';
-import SubscriptionBanner from '@/components/SubscriptionBanner';
-import QuotaExceededModal from '@/components/QuotaExceededModal';
 
 // AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
@@ -42,14 +40,6 @@ export default function Dashboard() {
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
   const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf'>('txt');
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
-  const [subscriptionData, setSubscriptionData] = useState<{
-    plan: string;
-    filesUsed: number;
-    filesTotal: number;
-    resetDate: Date | null;
-    daysUntilReset: number;
-  } | null>(null);
-  const [showQuotaModal, setShowQuotaModal] = useState(false);
 
   useEffect(() => {
     // SECURITY: Verificar autenticación mediante cookie httpOnly
@@ -77,28 +67,6 @@ export default function Dashboard() {
 
     checkAuth();
   }, [router]);
-
-  // Fetch subscription data
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      try {
-        const res = await fetch('/api/subscription/status', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          setSubscriptionData({
-            plan: data.plan,
-            filesUsed: data.usage,
-            filesTotal: data.quota,
-            resetDate: data.resetDate ? new Date(data.resetDate) : null,
-            daysUntilReset: data.stats?.daysUntilReset || 0
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching subscription:', error);
-      }
-    };
-    if (user) fetchSubscription();
-  }, [user]);
 
   // Update timer every second for files being processed
   useEffect(() => {
@@ -441,13 +409,6 @@ export default function Dashboard() {
           if (!processRes.ok) {
             const errorData = await processRes.json();
             console.error('[Process] API Error:', errorData);
-
-            // Check if it's a quota exceeded error
-            if (errorData.code === 'QUOTA_EXCEEDED' && subscriptionData) {
-              setShowQuotaModal(true);
-              setError(errorData.error);
-              break; // Stop processing more files
-            }
 
             throw new Error(errorData.error || 'Error al procesar');
           }
@@ -1319,37 +1280,6 @@ export default function Dashboard() {
 
         </div>
       </div>
-
-      {/* Quota Exceeded Modal */}
-      {subscriptionData && (
-        <QuotaExceededModal
-          isOpen={showQuotaModal}
-          onClose={async () => {
-            setShowQuotaModal(false);
-            // Refresh subscription data after modal closes
-            try {
-              const res = await fetch('/api/subscription/status', { credentials: 'include' });
-              if (res.ok) {
-                const data = await res.json();
-                setSubscriptionData({
-                  plan: data.plan,
-                  filesUsed: data.usage,
-                  filesTotal: data.quota,
-                  resetDate: data.resetDate ? new Date(data.resetDate) : null,
-                  daysUntilReset: data.stats?.daysUntilReset || 0
-                });
-              }
-            } catch (error) {
-              console.error('Error refreshing subscription:', error);
-            }
-          }}
-          type="files"
-          used={subscriptionData.filesUsed}
-          total={subscriptionData.filesTotal}
-          resetDate={subscriptionData.resetDate}
-          currentPlan={subscriptionData.plan}
-        />
-      )}
     </div>
   );
 }
