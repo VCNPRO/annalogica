@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Moon, Sun, Globe, Settings as SettingsIcon, Download, Clock, Info, HelpCircle, LogOut, CreditCard, AlertCircle, CheckCircle2 } from 'lucide-react';
+import SubscriptionBanner from '@/components/SubscriptionBanner';
 
 export default function Settings() {
   const router = useRouter();
@@ -17,6 +18,13 @@ export default function Settings() {
     organizeInFolders: true,
     downloadFormat: 'txt' as 'txt' | 'pdf' | 'both'
   });
+  const [subscriptionData, setSubscriptionData] = useState<{
+    plan: string;
+    filesUsed: number;
+    filesTotal: number;
+    resetDate: Date | null;
+    daysUntilReset: number;
+  } | null>(null);
 
   useEffect(() => {
     loadUserData();
@@ -45,6 +53,26 @@ export default function Settings() {
       setDarkMode(savedTheme === 'dark');
       setLanguage(savedLang);
       if (savedOptions) setDefaultOptions(JSON.parse(savedOptions));
+
+      // Load subscription data
+      try {
+        const subResponse = await fetch('/api/subscription/status', {
+          credentials: 'include'
+        });
+
+        if (subResponse.ok) {
+          const subData = await subResponse.json();
+          setSubscriptionData({
+            plan: subData.plan || 'free',
+            filesUsed: subData.usage || 0,
+            filesTotal: subData.quota || 10,
+            resetDate: subData.resetDate ? new Date(subData.resetDate) : null,
+            daysUntilReset: subData.stats?.daysUntilReset || 0
+          });
+        }
+      } catch (subError) {
+        console.error('Error loading subscription data:', subError);
+      }
 
       setLoading(false);
     } catch (error) {
@@ -170,6 +198,19 @@ export default function Settings() {
           </div>
           <p className={`${textSecondary} text-sm`}>Personaliza tu experiencia con annalogica</p>
         </div>
+
+        {/* Subscription Banner */}
+        {subscriptionData && (
+          <div className="mb-8">
+            <SubscriptionBanner
+              plan={subscriptionData.plan}
+              filesUsed={subscriptionData.filesUsed}
+              filesTotal={subscriptionData.filesTotal}
+              resetDate={subscriptionData.resetDate}
+              daysUntilReset={subscriptionData.daysUntilReset}
+            />
+          </div>
+        )}
 
         {/* Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

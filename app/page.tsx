@@ -997,17 +997,6 @@ export default function Dashboard() {
         <div className="flex-1 p-6 overflow-y-auto flex flex-col" style={{ height: '100%' }}>
           <div className="mb-6" style={{ height: '28px' }}></div>
 
-          {/* Subscription Banner */}
-          {subscriptionData && (
-            <SubscriptionBanner
-              plan={subscriptionData.plan}
-              filesUsed={subscriptionData.filesUsed}
-              filesTotal={subscriptionData.filesTotal}
-              resetDate={subscriptionData.resetDate}
-              daysUntilReset={subscriptionData.daysUntilReset}
-            />
-          )}
-
           <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden mb-6`} style={{ flex: '1 1 60%', minHeight: '400px' }}>
             <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
               <div>
