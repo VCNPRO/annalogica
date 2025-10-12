@@ -3,8 +3,22 @@ import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rat
 import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client';
 import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guard';
+import {
+  successResponse,
+  handleError,
+  unauthorizedResponse,
+  forbiddenResponse,
+  badRequestResponse
+} from '@/lib/api-response';
+import {
+  ValidationError,
+  QuotaExceededError,
+  validateRequired,
+  validateUrl
+} from '@/lib/errors';
+import { logger } from '@/lib/logger';
+import type { JobCreateResponse } from '@/types/job';
 
-// API endpoint for creating async transcription jobs
 /**
  * POST /api/process
  * Create transcription job (async) - returns immediately
@@ -13,41 +27,43 @@ import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guar
 export async function POST(request: Request) {
   try {
     // SECURITY: Verify authentication
-    console.log('[API Process] Verificando autenticación...');
-    console.log('[API Process] Authorization header:', request.headers.get('Authorization')?.substring(0, 50) + '...');
+    logger.info('Process API: Authentication check started');
 
     const user = verifyRequestAuth(request);
-    console.log('[API Process] Usuario verificado:', user ? { userId: user.userId, email: user.email } : null);
 
     if (!user) {
-      console.error('[API Process] Autenticación fallida');
-      return Response.json({ error: 'No autorizado' }, { status: 401 });
+      logger.security('Process API: Authentication failed', {});
+      return unauthorizedResponse();
     }
 
+    logger.info('Process API: User authenticated', {
+      userId: user.userId,
+      email: user.email
+    });
+
     // QUOTA: Check subscription status and quota
-    console.log('[API Process] Verificando cuota de suscripción...');
+    logger.info('Process API: Checking subscription quota', { userId: user.userId });
     const subscriptionStatus = await checkSubscriptionStatus(user.userId);
 
     if (!subscriptionStatus.canUpload) {
-      console.error('[API Process] Cuota excedida:', {
+      logger.info('Process API: Quota exceeded', {
         userId: user.userId,
         usage: subscriptionStatus.usage,
         quota: subscriptionStatus.quota
       });
-      return Response.json(
-        {
-          error: subscriptionStatus.message || 'Has alcanzado el límite de tu plan',
-          code: 'QUOTA_EXCEEDED',
-          quota: subscriptionStatus.quota,
-          usage: subscriptionStatus.usage,
-          remaining: subscriptionStatus.remaining,
-          upgradeUrl: subscriptionStatus.upgradeUrl
-        },
-        { status: 403 }
+
+      throw new QuotaExceededError(
+        subscriptionStatus.message || 'Has alcanzado el límite de tu plan',
+        subscriptionStatus.quota,
+        subscriptionStatus.usage,
+        subscriptionStatus.resetDate
       );
     }
 
-    console.log('[API Process] Cuota verificada - Archivos disponibles:', subscriptionStatus.remaining);
+    logger.info('Process API: Quota verified', {
+      userId: user.userId,
+      remaining: subscriptionStatus.remaining
+    });
 
     // SECURITY: Rate limiting
     const identifier = getClientIdentifier(request, user.userId);
@@ -58,23 +74,34 @@ export async function POST(request: Request) {
     );
     if (rateLimitResponse) return rateLimitResponse;
 
-    const { audioUrl, filename } = await request.json();
+    // Parse and validate request body
+    const body = await request.json();
+    const { audioUrl, filename } = body;
 
-    if (!audioUrl || !filename) {
-      return Response.json(
-        { error: 'audioUrl y filename son requeridos' },
-        { status: 400 }
-      );
+    // Validate required fields
+    validateRequired(body, ['audioUrl', 'filename']);
+
+    // Validate URL format
+    validateUrl(audioUrl);
+
+    // Validate filename
+    if (typeof filename !== 'string' || filename.trim().length === 0) {
+      throw new ValidationError('Filename debe ser un string no vacío');
     }
 
     // Create job in database
     const job = await TranscriptionJobDB.create(
       user.userId,
-      filename,
+      filename.trim(),
       audioUrl
     );
 
-    console.log('[API Process] Job created:', job.id, { filename, audioUrl });
+    logger.info('Process API: Job created', {
+      jobId: job.id,
+      userId: user.userId,
+      filename,
+      audioUrl: audioUrl.substring(0, 50) + '...'
+    });
 
     // Send job to Inngest queue for async processing
     await inngest.send({
@@ -83,34 +110,38 @@ export async function POST(request: Request) {
         jobId: job.id,
         userId: user.userId,
         audioUrl,
-        filename
+        filename: filename.trim()
       }
     });
 
-    console.log('[API Process] Job sent to Inngest:', job.id);
+    logger.info('Process API: Job sent to Inngest', { jobId: job.id });
 
     // QUOTA: Increment usage counter after successful job creation
     try {
       await incrementUsage(user.userId);
-      console.log('[API Process] Uso incrementado para usuario:', user.userId);
+      logger.info('Process API: Usage incremented', { userId: user.userId });
     } catch (error) {
-      console.error('[API Process] Error incrementando uso:', error);
       // Don't fail the request if usage increment fails
+      // Log error and continue
+      logger.error('Process API: Failed to increment usage (non-fatal)', error, {
+        userId: user.userId,
+        jobId: job.id
+      });
     }
 
     // Return immediately with job ID
     // Frontend will poll /api/jobs/:id for status
-    return Response.json({
+    const response: JobCreateResponse = {
       success: true,
       message: 'Transcripción en proceso. Esto puede tardar 1-3 minutos.',
       jobId: job.id,
       status: 'pending'
+    };
+
+    return successResponse(response, 'Job creado exitosamente', 201);
+  } catch (error) {
+    return handleError(error, {
+      endpoint: 'POST /api/process'
     });
-  } catch (error: any) {
-    console.error('[API Process] Error:', error);
-    return Response.json(
-      { error: error.message || 'Error al procesar transcripción' },
-      { status: 500 }
-    );
   }
 }

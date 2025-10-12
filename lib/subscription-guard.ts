@@ -1,10 +1,12 @@
 // Middleware para validar suscripciones y cuotas
 import { sql } from '@vercel/postgres';
 import { logger } from './logger';
+import { validateUserId, DatabaseError, NotFoundError } from './errors';
+import type { SubscriptionPlan, SubscriptionStatus as UserSubscriptionStatus } from '@/types/user';
 
 export interface SubscriptionStatus {
   isActive: boolean;
-  plan: string;
+  plan: SubscriptionPlan;
   quota: number;
   usage: number;
   remaining: number;
@@ -18,6 +20,9 @@ export interface SubscriptionStatus {
  * Verifica el estado de la suscripción de un usuario y si puede subir archivos
  */
 export async function checkSubscriptionStatus(userId: string | number): Promise<SubscriptionStatus> {
+  // Validate userId
+  validateUserId(userId);
+
   try {
     // Obtener datos del usuario
     const result = await sql`
@@ -35,16 +40,7 @@ export async function checkSubscriptionStatus(userId: string | number): Promise<
 
     if (result.rows.length === 0) {
       logger.error('User not found in subscription check', { userId });
-      return {
-        isActive: false,
-        plan: 'unknown',
-        quota: 0,
-        usage: 0,
-        remaining: 0,
-        resetDate: null,
-        canUpload: false,
-        message: 'Usuario no encontrado',
-      };
+      throw new NotFoundError('Usuario', userId);
     }
 
     const user = result.rows[0];
@@ -87,7 +83,7 @@ export async function checkSubscriptionStatus(userId: string | number): Promise<
 
     return {
       isActive,
-      plan,
+      plan: plan as SubscriptionPlan,
       quota,
       usage,
       remaining,
@@ -97,8 +93,11 @@ export async function checkSubscriptionStatus(userId: string | number): Promise<
       upgradeUrl,
     };
   } catch (error) {
-    logger.error('Error checking subscription status', error);
-    throw new Error('Error al verificar suscripción');
+    if (error instanceof NotFoundError) {
+      throw error;
+    }
+    logger.error('Error checking subscription status', error, { userId });
+    throw new DatabaseError('checkSubscriptionStatus', error);
   }
 }
 
@@ -106,6 +105,8 @@ export async function checkSubscriptionStatus(userId: string | number): Promise<
  * Incrementa el uso mensual del usuario
  */
 export async function incrementUsage(userId: string | number): Promise<void> {
+  validateUserId(userId);
+
   try {
     await sql`
       UPDATE users
@@ -116,7 +117,7 @@ export async function incrementUsage(userId: string | number): Promise<void> {
     logger.info('Monthly usage incremented', { userId });
   } catch (error) {
     logger.error('Error incrementing usage', error, { userId });
-    throw new Error('Error al actualizar uso mensual');
+    throw new DatabaseError('incrementUsage', error);
   }
 }
 
@@ -124,6 +125,8 @@ export async function incrementUsage(userId: string | number): Promise<void> {
  * Resetea el uso mensual de un usuario (para testing o ajustes manuales)
  */
 export async function resetUsage(userId: string | number): Promise<void> {
+  validateUserId(userId);
+
   try {
     const nextMonth = new Date();
     nextMonth.setMonth(nextMonth.getMonth() + 1);
@@ -141,7 +144,7 @@ export async function resetUsage(userId: string | number): Promise<void> {
     logger.info('User usage reset', { userId });
   } catch (error) {
     logger.error('Error resetting usage', error, { userId });
-    throw new Error('Error al resetear uso');
+    throw new DatabaseError('resetUsage', error);
   }
 }
 
@@ -169,7 +172,7 @@ export async function resetAllUsages(): Promise<{ count: number }> {
     return { count };
   } catch (error) {
     logger.error('Error resetting all usages', error);
-    throw new Error('Error al resetear uso de todos los usuarios');
+    throw new DatabaseError('resetAllUsages', error);
   }
 }
 
