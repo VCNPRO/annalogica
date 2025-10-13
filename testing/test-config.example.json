@@ -1,0 +1,119 @@
+{
+  "description": "Configuración de ejemplo para tests de Annalogica",
+  "version": "1.0.0",
+  "testFiles": [
+    {
+      "name": "audio-corto-2-personas.mp3",
+      "path": "./testing/samples/audio-corto-2-personas.mp3",
+      "type": "audio",
+      "format": "mp3",
+      "duration": 120,
+      "expectedSpeakers": 2,
+      "description": "Audio de 2 minutos con 2 hablantes claros"
+    },
+    {
+      "name": "audio-medio-3-personas.mp3",
+      "path": "./testing/samples/audio-medio-3-personas.mp3",
+      "type": "audio",
+      "format": "mp3",
+      "duration": 600,
+      "expectedSpeakers": 3,
+      "description": "Audio de 10 minutos con 3 hablantes"
+    },
+    {
+      "name": "audio-largo-entrevista.wav",
+      "path": "./testing/samples/audio-largo-entrevista.wav",
+      "type": "audio",
+      "format": "wav",
+      "duration": 3600,
+      "expectedSpeakers": 2,
+      "description": "Entrevista de 1 hora con 2 personas"
+    },
+    {
+      "name": "video-presentacion.mp4",
+      "path": "./testing/samples/video-presentacion.mp4",
+      "type": "video",
+      "format": "mp4",
+      "duration": 1800,
+      "expectedSpeakers": 1,
+      "description": "Presentación de 30 minutos con 1 hablante"
+    },
+    {
+      "name": "video-reunion-multiple.mp4",
+      "path": "./testing/samples/video-reunion-multiple.mp4",
+      "type": "video",
+      "format": "mp4",
+      "duration": 2400,
+      "expectedSpeakers": 5,
+      "description": "Reunión de 40 minutos con 5 participantes"
+    },
+    {
+      "name": "audio-podcast.m4a",
+      "path": "./testing/samples/audio-podcast.m4a",
+      "type": "audio",
+      "format": "m4a",
+      "duration": 2700,
+      "expectedSpeakers": 3,
+      "description": "Podcast de 45 minutos con 3 hablantes"
+    }
+  ],
+  "expectedMetrics": {
+    "minTranscriptionQuality": 95,
+    "minDiarizationQuality": 90,
+    "maxTimeRatio": 0.20,
+    "maxUploadTime": 5000,
+    "description": "Métricas objetivo para considerar el test exitoso"
+  },
+  "testScenarios": {
+    "performance": {
+      "description": "Tests de rendimiento",
+      "files": ["audio-corto-2-personas.mp3", "audio-medio-3-personas.mp3"],
+      "focus": ["uploadTime", "processingTime", "timeRatio"]
+    },
+    "quality": {
+      "description": "Tests de calidad",
+      "files": ["audio-largo-entrevista.wav", "video-presentacion.mp4"],
+      "focus": ["transcriptionQuality", "diarizationQuality"]
+    },
+    "scalability": {
+      "description": "Tests de escalabilidad",
+      "files": ["video-reunion-multiple.mp4", "audio-podcast.m4a"],
+      "focus": ["multiSpeaker", "longDuration"]
+    }
+  },
+  "authentication": {
+    "email": "test@example.com",
+    "password": "your_test_password_here",
+    "description": "Credenciales para testing (cambiar por las reales)"
+  },
+  "environments": {
+    "local": {
+      "url": "http://localhost:3000",
+      "description": "Servidor de desarrollo local"
+    },
+    "production": {
+      "url": "https://annalogica.vercel.app",
+      "description": "Entorno de producción en Vercel"
+    }
+  },
+  "notifications": {
+    "onComplete": {
+      "email": false,
+      "slack": false,
+      "console": true
+    },
+    "onFailure": {
+      "email": false,
+      "slack": false,
+      "console": true
+    }
+  },
+  "advanced": {
+    "parallelTests": false,
+    "retryOnFailure": true,
+    "maxRetries": 3,
+    "saveDetailedLogs": true,
+    "generateDashboard": true,
+    "compareWithPrevious": true
+  }
+}

@@ -28,22 +28,39 @@ export default function AdminDashboard() {
   const [view, setView] = useState<'user' | 'platform' | 'all'>('user');
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    loadData();
+    // Verificar autenticación
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me', {
+          credentials: 'include'
+        });
+        if (!res.ok) {
+          router.push('/login');
+          return;
+        }
+        const data = await res.json();
+        // Verificar que sea admin
+        if (data.user?.role !== 'admin') {
+          alert('Acceso denegado: se requieren permisos de administrador');
+          router.push('/');
+          return;
+        }
+        loadData();
+      } catch (error) {
+        console.error('Error verificando autenticación:', error);
+        router.push('/login');
+      }
+    };
+    checkAuth();
   }, [days, view, router]);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
 
       // Load user stats
-      const userRes = await fetch(`/api/admin/usage?mode=user&days=${days}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const userRes = await fetch(`/api/200830/usage?mode=user&days=${days}`, {
+        credentials: 'include'
       });
       if (userRes.ok) {
         const userData = await userRes.json();
@@ -52,8 +69,8 @@ export default function AdminDashboard() {
 
       // Load platform stats (admin only)
       if (view === 'platform') {
-        const platformRes = await fetch(`/api/admin/usage?mode=platform&days=${days}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        const platformRes = await fetch(`/api/200830/usage?mode=platform&days=${days}`, {
+          credentials: 'include'
         });
         if (platformRes.ok) {
           const platformData = await platformRes.json();
@@ -63,8 +80,8 @@ export default function AdminDashboard() {
 
       // Load all users (admin only)
       if (view === 'all') {
-        const allRes = await fetch(`/api/admin/usage?mode=all&days=${days}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        const allRes = await fetch(`/api/200830/usage?mode=all&days=${days}`, {
+          credentials: 'include'
         });
         if (allRes.ok) {
           const allData = await allRes.json();
