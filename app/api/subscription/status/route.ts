@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getUserUsageStats } from '@/lib/subscription-guard';
-import { verifyAuth } from '@/lib/auth';
+import { verifyRequestAuth } from '@/lib/auth';
 
 export async function GET(request: Request) {
   try {
     // Verificar autenticación
-    const authResult = await verifyAuth(request);
-    if (!authResult.authenticated || !authResult.user) {
+    const payload = verifyRequestAuth(request);
+    if (!payload) {
       return NextResponse.json(
         { error: 'No autenticado' },
         { status: 401 }
       );
     }
 
-    const userId = authResult.user.id;
+    const userId = payload.userId;
 
     // Obtener estadísticas de uso
     const stats = await getUserUsageStats(userId);
