@@ -1,6 +1,7 @@
 'use client';
 
-import { Clock, FileText, Calendar } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { TrendingUp, FileText, Calendar } from 'lucide-react';
 
 interface SubscriptionBannerProps {
   plan: string;
@@ -17,6 +18,7 @@ export default function SubscriptionBanner({
   resetDate,
   daysUntilReset,
 }: SubscriptionBannerProps) {
+  const router = useRouter();
   const percentage = filesTotal > 0 ? Math.round((filesUsed / filesTotal) * 100) : 0;
   const remaining = Math.max(0, filesTotal - filesUsed);
 
@@ -56,6 +58,11 @@ export default function SubscriptionBanner({
     return plans[plan] || plan.toUpperCase();
   };
 
+  const handleUpgrade = () => {
+    // Contactar con soporte para mejorar plan
+    window.location.href = 'mailto:soporte@annalogica.eu?subject=Solicitud de Mejora de Plan&body=Hola,%0D%0A%0D%0AMe gustaría información sobre cómo mejorar mi plan actual.%0D%0A%0D%0APlan actual: ' + getPlanDisplayName() + '%0D%0AUso actual: ' + filesUsed + ' / ' + filesTotal + ' archivos';
+  };
+
   return (
     <div className={`rounded-xl border-2 ${getBgColor()} p-6 mb-6 shadow-sm`}>
       {/* Header */}
@@ -66,10 +73,19 @@ export default function SubscriptionBanner({
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {percentage >= 100
-              ? '¡Límite alcanzado! Contacta con soporte.'
+              ? '¡Límite alcanzado! Mejora para continuar.'
               : `Te quedan ${remaining} archivos este mes`}
           </p>
         </div>
+        {plan !== 'empresarial' && (
+          <button
+            onClick={handleUpgrade}
+            className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+          >
+            <TrendingUp className="h-4 w-4" />
+            Mejorar
+          </button>
+        )}
       </div>
 
       {/* Progress Bar */}
