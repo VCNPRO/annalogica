@@ -68,7 +68,7 @@ export async function checkSubscriptionStatus(userId: string | number): Promise<
       upgradeUrl = '/settings';
     } else if (remaining === 0) {
       message = `Has alcanzado el límite de ${quota} archivos de tu plan ${plan}.`;
-      upgradeUrl = '/pricing';
+      upgradeUrl = '/settings';
     }
 
     logger.info('Subscription status checked', {
