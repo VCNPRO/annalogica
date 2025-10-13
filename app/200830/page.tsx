@@ -2,33 +2,41 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Search, UserPlus, RefreshCw, Eye, Trash2, Key, RotateCcw, CreditCard, Crown } from 'lucide-react';
 
-interface UsageSummary {
-  totalCost: number;
-  uploads: number;
-  transcriptions: number;
-  summaries: number;
-  downloads: number;
-  storageMB: number;
-}
-
-interface PlatformStats extends UsageSummary {
-  totalUsers: number;
-  totalStorageGB: number;
-  avgCostPerUser: number;
+interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  role: 'user' | 'admin';
+  subscription_plan: string;
+  subscription_status: string;
+  monthly_quota: number;
+  monthly_usage: number;
+  quota_reset_date: string;
+  created_at: string;
+  total_jobs: number;
+  completed_jobs: number;
+  last_activity: string | null;
 }
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [userStats, setUserStats] = useState<UsageSummary | null>(null);
-  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [days, setDays] = useState(30);
-  const [view, setView] = useState<'user' | 'platform' | 'all'>('user');
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [search, setSearch] = useState('');
+  const [filterPlan, setFilterPlan] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [modalAction, setModalAction] = useState<'view' | 'edit' | 'delete' | 'resetPassword' | 'resetQuota' | 'changePlan'>('view');
+
+  // Form states
+  const [newPassword, setNewPassword] = useState('');
+  const [newPlan, setNewPlan] = useState('free');
+  const [trialDays, setTrialDays] = useState(0);
 
   useEffect(() => {
-    // Verificar autenticación
     const checkAuth = async () => {
       try {
         const res = await fetch('/api/auth/me', {
@@ -39,337 +47,535 @@ export default function AdminDashboard() {
           return;
         }
         const data = await res.json();
-        // Verificar que sea admin
         if (data.user?.role !== 'admin') {
           alert('Acceso denegado: se requieren permisos de administrador');
           router.push('/');
           return;
         }
-        loadData();
+        loadUsers();
       } catch (error) {
         console.error('Error verificando autenticación:', error);
         router.push('/login');
       }
     };
     checkAuth();
-  }, [days, view, router]);
+  }, [router]);
 
-  const loadData = async () => {
+  const loadUsers = async () => {
     try {
       setLoading(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (filterPlan) params.append('plan', filterPlan);
+      if (filterStatus) params.append('status', filterStatus);
 
-      // Load user stats
-      const userRes = await fetch(`/api/200830/usage?mode=user&days=${days}`, {
+      const res = await fetch(`/api/200830/users?${params}`, {
         credentials: 'include'
       });
-      if (userRes.ok) {
-        const userData = await userRes.json();
-        setUserStats(userData.data);
-      }
 
-      // Load platform stats (admin only)
-      if (view === 'platform') {
-        const platformRes = await fetch(`/api/200830/usage?mode=platform&days=${days}`, {
-          credentials: 'include'
-        });
-        if (platformRes.ok) {
-          const platformData = await platformRes.json();
-          setPlatformStats(platformData.data);
-        }
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.users);
       }
-
-      // Load all users (admin only)
-      if (view === 'all') {
-        const allRes = await fetch(`/api/200830/usage?mode=all&days=${days}`, {
-          credentials: 'include'
-        });
-        if (allRes.ok) {
-          const allData = await allRes.json();
-          setAllUsers(allData.data);
-        }
-      }
-
     } catch (error) {
-      console.error('Error loading usage data:', error);
+      console.error('Error loading users:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 4
-    }).format(amount);
+  useEffect(() => {
+    const debounce = setTimeout(() => {
+      if (!loading) loadUsers();
+    }, 300);
+    return () => clearTimeout(debounce);
+  }, [search, filterPlan, filterStatus]);
+
+  const handleAction = async () => {
+    if (!selectedUser) return;
+
+    try {
+      let endpoint = '';
+      let method = 'POST';
+      let body: any = {};
+
+      switch (modalAction) {
+        case 'resetPassword':
+          if (!newPassword || newPassword.length < 8) {
+            alert('La contraseña debe tener al menos 8 caracteres');
+            return;
+          }
+          endpoint = `/api/200830/users/${selectedUser.id}/reset-password`;
+          body = { newPassword };
+          break;
+
+        case 'resetQuota':
+          endpoint = `/api/200830/users/${selectedUser.id}/reset-quota`;
+          break;
+
+        case 'changePlan':
+          endpoint = `/api/200830/users/${selectedUser.id}/change-plan`;
+          body = {
+            plan: newPlan,
+            trialDays: trialDays > 0 ? trialDays : undefined,
+          };
+          break;
+
+        case 'delete':
+          if (!confirm(`¿Estás seguro de eliminar al usuario ${selectedUser.email}? Esta acción no se puede deshacer.`)) {
+            return;
+          }
+          endpoint = `/api/200830/users/${selectedUser.id}`;
+          method = 'DELETE';
+          break;
+
+        default:
+          return;
+      }
+
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: method !== 'DELETE' ? JSON.stringify(body) : undefined,
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(data.message || 'Acción completada exitosamente');
+        setShowModal(false);
+        setSelectedUser(null);
+        setNewPassword('');
+        setNewPlan('free');
+        setTrialDays(0);
+        loadUsers();
+      } else {
+        alert(`Error: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Error executing action:', error);
+      alert('Error al ejecutar la acción');
+    }
   };
 
-  if (loading) {
+  const openModal = (user: User, action: typeof modalAction) => {
+    setSelectedUser(user);
+    setModalAction(action);
+    setShowModal(true);
+    if (action === 'changePlan') {
+      setNewPlan(user.subscription_plan);
+    }
+  };
+
+  const getUsagePercent = (usage: number, quota: number) => {
+    return quota > 0 ? Math.round((usage / quota) * 100) : 0;
+  };
+
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-500';
+      case 'trialing': return 'bg-blue-500';
+      case 'past_due': return 'bg-yellow-500';
+      case 'canceled': return 'bg-red-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getPlanBadgeColor = (plan: string) => {
+    switch (plan) {
+      case 'free': return 'bg-gray-600';
+      case 'basico': return 'bg-blue-600';
+      case 'pro': return 'bg-purple-600';
+      case 'business': return 'bg-indigo-600';
+      case 'empresarial': return 'bg-orange-600';
+      default: return 'bg-gray-600';
+    }
+  };
+
+  if (loading && users.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
-        <div className="text-white text-xl">Cargando estadísticas...</div>
+        <div className="text-white text-xl">Cargando dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white py-12 px-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold">Dashboard de Costes</h1>
-          <a href="/" className="text-blue-400 hover:underline">← Volver al Dashboard</a>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white">
+      {/* Header */}
+      <div className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Crown className="h-8 w-8 text-orange-500" />
+                Panel de Administración
+              </h1>
+              <p className="text-slate-400 text-sm mt-1">Gestión completa de usuarios y suscripciones</p>
+            </div>
+            <a href="/" className="text-blue-400 hover:text-blue-300 text-sm">
+              ← Volver al Dashboard
+            </a>
+          </div>
         </div>
+      </div>
 
-        {/* Period selector */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Filters */}
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 mb-6">
-          <div className="flex gap-4 items-center">
-            <span className="text-slate-300">Período:</span>
-            <select
-              value={days}
-              onChange={(e) => setDays(parseInt(e.target.value))}
-              className="bg-slate-700 text-white rounded px-4 py-2"
-            >
-              <option value="7">Últimos 7 días</option>
-              <option value="30">Últimos 30 días</option>
-              <option value="90">Últimos 90 días</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Search */}
+            <div className="md:col-span-2">
+              <label className="block text-sm text-slate-300 mb-2">Buscar Usuario</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Email o nombre..."
+                  className="w-full bg-slate-700 text-white rounded-lg pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                />
+              </div>
+            </div>
 
-            <span className="text-slate-300 ml-8">Vista:</span>
-            <button
-              onClick={() => setView('user')}
-              className={`px-4 py-2 rounded ${view === 'user' ? 'bg-blue-600' : 'bg-slate-700'}`}
-            >
-              Mi Uso
-            </button>
-            <button
-              onClick={() => setView('platform')}
-              className={`px-4 py-2 rounded ${view === 'platform' ? 'bg-blue-600' : 'bg-slate-700'}`}
-            >
-              Plataforma
-            </button>
-            <button
-              onClick={() => setView('all')}
-              className={`px-4 py-2 rounded ${view === 'all' ? 'bg-blue-600' : 'bg-slate-700'}`}
-            >
-              Todos los Usuarios
-            </button>
-          </div>
-        </div>
+            {/* Filter Plan */}
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Plan</label>
+              <select
+                value={filterPlan}
+                onChange={(e) => setFilterPlan(e.target.value)}
+                className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              >
+                <option value="">Todos</option>
+                <option value="free">Free</option>
+                <option value="basico">Básico</option>
+                <option value="pro">Pro</option>
+                <option value="business">Business</option>
+                <option value="universidad">Universidad</option>
+                <option value="medios">Medios</option>
+                <option value="empresarial">Empresarial</option>
+              </select>
+            </div>
 
-        {/* User Stats */}
-        {view === 'user' && userStats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <StatCard
-              title="Coste Total"
-              value={formatCurrency(userStats.totalCost)}
-              subtitle={`Últimos ${days} días`}
-              color="text-green-400"
-            />
-            <StatCard
-              title="Archivos Subidos"
-              value={userStats.uploads.toString()}
-              subtitle={`${userStats.storageMB.toFixed(2)} MB storage`}
-              color="text-blue-400"
-            />
-            <StatCard
-              title="Transcripciones"
-              value={userStats.transcriptions.toString()}
-              subtitle={`~${formatCurrency(userStats.transcriptions * 0.00046)}`}
-              color="text-purple-400"
-            />
-            <StatCard
-              title="Resúmenes IA"
-              value={userStats.summaries.toString()}
-              subtitle="Claude Sonnet 4.5"
-              color="text-pink-400"
-            />
-            <StatCard
-              title="Descargas"
-              value={userStats.downloads.toString()}
-              subtitle="TXT, SRT, PDF"
-              color="text-yellow-400"
-            />
-            <StatCard
-              title="Coste Promedio"
-              value={formatCurrency(userStats.totalCost / Math.max(userStats.uploads, 1))}
-              subtitle="Por archivo procesado"
-              color="text-orange-400"
-            />
-          </div>
-        )}
-
-        {/* Platform Stats */}
-        {view === 'platform' && platformStats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatCard
-              title="Coste Total"
-              value={formatCurrency(platformStats.totalCost)}
-              subtitle="Toda la plataforma"
-              color="text-green-400"
-            />
-            <StatCard
-              title="Usuarios Activos"
-              value={platformStats.totalUsers.toString()}
-              subtitle={`Últimos ${days} días`}
-              color="text-blue-400"
-            />
-            <StatCard
-              title="Storage Total"
-              value={`${platformStats.totalStorageGB.toFixed(2)} GB`}
-              subtitle={`~${formatCurrency(platformStats.totalStorageGB * 0.023)}/mes`}
-              color="text-purple-400"
-            />
-            <StatCard
-              title="Coste/Usuario"
-              value={formatCurrency(platformStats.avgCostPerUser)}
-              subtitle="Promedio"
-              color="text-orange-400"
-            />
-            <StatCard
-              title="Transcripciones"
-              value={platformStats.transcriptions.toString()}
-              subtitle="Total procesadas"
-              color="text-pink-400"
-            />
-            <StatCard
-              title="Resúmenes IA"
-              value={platformStats.summaries.toString()}
-              subtitle="Total generados"
-              color="text-yellow-400"
-            />
-            <StatCard
-              title="Uploads"
-              value={platformStats.uploads.toString()}
-              subtitle="Archivos subidos"
-              color="text-cyan-400"
-            />
-            <StatCard
-              title="Downloads"
-              value={platformStats.downloads.toString()}
-              subtitle="Archivos descargados"
-              color="text-indigo-400"
-            />
-          </div>
-        )}
-
-        {/* All Users Table */}
-        {view === 'all' && allUsers.length > 0 && (
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 overflow-x-auto">
-            <h2 className="text-2xl font-bold mb-4">Uso por Usuario</h2>
-            <table className="w-full">
-              <thead>
-                <tr className="text-left border-b border-slate-700">
-                  <th className="pb-3">Email</th>
-                  <th className="pb-3">Coste Total</th>
-                  <th className="pb-3">Uploads</th>
-                  <th className="pb-3">Transcripciones</th>
-                  <th className="pb-3">Resúmenes</th>
-                  <th className="pb-3">Storage (MB)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allUsers.map((user) => (
-                  <tr key={user.userId} className="border-b border-slate-700/50">
-                    <td className="py-3 text-slate-300">{user.email}</td>
-                    <td className="py-3 font-mono text-green-400">
-                      {formatCurrency(user.totalCost)}
-                    </td>
-                    <td className="py-3">{user.uploads}</td>
-                    <td className="py-3">{user.transcriptions}</td>
-                    <td className="py-3">{user.summaries}</td>
-                    <td className="py-3">{user.storageMB.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Cost Breakdown */}
-        {userStats && view === 'user' && (
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6 mt-6">
-            <h2 className="text-2xl font-bold mb-4">Desglose de Costes</h2>
-            <div className="space-y-3">
-              <CostBreakdownItem
-                label="Transcripciones Whisper"
-                count={userStats.transcriptions}
-                costPer={0.00046}
-                total={userStats.transcriptions * 0.00046}
-              />
-              <CostBreakdownItem
-                label="Storage"
-                count={userStats.storageMB}
-                unit="MB"
-                costPer={0.023 / 1024}
-                total={(userStats.storageMB / 1024) * 0.023}
-              />
-              <CostBreakdownItem
-                label="Resúmenes Claude"
-                count={userStats.summaries}
-                costPer={0.024}
-                total={userStats.summaries * 0.024}
-                note="Estimado promedio"
-              />
+            {/* Filter Status */}
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Estado</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:outline-none"
+              >
+                <option value="">Todos</option>
+                <option value="free">Free</option>
+                <option value="active">Activo</option>
+                <option value="trialing">Trial</option>
+                <option value="past_due">Vencido</option>
+                <option value="canceled">Cancelado</option>
+              </select>
             </div>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
-function StatCard({
-  title,
-  value,
-  subtitle,
-  color
-}: {
-  title: string;
-  value: string;
-  subtitle: string;
-  color: string;
-}) {
-  return (
-    <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-6">
-      <h3 className="text-slate-400 text-sm mb-2">{title}</h3>
-      <p className={`text-3xl font-bold ${color} mb-1`}>{value}</p>
-      <p className="text-slate-500 text-sm">{subtitle}</p>
-    </div>
-  );
-}
+          <div className="flex justify-between items-center mt-4">
+            <p className="text-slate-400 text-sm">
+              {users.length} usuario{users.length !== 1 ? 's' : ''} encontrado{users.length !== 1 ? 's' : ''}
+            </p>
+            <button
+              onClick={loadUsers}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Recargar
+            </button>
+          </div>
+        </div>
 
-function CostBreakdownItem({
-  label,
-  count,
-  unit = 'items',
-  costPer,
-  total,
-  note
-}: {
-  label: string;
-  count: number;
-  unit?: string;
-  costPer: number;
-  total: number;
-  note?: string;
-}) {
-  return (
-    <div className="flex justify-between items-center border-b border-slate-700 pb-2">
-      <div>
-        <span className="text-slate-300">{label}</span>
-        <span className="text-slate-500 text-sm ml-2">
-          {count} {unit}
-        </span>
-        {note && <span className="text-slate-600 text-xs ml-2">({note})</span>}
-      </div>
-      <div className="text-right">
-        <div className="text-green-400 font-mono">
-          ${total.toFixed(4)}
+        {/* Users Table */}
+        <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-700/50">
+                <tr className="text-left text-sm">
+                  <th className="px-4 py-3 font-medium">Usuario</th>
+                  <th className="px-4 py-3 font-medium">Plan / Estado</th>
+                  <th className="px-4 py-3 font-medium">Uso</th>
+                  <th className="px-4 py-3 font-medium">Actividad</th>
+                  <th className="px-4 py-3 font-medium">Rol</th>
+                  <th className="px-4 py-3 font-medium text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700/50">
+                {users.map((user) => {
+                  const usagePercent = getUsagePercent(user.monthly_usage, user.monthly_quota);
+                  return (
+                    <tr key={user.id} className="hover:bg-slate-700/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="text-sm font-medium">{user.email}</p>
+                          {user.name && <p className="text-xs text-slate-400">{user.name}</p>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1">
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getPlanBadgeColor(user.subscription_plan)} w-fit`}>
+                            {user.subscription_plan.toUpperCase()}
+                          </span>
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${getStatusBadgeColor(user.subscription_status)} w-fit`}>
+                            {user.subscription_status}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="w-full">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span>{user.monthly_usage} / {user.monthly_quota}</span>
+                            <span className={usagePercent >= 80 ? 'text-red-400' : 'text-slate-400'}>
+                              {usagePercent}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-700 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full transition-all ${
+                                usagePercent >= 100 ? 'bg-red-500' :
+                                usagePercent >= 80 ? 'bg-yellow-500' :
+                                'bg-green-500'
+                              }`}
+                              style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-xs">
+                          <p className="text-slate-300">{user.total_jobs} archivos</p>
+                          <p className="text-slate-500">
+                            {user.last_activity
+                              ? new Date(user.last_activity).toLocaleDateString('es-ES')
+                              : 'Sin actividad'}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          user.role === 'admin' ? 'bg-orange-600' : 'bg-slate-600'
+                        }`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => openModal(user, 'view')}
+                            className="p-2 bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+                            title="Ver detalles"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => openModal(user, 'changePlan')}
+                            className="p-2 bg-purple-600 hover:bg-purple-700 rounded transition-colors"
+                            title="Cambiar plan"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => openModal(user, 'resetQuota')}
+                            className="p-2 bg-green-600 hover:bg-green-700 rounded transition-colors"
+                            title="Resetear cuota"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => openModal(user, 'resetPassword')}
+                            className="p-2 bg-yellow-600 hover:bg-yellow-700 rounded transition-colors"
+                            title="Cambiar contraseña"
+                          >
+                            <Key className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => openModal(user, 'delete')}
+                            className="p-2 bg-red-600 hover:bg-red-700 rounded transition-colors"
+                            title="Eliminar usuario"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {users.length === 0 && (
+              <div className="text-center py-12 text-slate-400">
+                No se encontraron usuarios
+              </div>
+            )}
+          </div>
         </div>
-        <div className="text-slate-500 text-xs">
-          ${costPer.toFixed(6)} / {unit}
-        </div>
       </div>
+
+      {/* Modal */}
+      {showModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-700">
+              <h2 className="text-xl font-bold">
+                {modalAction === 'view' && 'Detalles del Usuario'}
+                {modalAction === 'resetPassword' && 'Cambiar Contraseña'}
+                {modalAction === 'resetQuota' && 'Resetear Cuota'}
+                {modalAction === 'changePlan' && 'Cambiar Plan'}
+                {modalAction === 'delete' && 'Eliminar Usuario'}
+              </h2>
+              <p className="text-sm text-slate-400 mt-1">{selectedUser.email}</p>
+            </div>
+
+            <div className="p-6">
+              {modalAction === 'view' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Email</label>
+                      <p className="text-sm">{selectedUser.email}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Nombre</label>
+                      <p className="text-sm">{selectedUser.name || '-'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Plan</label>
+                      <p className="text-sm">{selectedUser.subscription_plan}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Estado</label>
+                      <p className="text-sm">{selectedUser.subscription_status}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Uso</label>
+                      <p className="text-sm">{selectedUser.monthly_usage} / {selectedUser.monthly_quota}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Rol</label>
+                      <p className="text-sm">{selectedUser.role}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Total Archivos</label>
+                      <p className="text-sm">{selectedUser.total_jobs}</p>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1">Completados</label>
+                      <p className="text-sm">{selectedUser.completed_jobs}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {modalAction === 'resetPassword' && (
+                <div>
+                  <label className="block text-sm mb-2">Nueva Contraseña (mínimo 8 caracteres)</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                    placeholder="••••••••"
+                  />
+                </div>
+              )}
+
+              {modalAction === 'resetQuota' && (
+                <div>
+                  <p className="text-slate-300 mb-4">
+                    ¿Estás seguro de resetear la cuota del usuario <strong>{selectedUser.email}</strong>?
+                  </p>
+                  <div className="bg-slate-700 rounded-lg p-4">
+                    <p className="text-sm text-slate-300">Uso actual: <strong>{selectedUser.monthly_usage} / {selectedUser.monthly_quota}</strong></p>
+                    <p className="text-sm text-slate-300 mt-2">Después del reset: <strong>0 / {selectedUser.monthly_quota}</strong></p>
+                  </div>
+                </div>
+              )}
+
+              {modalAction === 'changePlan' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm mb-2">Nuevo Plan</label>
+                    <select
+                      value={newPlan}
+                      onChange={(e) => setNewPlan(e.target.value)}
+                      className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                    >
+                      <option value="free">Free (10 archivos/mes)</option>
+                      <option value="basico">Básico (25 archivos/mes)</option>
+                      <option value="pro">Pro (100 archivos/mes)</option>
+                      <option value="business">Business (500 archivos/mes)</option>
+                      <option value="universidad">Universidad (2000 archivos/mes)</option>
+                      <option value="medios">Medios (5000 archivos/mes)</option>
+                      <option value="empresarial">Empresarial (ilimitado)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-2">Días de Trial (opcional)</label>
+                    <input
+                      type="number"
+                      value={trialDays}
+                      onChange={(e) => setTrialDays(parseInt(e.target.value) || 0)}
+                      min="0"
+                      max="90"
+                      className="w-full bg-slate-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:outline-none"
+                      placeholder="0 = sin trial"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {modalAction === 'delete' && (
+                <div>
+                  <p className="text-red-400 font-medium mb-4">
+                    ⚠️ Esta acción es permanente y no se puede deshacer
+                  </p>
+                  <p className="text-slate-300 mb-2">
+                    Se eliminará:
+                  </p>
+                  <ul className="list-disc list-inside text-sm text-slate-400 space-y-1">
+                    <li>Usuario: {selectedUser.email}</li>
+                    <li>Todos sus archivos procesados ({selectedUser.total_jobs} archivos)</li>
+                    <li>Todo su historial de actividad</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setSelectedUser(null);
+                  setNewPassword('');
+                  setNewPlan('free');
+                  setTrialDays(0);
+                }}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              {modalAction !== 'view' && (
+                <button
+                  onClick={handleAction}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    modalAction === 'delete'
+                      ? 'bg-red-600 hover:bg-red-700'
+                      : 'bg-orange-600 hover:bg-orange-700'
+                  }`}
+                >
+                  {modalAction === 'delete' ? 'Eliminar' : 'Confirmar'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

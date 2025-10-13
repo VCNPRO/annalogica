@@ -605,16 +605,53 @@ psql $DATABASE_URL -c "SELECT COUNT(DISTINCT user_id) FROM transcription_jobs WH
 
 ---
 
-## 10. Próximas Mejoras
+## 10. Sistema de Notificaciones Email
 
-- [ ] UI completa en `/200830` para gestión visual
-- [ ] Endpoint API para resetear contraseñas
-- [ ] Sistema de notificaciones por email
-- [ ] Logs de auditoría de acciones admin
+### 10.1 Notificaciones Automáticas
+
+El sistema envía notificaciones automáticas vía email a usuarios y administradores:
+
+**Tipos de Notificaciones:**
+1. ⚠️ **Advertencia de Cuota (80%+)** - Cuando usuario alcanza 80% o más de su cuota
+2. ⏰ **Expiración de Trial** - 3 días y 1 día antes de que expire el trial
+3. 🚨 **Errores Críticos** - Notifica al administrador de errores graves
+4. 👋 **Bienvenida** - Email de bienvenida a nuevos usuarios
+
+### 10.2 Cron Job de Notificaciones
+
+**Frecuencia:** Cada 6 horas (00:00, 06:00, 12:00, 18:00 UTC)
+
+**Endpoint:** `/api/cron/check-notifications`
+
+**Proceso Automático:**
+- Verifica usuarios con cuota ≥ 80%
+- Envía advertencias (máximo 1 cada 24h por usuario)
+- Busca trials expirando en 3 días o 1 día
+- Envía recordatorios de expiración
+- Convierte trials expirados a plan free automáticamente
+
+### 10.3 Configuración
+
+**Variables de Entorno Requeridas:**
+```bash
+RESEND_API_KEY=re_xxxxxxxxxxxx
+ADMIN_EMAIL=admin@annalogica.eu
+```
+
+**Ver más:** `/docs/SISTEMA-NOTIFICACIONES-EMAIL.md`
+
+---
+
+## 11. Próximas Mejoras
+
+- [x] UI completa en `/200830` para gestión visual ✅
+- [x] Endpoints API de gestión de usuarios ✅
+- [x] Sistema de notificaciones por email ✅
+- [x] Logs de auditoría de acciones admin ✅
 - [ ] Rate limiting para endpoints admin
 - [ ] Dashboard de métricas en tiempo real
 - [ ] Sistema de backup automático
-- [ ] Alertas automáticas (usuarios cerca del límite, etc.)
+- [ ] Integración con Stripe webhooks
 
 ---
 

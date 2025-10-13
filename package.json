@@ -27,6 +27,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "replicate": "^1.2.0",
+    "resend": "^6.1.2",
     "stripe": "^19.1.0"
   },
   "devDependencies": {
