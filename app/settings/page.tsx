@@ -30,6 +30,14 @@ export default function Settings() {
     loadUserData();
   }, [router]);
 
+  // Aplicar tema al cargar
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    const isDark = savedTheme === 'dark';
+    setDarkMode(isDark);
+    document.documentElement.classList.toggle('dark', isDark);
+  }, []);
+
   const loadUserData = async () => {
     try {
       // Verify auth with cookies
@@ -167,9 +175,17 @@ export default function Settings() {
       <div className="pt-20 px-6 pb-6 max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <SettingsIcon className="h-8 w-8 text-orange-500" />
-            <h1 className="font-orbitron text-3xl text-orange-500 font-bold">ajustes</h1>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <SettingsIcon className="h-8 w-8 text-orange-500" />
+              <h1 className="font-orbitron text-3xl text-orange-500 font-bold">ajustes</h1>
+            </div>
+            <button
+              onClick={() => router.push('/')}
+              className={`${bgSecondary} ${border} border px-4 py-2 rounded-lg text-orange-500 hover:text-orange-600 text-sm font-medium transition-colors inline-flex items-center gap-2`}
+            >
+              ← Volver al Dashboard
+            </button>
           </div>
           <p className={`${textSecondary} text-sm`}>Personaliza tu experiencia con annalogica</p>
         </div>
@@ -241,7 +257,7 @@ export default function Settings() {
               <h2 className={`text-lg font-semibold ${textPrimary}`}>ID de Cliente</h2>
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-5">
+            <div className={`${darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'} border rounded-lg p-5`}>
               <p className={`text-sm mb-4 ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>
                 Este es tu identificador único. Úsalo si necesitas contactar con soporte técnico.
               </p>
@@ -389,10 +405,10 @@ export default function Settings() {
               <h2 className={`text-lg font-semibold ${textPrimary}`}>Política de Retención de Archivos</h2>
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-5">
+            <div className={`${darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'} border rounded-lg p-5`}>
               <div className="space-y-4 text-sm">
                 <p className={`font-medium ${darkMode ? 'text-blue-100' : 'text-blue-900'}`}>
-                  Los archivos procesados se almacenan temporalmente en nuestros servidores por un máximo de <strong className="text-blue-600 dark:text-blue-400">30 días</strong>.
+                  Los archivos procesados se almacenan temporalmente en nuestros servidores por un máximo de <strong className={darkMode ? 'text-blue-400' : 'text-blue-600'}>30 días</strong>.
                 </p>
 
                 <div className="grid md:grid-cols-2 gap-4">
@@ -415,9 +431,9 @@ export default function Settings() {
                   </div>
                 </div>
 
-                <div className="bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4 mt-4">
+                <div className={`${darkMode ? 'bg-yellow-900/30 border-yellow-700' : 'bg-yellow-50 border-yellow-300'} border rounded-lg p-4 mt-4`}>
                   <div className="flex gap-3">
-                    <span className="text-yellow-600 dark:text-yellow-400 text-lg">⚠️</span>
+                    <span className={`text-lg ${darkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>⚠️</span>
                     <div>
                       <p className={`font-semibold text-sm mb-1 ${darkMode ? 'text-yellow-200' : 'text-yellow-900'}`}>Importante</p>
                       <p className={`text-xs ${darkMode ? 'text-yellow-300' : 'text-yellow-800'}`}>
@@ -437,16 +453,6 @@ export default function Settings() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Back Button */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={() => router.push('/')}
-            className="text-orange-500 hover:text-orange-600 text-sm font-medium transition-colors inline-flex items-center gap-2"
-          >
-            ← Volver al Dashboard
-          </button>
         </div>
 
         {/* Footer */}
