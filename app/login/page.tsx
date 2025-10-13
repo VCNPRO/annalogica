@@ -51,7 +51,7 @@ export default function Login() {
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-8">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-orange-600 dark:text-orange-400 mb-2">anna logica</h1>
+          <h1 className="font-orbitron text-[36px] text-orange-500 font-bold mb-2">annalogica</h1>
           <p className="text-gray-600 dark:text-gray-300">
             {isLogin ? 'Inicia sesión' : 'Crea tu cuenta'}
           </p>
