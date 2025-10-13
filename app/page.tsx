@@ -39,6 +39,7 @@ export default function Dashboard() {
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
   const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf' | 'both'>('txt');
+  const [downloadDirHandle, setDownloadDirHandle] = useState<any>(null);
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
   useEffect(() => {
@@ -533,120 +534,103 @@ export default function Dashboard() {
     }
   };
 
-  const downloadFilesOrganized = async (file: UploadedFile, job: any) => {
+  const downloadFilesOrganized = async (file: UploadedFile, job: any, dirHandle: any, format: 'txt' | 'pdf' | 'both') => {
     try {
-      const savedOptions = localStorage.getItem('defaultOptions');
-      const options = savedOptions ? JSON.parse(savedOptions) : { organizeInFolders: true, downloadFormat: 'txt' };
+      // Create folder for this file
+      const baseName = file.name.replace(/\.[^/.]+$/, '');
+      const folderHandle = await dirHandle.getDirectoryHandle(baseName, { create: true });
 
-      // Check if File System Access API is supported
-      if (options.organizeInFolders && 'showDirectoryPicker' in window) {
-        try {
-          // Request directory permission
-          const dirHandle = await (window as any).showDirectoryPicker();
+      // Helper to save a blob to a file handle
+      const saveBlob = async (handle: any, blob: Blob) => {
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+      };
 
-          // Create folder for this file
-          const baseName = file.name.replace(/\.[^/.]+$/, '');
-          const folderHandle = await dirHandle.getDirectoryHandle(baseName, { create: true });
-
-          // Helper to save a blob to a file handle
-          const saveBlob = async (handle: any, blob: Blob) => {
-            const writable = await handle.createWritable();
-            await writable.write(blob);
-            await writable.close();
-          };
-
-          // Download Transcription
-          if (job.txt_url) {
-            const textRes = await fetch(job.txt_url);
-            const textContent = await textRes.text();
-            if (options.downloadFormat === 'pdf' || options.downloadFormat === 'both') {
-              const pdfBlob = await generatePdf('Transcripción', textContent, file.name);
-              const pdfHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
-              await saveBlob(pdfHandle, pdfBlob);
-            }
-            if (options.downloadFormat === 'txt' || options.downloadFormat === 'both') {
-              const txtBlob = new Blob([textContent], { type: 'text/plain' });
-              const txtHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
-              await saveBlob(txtHandle, txtBlob);
-            }
-          }
-
-          // Download Summary
-          if (job.summary_url) {
-            const summaryRes = await fetch(job.summary_url);
-            const summaryText = await summaryRes.text();
-            if (options.downloadFormat === 'pdf' || options.downloadFormat === 'both') {
-              const pdfBlob = await generatePdf('Resumen', summaryText, file.name);
-              const pdfHandle = await folderHandle.getFileHandle(`${baseName}-resumen.pdf`, { create: true });
-              await saveBlob(pdfHandle, pdfBlob);
-            }
-            if (options.downloadFormat === 'txt' || options.downloadFormat === 'both') {
-              const txtBlob = new Blob([summaryText], { type: 'text/plain' });
-              const txtHandle = await folderHandle.getFileHandle(`${baseName}-resumen.txt`, { create: true });
-              await saveBlob(txtHandle, txtBlob);
-            }
-          }
-
-          // Download Speakers Report
-          if (job.speakers_url) {
-            const speakersRes = await fetch(job.speakers_url);
-            const speakersText = await speakersRes.text();
-            if (options.downloadFormat === 'pdf' || options.downloadFormat === 'both') {
-              const pdfBlob = await generatePdf('Análisis de Oradores', speakersText, file.name);
-              const pdfHandle = await folderHandle.getFileHandle(`${baseName}-oradores.pdf`, { create: true });
-              await saveBlob(pdfHandle, pdfBlob);
-            }
-            if (options.downloadFormat === 'txt' || options.downloadFormat === 'both') {
-              const txtBlob = new Blob([speakersText], { type: 'text/plain' });
-              const txtHandle = await folderHandle.getFileHandle(`${baseName}-oradores.txt`, { create: true });
-              await saveBlob(txtHandle, txtBlob);
-            }
-          }
-          
-          // Download Tags
-          if (job.metadata?.tags && job.metadata.tags.length > 0) {
-            const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
-            if (options.downloadFormat === 'pdf' || options.downloadFormat === 'both') {
-              const pdfBlob = await generatePdf('Tags', tagsText, file.name);
-              const pdfHandle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
-              await saveBlob(pdfHandle, pdfBlob);
-            }
-            if (options.downloadFormat === 'txt' || options.downloadFormat === 'both') {
-              const txtBlob = new Blob([tagsText], { type: 'text/plain' });
-              const txtHandle = await folderHandle.getFileHandle(`${baseName}-tags.txt`, { create: true });
-              await saveBlob(txtHandle, txtBlob);
-            }
-          }
-
-          // Download SRT (always as .srt)
-          if (job.srt_url) {
-            const srtRes = await fetch(job.srt_url);
-            const srtBlob = await srtRes.blob();
-            const fileHandle = await folderHandle.getFileHandle(`${baseName}.srt`, { create: true });
-            await saveBlob(fileHandle, srtBlob);
-          }
-
-          // Download VTT (always as .vtt)
-          if (job.vtt_url) {
-            const vttRes = await fetch(job.vtt_url);
-            const vttBlob = await vttRes.blob();
-            const fileHandle = await folderHandle.getFileHandle(`${baseName}.vtt`, { create: true });
-            await saveBlob(fileHandle, vttBlob);
-          }
-
-          alert(`✅ Archivos guardados en carpeta: ${baseName}`);
-        } catch (err: any) {
-          // User cancelled or permission denied - fallback to individual downloads
-          console.log('Folder creation cancelled or denied, falling back to individual downloads');
-          await downloadFilesIndividually(file, job, options.downloadFormat);
+      // Download Transcription
+      if (job.txt_url) {
+        const textRes = await fetch(job.txt_url);
+        const textContent = await textRes.text();
+        if (format === 'pdf' || format === 'both') {
+          const pdfBlob = await generatePdf('Transcripción', textContent, file.name);
+          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
+          await saveBlob(pdfHandle, pdfBlob);
         }
-      } else {
-        // Fallback to individual downloads
-        await downloadFilesIndividually(file, job, options.downloadFormat);
+        if (format === 'txt' || format === 'both') {
+          const txtBlob = new Blob([textContent], { type: 'text/plain' });
+          const txtHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
+          await saveBlob(txtHandle, txtBlob);
+        }
       }
+
+      // Download Summary
+      if (job.summary_url) {
+        const summaryRes = await fetch(job.summary_url);
+        const summaryText = await summaryRes.text();
+        if (format === 'pdf' || format === 'both') {
+          const pdfBlob = await generatePdf('Resumen', summaryText, file.name);
+          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-resumen.pdf`, { create: true });
+          await saveBlob(pdfHandle, pdfBlob);
+        }
+        if (format === 'txt' || format === 'both') {
+          const txtBlob = new Blob([summaryText], { type: 'text/plain' });
+          const txtHandle = await folderHandle.getFileHandle(`${baseName}-resumen.txt`, { create: true });
+          await saveBlob(txtHandle, txtBlob);
+        }
+      }
+
+      // Download Speakers Report
+      if (job.speakers_url) {
+        const speakersRes = await fetch(job.speakers_url);
+        const speakersText = await speakersRes.text();
+        if (format === 'pdf' || format === 'both') {
+          const pdfBlob = await generatePdf('Análisis de Oradores', speakersText, file.name);
+          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-oradores.pdf`, { create: true });
+          await saveBlob(pdfHandle, pdfBlob);
+        }
+        if (format === 'txt' || format === 'both') {
+          const txtBlob = new Blob([speakersText], { type: 'text/plain' });
+          const txtHandle = await folderHandle.getFileHandle(`${baseName}-oradores.txt`, { create: true });
+          await saveBlob(txtHandle, txtBlob);
+        }
+      }
+      
+      // Download Tags
+      if (job.metadata?.tags && job.metadata.tags.length > 0) {
+        const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
+        if (format === 'pdf' || format === 'both') {
+          const pdfBlob = await generatePdf('Tags', tagsText, file.name);
+          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
+          await saveBlob(pdfHandle, pdfBlob);
+        }
+        if (format === 'txt' || format === 'both') {
+          const txtBlob = new Blob([tagsText], { type: 'text/plain' });
+          const txtHandle = await folderHandle.getFileHandle(`${baseName}-tags.txt`, { create: true });
+          await saveBlob(txtHandle, txtBlob);
+        }
+      }
+
+      // Download SRT (always as .srt)
+      if (job.srt_url) {
+        const srtRes = await fetch(job.srt_url);
+        const srtBlob = await srtRes.blob();
+        const fileHandle = await folderHandle.getFileHandle(`${baseName}.srt`, { create: true });
+        await saveBlob(fileHandle, srtBlob);
+      }
+
+      // Download VTT (always as .vtt)
+      if (job.vtt_url) {
+        const vttRes = await fetch(job.vtt_url);
+        const vttBlob = await vttRes.blob();
+        const fileHandle = await folderHandle.getFileHandle(`${baseName}.vtt`, { create: true });
+        await saveBlob(fileHandle, vttBlob);
+      }
+
+      alert(`✅ Archivos para "${file.name}" guardados en la carpeta: ${baseName}`);
+
     } catch (error) {
       console.error('Error downloading organized files:', error);
-      alert('Error al descargar archivos. Inténtalo de nuevo.');
+      alert(`Error al descargar los archivos para "${file.name}". Inténtalo de nuevo.`);
     }
   };
 
@@ -1222,20 +1206,27 @@ export default function Dashboard() {
                       return;
                     }
 
+                    if (!downloadDirHandle && 'showDirectoryPicker' in window) {
+                      alert('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".');
+                      return;
+                    }
+
                     for (const file of completedFiles) {
                       if (file.jobId) {
                         try {
-                          // SECURITY: Cookie httpOnly se envía automáticamente
-                          const res = await fetch(`/api/jobs/${file.jobId}`, {
-                            credentials: 'include'
-                          });
+                          const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
                           if (res.ok) {
                             const data = await res.json();
                             const job = data.job;
-                            await downloadFilesOrganized(file, job);
+                            if (downloadDirHandle) {
+                              await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
+                            } else {
+                              await downloadFilesIndividually(file, job, downloadFormat);
+                            }
                           }
                         } catch (err) {
                           console.error('Error downloading files:', err);
+                          alert(`Error al descargar ${file.name}.`);
                         }
                       }
                     }
@@ -1247,12 +1238,16 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={async () => {
+                    if (!('showDirectoryPicker' in window)) {
+                      alert('Tu navegador no soporta la selección de carpetas. Las descargas se realizarán individualmente.');
+                      return;
+                    }
                     try {
-                      const dirHandle = await (window as any).showDirectoryPicker();
-                      localStorage.setItem('downloadPath', dirHandle.name);
-                      alert(`Carpeta seleccionada: ${dirHandle.name}\n\nLos archivos se descargarán en esta carpeta.`);
+                      const handle = await (window as any).showDirectoryPicker();
+                      setDownloadDirHandle(handle);
+                      alert(`Carpeta de descarga seleccionada: "${handle.name}".\n\nLas próximas descargas se guardarán aquí.`);
                     } catch (err) {
-                      console.log('User cancelled directory picker');
+                      console.error('Error al seleccionar la carpeta:', err);
                     }
                   }}
                   className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
@@ -1286,18 +1281,25 @@ export default function Dashboard() {
                         onClick={async () => {
                           if (!file.jobId) return;
 
+                          if (!downloadDirHandle && 'showDirectoryPicker' in window) {
+                            alert('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".');
+                            return;
+                          }
+
                           try {
-                            // SECURITY: Cookie httpOnly se envía automáticamente
-                            const res = await fetch(`/api/jobs/${file.jobId}`, {
-                              credentials: 'include'
-                            });
+                            const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
                             if (res.ok) {
                               const data = await res.json();
                               const job = data.job;
-                              await downloadFilesOrganized(file, job);
+                              if (downloadDirHandle) {
+                                await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
+                              } else {
+                                await downloadFilesIndividually(file, job, downloadFormat);
+                              }
                             }
                           } catch (err) {
                             console.error('Error downloading file:', err);
+                            alert(`Error al descargar ${file.name}.`);
                           }
                         }}
                         className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
