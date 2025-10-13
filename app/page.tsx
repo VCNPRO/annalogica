@@ -33,12 +33,42 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]); // Keep this state
+
+  // Load files from localStorage on initial render
+  useEffect(() => {
+    try {
+      const savedFiles = localStorage.getItem('uploadedFiles');
+      if (savedFiles) {
+        const parsedFiles: UploadedFile[] = JSON.parse(savedFiles);
+        // Reset progress for files that were uploading or processing
+        const restoredFiles = parsedFiles.map(file => {
+          if (file.status === 'uploading' || file.status === 'processing') {
+            return { ...file, status: 'error', uploadProgress: 0, processingProgress: 0 };
+          }
+          return file;
+        });
+        setUploadedFiles(restoredFiles);
+      }
+    } catch (error) {
+      console.error('Error loading files from localStorage:', error);
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  // Save files to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('uploadedFiles', JSON.stringify(uploadedFiles));
+    } catch (error) {
+      console.error('Error saving files to localStorage:', error);
+    }
+  }, [uploadedFiles]);
+
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState('es');
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
-  const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf' | 'both'>('txt');
+  const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf' | 'both'>('pdf');
   const [downloadDirHandle, setDownloadDirHandle] = useState<any>(null);
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
@@ -994,11 +1024,15 @@ export default function Dashboard() {
                         setUploadedFiles([]);
                         setSelectedFileIds(new Set());
                         setError(null);
+                        localStorage.removeItem('uploadedFiles'); // Limpiar localStorage
                       }
                     } else if (uploadedFiles.length > 0) {
-                      setUploadedFiles([]);
-                      setSelectedFileIds(new Set());
-                      setError(null);
+                      if (confirm('¿Estás seguro de que quieres limpiar todos los archivos?')) {
+                        setUploadedFiles([]);
+                        setSelectedFileIds(new Set());
+                        setError(null);
+                        localStorage.removeItem('uploadedFiles'); // Limpiar localStorage
+                      }
                     }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
@@ -1170,20 +1204,20 @@ export default function Dashboard() {
                       type="radio"
                       className="accent-orange-500 scale-75"
                       name="downloadFormat"
-                      checked={downloadFormat === 'txt'}
-                      onChange={() => setDownloadFormat('txt')}
+                      checked={downloadFormat === 'pdf'}
+                      onChange={() => setDownloadFormat('pdf')}
                     />
-                    <span className={`text-xs ${textSecondary}`}>TXT</span>
+                    <span className={`text-xs ${textSecondary}`}>PDF</span>
                   </label>
                   <label className="flex items-center gap-1">
                     <input
                       type="radio"
                       className="accent-orange-500 scale-75"
                       name="downloadFormat"
-                      checked={downloadFormat === 'pdf'}
-                      onChange={() => setDownloadFormat('pdf')}
+                      checked={downloadFormat === 'txt'}
+                      onChange={() => setDownloadFormat('txt')}
                     />
-                    <span className={`text-xs ${textSecondary}`}>PDF</span>
+                    <span className={`text-xs ${textSecondary}`}>TXT</span>
                   </label>
                   <label className="flex items-center gap-1">
                     <input

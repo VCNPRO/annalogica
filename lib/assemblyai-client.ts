@@ -316,7 +316,7 @@ export async function saveSummary(
 /**
  * Generate speakers/participants report from transcription
  */
-export function generateSpeakersReport(result: TranscriptionResult): string {
+export function generateSpeakersReport(result: TranscriptionResult, detailed: boolean = false): string {
   if (!result.utterances || result.utterances.length === 0) {
     return 'No se detectaron oradores en esta transcripción.';
   }
@@ -389,19 +389,21 @@ export function generateSpeakersReport(result: TranscriptionResult): string {
     report += `   Promedio por intervención: ${avgDuration}\n\n`;
   });
 
-  // Detailed timeline
-  report += '-'.repeat(60) + '\n';
-  report += 'LÍNEA DE TIEMPO DETALLADA\n';
-  report += '-'.repeat(60) + '\n\n';
+  // Detailed timeline - ONLY if requested
+  if (detailed) {
+    report += '-'.repeat(60) + '\n';
+    report += 'LÍNEA DE TIEMPO DETALLADA\n';
+    report += '-'.repeat(60) + '\n\n';
 
-  result.utterances.forEach((utterance, index) => {
-    const startTime = formatTimestampSimple(utterance.start);
-    const endTime = formatTimestampSimple(utterance.end);
-    const duration = formatDuration(utterance.end - utterance.start);
+    result.utterances.forEach((utterance, index) => {
+      const startTime = formatTimestampSimple(utterance.start);
+      const endTime = formatTimestampSimple(utterance.end);
+      const duration = formatDuration(utterance.end - utterance.start);
 
-    report += `[${startTime} → ${endTime}] (${duration})\n`;
-    report += `${utterance.speaker}: ${utterance.text.trim()}\n\n`;
-  });
+      report += `[${startTime} → ${endTime}] (${duration})\n`;
+      report += `${utterance.speaker}: ${utterance.text.trim()}\n\n`;
+    });
+  }
 
   return report;
 }
@@ -436,7 +438,8 @@ function formatTimestampSimple(ms: number): string {
  */
 export async function saveSpeakersReport(
   result: TranscriptionResult,
-  filename: string
+  filename: string,
+  detailed: boolean = false
 ): Promise<string> {
   const baseName = filename.replace(/\.[^/.]+$/, '');
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
@@ -445,7 +448,7 @@ export async function saveSpeakersReport(
     throw new Error('BLOB_READ_WRITE_TOKEN not configured');
   }
 
-  const report = generateSpeakersReport(result);
+  const report = generateSpeakersReport(result, detailed);
 
   const speakersBlob = await put(`${baseName}-oradores.txt`, report, {
     access: 'public',
