@@ -59,8 +59,7 @@ export default function SubscriptionBanner({
   };
 
   const handleUpgrade = () => {
-    // Contactar con soporte para mejorar plan
-    window.location.href = 'mailto:soporte@annalogica.eu?subject=Solicitud de Mejora de Plan&body=Hola,%0D%0A%0D%0AMe gustaría información sobre cómo mejorar mi plan actual.%0D%0A%0D%0APlan actual: ' + getPlanDisplayName() + '%0D%0AUso actual: ' + filesUsed + ' / ' + filesTotal + ' archivos';
+    router.push('/pricing');
   };
 
   return (
