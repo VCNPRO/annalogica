@@ -38,7 +38,7 @@ export default function Dashboard() {
   const [language, setLanguage] = useState('es');
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
-  const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf'>('txt');
+  const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf' | 'both'>('txt');
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
   useEffect(() => {
@@ -482,23 +482,14 @@ export default function Dashboard() {
     }
   };
 
-  const downloadPDF = async (txtUrl: string, filename: string, tags?: string[]) => {
+  const generatePdf = async (title: string, text: string, filename: string) => {
     try {
-      // Fetch the transcription text
-      const textRes = await fetch(txtUrl);
-      if (!textRes.ok) {
-        throw new Error('Failed to fetch transcription text');
-      }
-      const text = await textRes.text();
-
-      // Initialize jsPDF
       const doc = new jsPDF({
         orientation: 'p',
         unit: 'mm',
         format: 'a4'
       });
 
-      // Set properties and add content
       const margin = 20;
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -508,7 +499,7 @@ export default function Dashboard() {
       // Header
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(16);
-      doc.text('TRANSCRIPCIÓN DE AUDIO', pageWidth / 2, yPosition, { align: 'center' });
+      doc.text(title.toUpperCase(), pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 10;
 
       // Metadata
@@ -517,24 +508,12 @@ export default function Dashboard() {
       doc.text(`Archivo: ${filename}`, margin, yPosition);
       yPosition += 5;
       doc.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, margin, yPosition);
-      yPosition += 5;
+      yPosition += 10;
 
-      // Tags if available
-      if (tags && tags.length > 0) {
-        doc.setFont('Helvetica', 'bold');
-        doc.text('Tags:', margin, yPosition);
-        doc.setFont('Helvetica', 'normal');
-        const tagsText = tags.join(', ');
-        const splitTags = doc.splitTextToSize(tagsText, usableWidth - 20);
-        doc.text(splitTags, margin + 15, yPosition);
-        yPosition += splitTags.length * 5;
-      }
-
-      yPosition += 5;
       doc.line(margin, yPosition, pageWidth - margin, yPosition);
       yPosition += 10;
 
-      // Body with automatic page breaks
+      // Body
       doc.setFontSize(10);
       const splitText = doc.splitTextToSize(text, usableWidth);
 
@@ -547,11 +526,9 @@ export default function Dashboard() {
         yPosition += 5;
       }
 
-      // Save
-      const pdfBlob = doc.output('blob');
-      return pdfBlob;
+      return doc.output('blob');
     } catch (error) {
-      console.error('Error generando PDF:', error);
+      console.error(`Error generando PDF para "${title}":`, error);
       throw error;
     }
   };
@@ -571,86 +548,90 @@ export default function Dashboard() {
           const baseName = file.name.replace(/\.[^/.]+$/, '');
           const folderHandle = await dirHandle.getDirectoryHandle(baseName, { create: true });
 
-          // Download transcription (txt, pdf, or both)
-          if (options.downloadFormat === 'pdf' && job.txt_url) {
-            const tags = job.metadata?.tags || [];
-            const pdfBlob = await downloadPDF(job.txt_url, file.name, tags);
-            const fileHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(pdfBlob);
+          // Helper to save a blob to a file handle
+          const saveBlob = async (handle: any, blob: Blob) => {
+            const writable = await handle.createWritable();
+            await writable.write(blob);
             await writable.close();
-          } else if (options.downloadFormat === 'txt' && job.txt_url) {
-            const txtRes = await fetch(job.txt_url);
-            const txtBlob = await txtRes.blob();
-            const fileHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(txtBlob);
-            await writable.close();
-          } else if (options.downloadFormat === 'both' && job.txt_url) {
-            // Download both TXT and PDF
-            const txtRes = await fetch(job.txt_url);
-            const txtBlob = await txtRes.blob();
-            const txtFileHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
-            const txtWritable = await txtFileHandle.createWritable();
-            await txtWritable.write(txtBlob);
-            await txtWritable.close();
+          };
 
-            const tags = job.metadata?.tags || [];
-            const pdfBlob = await downloadPDF(job.txt_url, file.name, tags);
-            const pdfFileHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
-            const pdfWritable = await pdfFileHandle.createWritable();
-            await pdfWritable.write(pdfBlob);
-            await pdfWritable.close();
-          }
-
-          // Download SRT
-          if (job.srt_url) {
-            const srtRes = await fetch(job.srt_url);
-            const srtBlob = await srtRes.blob();
-            const fileHandle = await folderHandle.getFileHandle(`${baseName}.srt`, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(srtBlob);
-            await writable.close();
-          }
-
-          // Download VTT
-          if (job.vtt_url) {
-            const vttRes = await fetch(job.vtt_url);
-            const vttBlob = await vttRes.blob();
-            const fileHandle = await folderHandle.getFileHandle(`${baseName}.vtt`, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(vttBlob);
-            await writable.close();
+          // Download Transcription
+          if (job.txt_url) {
+            const textRes = await fetch(job.txt_url);
+            const textContent = await textRes.text();
+            if (options.downloadFormat === 'pdf' || options.downloadFormat === 'both') {
+              const pdfBlob = await generatePdf('Transcripción', textContent, file.name);
+              const pdfHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
+              await saveBlob(pdfHandle, pdfBlob);
+            }
+            if (options.downloadFormat === 'txt' || options.downloadFormat === 'both') {
+              const txtBlob = new Blob([textContent], { type: 'text/plain' });
+              const txtHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
+              await saveBlob(txtHandle, txtBlob);
+            }
           }
 
           // Download Summary
           if (job.summary_url) {
             const summaryRes = await fetch(job.summary_url);
-            const summaryBlob = await summaryRes.blob();
-            const fileHandle = await folderHandle.getFileHandle(`${baseName}-resumen.txt`, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(summaryBlob);
-            await writable.close();
+            const summaryText = await summaryRes.text();
+            if (options.downloadFormat === 'pdf' || options.downloadFormat === 'both') {
+              const pdfBlob = await generatePdf('Resumen', summaryText, file.name);
+              const pdfHandle = await folderHandle.getFileHandle(`${baseName}-resumen.pdf`, { create: true });
+              await saveBlob(pdfHandle, pdfBlob);
+            }
+            if (options.downloadFormat === 'txt' || options.downloadFormat === 'both') {
+              const txtBlob = new Blob([summaryText], { type: 'text/plain' });
+              const txtHandle = await folderHandle.getFileHandle(`${baseName}-resumen.txt`, { create: true });
+              await saveBlob(txtHandle, txtBlob);
+            }
           }
 
           // Download Speakers Report
           if (job.speakers_url) {
             const speakersRes = await fetch(job.speakers_url);
-            const speakersBlob = await speakersRes.blob();
-            const fileHandle = await folderHandle.getFileHandle(`${baseName}-oradores.txt`, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(speakersBlob);
-            await writable.close();
+            const speakersText = await speakersRes.text();
+            if (options.downloadFormat === 'pdf' || options.downloadFormat === 'both') {
+              const pdfBlob = await generatePdf('Análisis de Oradores', speakersText, file.name);
+              const pdfHandle = await folderHandle.getFileHandle(`${baseName}-oradores.pdf`, { create: true });
+              await saveBlob(pdfHandle, pdfBlob);
+            }
+            if (options.downloadFormat === 'txt' || options.downloadFormat === 'both') {
+              const txtBlob = new Blob([speakersText], { type: 'text/plain' });
+              const txtHandle = await folderHandle.getFileHandle(`${baseName}-oradores.txt`, { create: true });
+              await saveBlob(txtHandle, txtBlob);
+            }
+          }
+          
+          // Download Tags
+          if (job.metadata?.tags && job.metadata.tags.length > 0) {
+            const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
+            if (options.downloadFormat === 'pdf' || options.downloadFormat === 'both') {
+              const pdfBlob = await generatePdf('Tags', tagsText, file.name);
+              const pdfHandle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
+              await saveBlob(pdfHandle, pdfBlob);
+            }
+            if (options.downloadFormat === 'txt' || options.downloadFormat === 'both') {
+              const txtBlob = new Blob([tagsText], { type: 'text/plain' });
+              const txtHandle = await folderHandle.getFileHandle(`${baseName}-tags.txt`, { create: true });
+              await saveBlob(txtHandle, txtBlob);
+            }
           }
 
-          // Save tags as separate file if available
-          if (job.metadata?.tags && job.metadata.tags.length > 0) {
-            const tagsText = `Tags para: ${file.name}\n\n${job.metadata.tags.join('\n')}`;
-            const tagsBlob = new Blob([tagsText], { type: 'text/plain' });
-            const fileHandle = await folderHandle.getFileHandle(`${baseName}-tags.txt`, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(tagsBlob);
-            await writable.close();
+          // Download SRT (always as .srt)
+          if (job.srt_url) {
+            const srtRes = await fetch(job.srt_url);
+            const srtBlob = await srtRes.blob();
+            const fileHandle = await folderHandle.getFileHandle(`${baseName}.srt`, { create: true });
+            await saveBlob(fileHandle, srtBlob);
+          }
+
+          // Download VTT (always as .vtt)
+          if (job.vtt_url) {
+            const vttRes = await fetch(job.vtt_url);
+            const vttBlob = await vttRes.blob();
+            const fileHandle = await folderHandle.getFileHandle(`${baseName}.vtt`, { create: true });
+            await saveBlob(fileHandle, vttBlob);
           }
 
           alert(`✅ Archivos guardados en carpeta: ${baseName}`);
@@ -670,36 +651,78 @@ export default function Dashboard() {
   };
 
   const downloadFilesIndividually = async (file: UploadedFile, job: any, format: 'txt' | 'pdf' | 'both') => {
-    // Download transcription in selected format
-    if (format === 'pdf' && job.txt_url) {
-      const tags = job.metadata?.tags || [];
-      const pdfBlob = await downloadPDF(job.txt_url, file.name, tags);
-      const url = URL.createObjectURL(pdfBlob);
+    // Helper to trigger download
+    const triggerDownload = (blob: Blob, filename: string) => {
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${file.name.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`;
+      a.download = filename;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } else if (format === 'txt' && job.txt_url) {
-      window.open(job.txt_url, '_blank');
-    } else if (format === 'both' && job.txt_url) {
-      // Download both TXT and PDF
-      window.open(job.txt_url, '_blank');
-      const tags = job.metadata?.tags || [];
-      const pdfBlob = await downloadPDF(job.txt_url, file.name, tags);
-      const url = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${file.name.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+    };
+
+    const baseName = file.name.replace(/\.[^/.]+$/, '');
+
+    // Download Transcription
+    if (job.txt_url) {
+      const res = await fetch(job.txt_url);
+      const text = await res.text();
+      if (format === 'pdf' || format === 'both') {
+        const pdfBlob = await generatePdf('Transcripción', text, file.name);
+        triggerDownload(pdfBlob, `${baseName}-transcripcion.pdf`);
+      }
+      if (format === 'txt' || format === 'both') {
+        const txtBlob = new Blob([text], { type: 'text/plain' });
+        triggerDownload(txtBlob, `${baseName}-transcripcion.txt`);
+      }
     }
 
-    // Always download other formats
+    // Download Summary
+    if (job.summary_url) {
+      const res = await fetch(job.summary_url);
+      const text = await res.text();
+      if (format === 'pdf' || format === 'both') {
+        const pdfBlob = await generatePdf('Resumen', text, file.name);
+        triggerDownload(pdfBlob, `${baseName}-resumen.pdf`);
+      }
+      if (format === 'txt' || format === 'both') {
+        const txtBlob = new Blob([text], { type: 'text/plain' });
+        triggerDownload(txtBlob, `${baseName}-resumen.txt`);
+      }
+    }
+
+    // Download Speakers Report
+    if (job.speakers_url) {
+      const res = await fetch(job.speakers_url);
+      const text = await res.text();
+      if (format === 'pdf' || format === 'both') {
+        const pdfBlob = await generatePdf('Análisis de Oradores', text, file.name);
+        triggerDownload(pdfBlob, `${baseName}-oradores.pdf`);
+      }
+      if (format === 'txt' || format === 'both') {
+        const txtBlob = new Blob([text], { type: 'text/plain' });
+        triggerDownload(txtBlob, `${baseName}-oradores.txt`);
+      }
+    }
+
+    // Download Tags
+    if (job.metadata?.tags && job.metadata.tags.length > 0) {
+      const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
+      if (format === 'pdf' || format === 'both') {
+        const pdfBlob = await generatePdf('Tags', tagsText, file.name);
+        triggerDownload(pdfBlob, `${baseName}-tags.pdf`);
+      }
+      if (format === 'txt' || format === 'both') {
+        const txtBlob = new Blob([tagsText], { type: 'text/plain' });
+        triggerDownload(txtBlob, `${baseName}-tags.txt`);
+      }
+    }
+
+    // Always download other formats as-is
     if (job.srt_url) window.open(job.srt_url, '_blank');
     if (job.vtt_url) window.open(job.vtt_url, '_blank');
-    if (job.summary_url) window.open(job.summary_url, '_blank');
-    if (job.speakers_url) window.open(job.speakers_url, '_blank');
   };
 
   const getStatusText = (status: FileStatus) => {
@@ -1177,6 +1200,16 @@ export default function Dashboard() {
                       onChange={() => setDownloadFormat('pdf')}
                     />
                     <span className={`text-xs ${textSecondary}`}>PDF</span>
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      className="accent-orange-500 scale-75"
+                      name="downloadFormat"
+                      checked={downloadFormat === 'both'}
+                      onChange={() => setDownloadFormat('both')}
+                    />
+                    <span className={`text-xs ${textSecondary}`}>Ambos</span>
                   </label>
                 </div>
               </div>
