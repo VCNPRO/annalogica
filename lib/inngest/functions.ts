@@ -153,8 +153,11 @@ export const summarizeFile = inngest.createFunction(
     });
 
     if (!summary) {
-        console.warn(`[Inngest] Summary generation returned empty for job ${jobId}. Skipping save.`);
-        return { status: 'skipped', reason: 'Empty summary generated' };
+        console.warn(`[Inngest] Summary generation returned empty for job ${jobId}. Marking as failed.`);
+        await step.run('update-status-failed', async () => {
+          await TranscriptionJobDB.updateStatus(jobId, 'failed', 'Summary generation failed');
+        });
+        return { status: 'failed', reason: 'Empty summary generated' };
     }
 
     const summaryUrl = await step.run('save-summary', async () => {
