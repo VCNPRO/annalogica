@@ -89,7 +89,7 @@ export default function Dashboard() {
   const [downloadDirHandle, setDownloadDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
-  const downloadFilesOrganized = async (file: UploadedFile, job: Job, dirHandle: FileSystemDirectoryHandle, format: 'txt' | 'pdf' | 'both') => {
+  const downloadFilesOrganized = async (file: UploadedFile, job: Job, dirHandle: FileSystemDirectoryHandle, format: 'txt' | 'pdf' | 'both') => {};
 
   useEffect(() => {
     // SECURITY: Verificar autenticación mediante cookie httpOnly
