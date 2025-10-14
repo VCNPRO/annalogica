@@ -87,6 +87,7 @@ export default function Dashboard() {
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
   const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf' | 'both'>('pdf');
   const [downloadDirHandle, setDownloadDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [createSubfolders, setCreateSubfolders] = useState(true);
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
   useEffect(() => {
@@ -585,7 +586,9 @@ export default function Dashboard() {
     try {
       // Create folder for this file
       const baseName = file.name.replace(/\.[^/.]+$/, '');
-      const folderHandle = await dirHandle.getDirectoryHandle(baseName, { create: true });
+      const folderHandle = createSubfolders
+        ? await dirHandle.getDirectoryHandle(baseName, { create: true })
+        : dirHandle;
 
       // Helper to save a blob to a file handle
       const saveBlob = async (handle: any, blob: Blob) => {
@@ -1248,6 +1251,18 @@ export default function Dashboard() {
                       onChange={() => setDownloadFormat('both')}
                     />
                     <span className={`text-xs ${textSecondary}`}>Ambos</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2 mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-4 w-4 text-orange-500 bg-transparent border-zinc-600 rounded accent-orange-500"
+                      checked={!createSubfolders}
+                      onChange={(e) => setCreateSubfolders(!e.target.checked)}
+                    />
+                    <span className={`text-xs ${textSecondary}`}>No crear sub-carpetas</span>
                   </label>
                 </div>
               </div>
