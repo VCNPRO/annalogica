@@ -39,7 +39,7 @@ export const transcribeFile = inngest.createFunction(
       // Type guard to check for the fallback response
       if ('error' in result) {
         // Throw an error to force Inngest to retry the step later
-        throw new Error(result.error);
+        throw new Error(result.error as string);
       }
 
       return result;
