@@ -52,7 +52,7 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error loading files from localStorage:', error);
     }
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
   // Save files to localStorage whenever they change
   useEffect(() => {
