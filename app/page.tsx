@@ -87,9 +87,9 @@ export default function Dashboard() {
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
   const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf' | 'both'>('pdf');
   const [downloadDirHandle, setDownloadDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
   const downloadFilesOrganized = async (file: UploadedFile, job: Job, dirHandle: FileSystemDirectoryHandle, format: 'txt' | 'pdf' | 'both') => {
-  const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
   useEffect(() => {
     // SECURITY: Verificar autenticación mediante cookie httpOnly
