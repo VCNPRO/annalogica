@@ -896,23 +896,7 @@ export default function Dashboard() {
             <p className={`text-xs ${textSecondary} mb-3`}>Selecciona archivos y aplica una acción de IA.</p>
 
             <div className="space-y-3">
-              <div>
-                <label className={`block text-xs font-medium ${textSecondary} mb-1`}>Idioma del Contenido</label>
-                <select 
-                  className={`w-full p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                >
-                  <option value="auto">Detección automática</option>
-                  <option value="es">Español</option>
-                  <option value="ca">Català</option>
-                  <option value="eu">Euskera</option>
-                  <option value="gl">Gallego</option>
-                  <option value="pt">Português</option>
-                  <option value="en">English</option>
-                  <option value="fr">Français</option>
-                </select>
-              </div>
+
 
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -1022,7 +1006,25 @@ export default function Dashboard() {
         </div>
 
         <div className="flex-1 p-6 overflow-y-auto flex flex-col" style={{ height: '100%' }}>
-          <div className="mb-6" style={{ height: '28px' }}></div>
+          <div className="mb-6 flex justify-start">
+            <label htmlFor="language-select" className="sr-only">Idioma del Contenido</label>
+            <select
+                id="language-select"
+                className={`p-2 ${bgSecondary} rounded-lg shadow-sm ${border} border ${textPrimary} text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                style={{ minWidth: '150px' }}
+            >
+                <option value="auto">Detección automática</option>
+                <option value="es">Español</option>
+                <option value="ca">Català</option>
+                <option value="eu">Euskera</option>
+                <option value="gl">Gallego</option>
+                <option value="pt">Português</option>
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+            </select>
+        </div>
 
           <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden mb-6`} style={{ flex: '1 1 60%', minHeight: '400px' }}>
             <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
