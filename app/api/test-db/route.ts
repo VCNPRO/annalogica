@@ -19,7 +19,8 @@ export async function GET(request: Request) {
       user.userId,
       'test-file.mp3',
       'https://example.com/test.mp3',
-      1024
+      'auto', // language
+      1024 // audioSizeBytes
     );
 
     return NextResponse.json({
