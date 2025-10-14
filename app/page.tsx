@@ -155,7 +155,7 @@ export default function Dashboard() {
             const timeSinceStart = (Date.now() - file.processingStartTime) / 1000; // seconds
             const audioDuration = job.audio_duration_seconds || 60;
             const maxExpectedTime = audioDuration * 0.5; // 0.5x multiplier (very generous timeout)
-            const timeoutThreshold = Math.max(maxExpectedTime, 300); // At least 5 minutes
+            const timeoutThreshold = Math.max(maxExpectedTime, 1200); // At least 20 minutes
 
             // If job is stuck for too long (beyond reasonable processing time)
             if (timeSinceStart > timeoutThreshold && (job.status === 'processing' || job.status === 'pending')) {
