@@ -1,7 +1,16 @@
 import { inngest } from './client';
 import { assemblyAIBreaker } from '@/lib/circuit-breakers';
 import { TranscriptionJobDB } from '@/lib/db';
-import type { TranscriptionResult, TranscriptionOptions } from '@/lib/assemblyai-client';
+import {
+  transcribeAudio,
+  saveTranscriptionResults,
+  saveSpeakersReport,
+  generateSummary,
+  saveSummary,
+  type TranscriptionResult,
+  type SummaryResult,
+  type TranscriptionOptions
+} from '@/lib/assemblyai-client';
 import { logTranscription, logSummary } from '@/lib/usage-tracking';
 
 /**
