@@ -27,6 +27,7 @@ export interface TranscriptionJob {
   user_id: string;
   status: 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed';
   filename: string;
+  language: string; // Add language field
   audio_url: string;
   audio_size_bytes: number | null;
   audio_duration_seconds: number | null;
@@ -199,11 +200,12 @@ export const TranscriptionJobDB = {
     userId: string,
     filename: string,
     audioUrl: string,
+    language: string = 'auto', // Default to auto-detection
     audioSizeBytes?: number
   ): Promise<TranscriptionJob> => {
     const result = await sql<TranscriptionJob>`
-      INSERT INTO transcription_jobs (user_id, filename, audio_url, audio_size_bytes, status)
-      VALUES (${userId}, ${filename}, ${audioUrl}, ${audioSizeBytes || null}, 'pending')
+      INSERT INTO transcription_jobs (user_id, filename, audio_url, language, audio_size_bytes, status)
+      VALUES (${userId}, ${filename}, ${audioUrl}, ${language}, ${audioSizeBytes || null}, 'pending')
       RETURNING *
     `;
     return result.rows[0];

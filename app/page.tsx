@@ -27,9 +27,26 @@ interface UploadedFile {
   estimatedTimeRemaining?: number; // Estimated seconds remaining
 }
 
+interface Job {
+  txt_url?: string;
+  srt_url?: string;
+  vtt_url?: string;
+  summary_url?: string;
+  speakers_url?: string;
+  metadata?: {
+    tags?: string[];
+  };
+}
+
+interface User {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]); // Keep this state
@@ -69,7 +86,9 @@ export default function Dashboard() {
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
   const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf' | 'both'>('pdf');
-  const [downloadDirHandle, setDownloadDirHandle] = useState<any>(null);
+  const [downloadDirHandle, setDownloadDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
+
+  const downloadFilesOrganized = async (file: UploadedFile, job: Job, dirHandle: FileSystemDirectoryHandle, format: 'txt' | 'pdf' | 'both') => {
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
 
   useEffect(() => {
@@ -432,7 +451,7 @@ export default function Dashboard() {
               'Content-Type': 'application/json'
             },
             credentials: 'include',
-            body: JSON.stringify({ audioUrl: file.blobUrl, filename: file.name })
+            body: JSON.stringify({ audioUrl: file.blobUrl, filename: file.name, language: language })
           });
 
           console.log('[Process] API Response status:', processRes.status);
@@ -664,7 +683,7 @@ export default function Dashboard() {
     }
   };
 
-  const downloadFilesIndividually = async (file: UploadedFile, job: any, format: 'txt' | 'pdf' | 'both') => {
+  const downloadFilesIndividually = async (file: UploadedFile, job: Job, format: 'txt' | 'pdf' | 'both') => {
     // Helper to trigger download
     const triggerDownload = (blob: Blob, filename: string) => {
       const url = URL.createObjectURL(blob);

@@ -40,7 +40,16 @@ export const transcribeFile = inngest.createFunction(
     });
 
     const transcriptionResult = await step.run('transcribe-audio', async () => {
-      return await transcribeAudio({ audioUrl, language: 'es', speakerLabels: true });
+      // The breaker will wrap the call to AssemblyAI
+      const result = await assemblyAIBreaker.fire({ audioUrl, language: job.language, speakerLabels: true });
+
+      // Check if the circuit breaker returned a fallback error
+      if (result.error) {
+        // Throw an error to force Inngest to retry the step later
+        throw new Error(result.error);
+      }
+
+      return result as TranscriptionResult;
     });
 
     await step.run('save-results-and-metadata', async () => {

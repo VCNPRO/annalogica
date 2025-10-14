@@ -76,10 +76,10 @@ export async function POST(request: Request) {
 
     // Parse and validate request body
     const body = await request.json();
-    const { audioUrl, filename } = body;
+    const { audioUrl, filename, language } = body;
 
     // Validate required fields
-    validateRequired(body, ['audioUrl', 'filename']);
+    validateRequired(body, ['audioUrl', 'filename', 'language']);
 
     // Validate URL format
     validateUrl(audioUrl);
@@ -93,7 +93,8 @@ export async function POST(request: Request) {
     const job = await TranscriptionJobDB.create(
       user.userId,
       filename.trim(),
-      audioUrl
+      audioUrl,
+      language
     );
 
     logger.info('Process API: Job created', {
