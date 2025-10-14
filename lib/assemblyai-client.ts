@@ -12,7 +12,7 @@ export function getAssemblyAIClient() {
 
 export interface TranscriptionOptions {
   audioUrl: string;
-  language?: 'es' | 'en' | 'auto';
+  language?: 'es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt' | 'auto';
   speakerLabels?: boolean;
   dualChannel?: boolean;
 }
@@ -51,7 +51,7 @@ export async function transcribeAudio(
   // Submit transcription job
   const transcript = await client.transcripts.transcribe({
     audio_url: options.audioUrl,
-    language_code: options.language === 'es' ? 'es' : undefined,
+    language_code: ['es', 'en', 'ca', 'eu', 'gl', 'pt'].includes(options.language || '') ? options.language as ('es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt') : undefined,
     language_detection: options.language === 'auto',
     speaker_labels: options.speakerLabels ?? true, // Enable by default
     dual_channel: options.dualChannel ?? false,

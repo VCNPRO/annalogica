@@ -885,9 +885,12 @@ export default function Dashboard() {
                 >
                   <option value="auto">Detección automática</option>
                   <option value="es">Español</option>
+                  <option value="ca">Català</option>
+                  <option value="eu">Euskera</option>
+                  <option value="gl">Gallego</option>
+                  <option value="pt">Português</option>
                   <option value="en">English</option>
                   <option value="fr">Français</option>
-                  <option value="ca">Català</option>
                 </select>
               </div>
 
