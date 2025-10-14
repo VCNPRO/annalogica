@@ -134,25 +134,44 @@ export async function getAdminLogStats(adminUserId?: string): Promise<{
   recentActions: number;
 }> {
   try {
-    const whereClause = adminUserId ? `WHERE admin_user_id = '${adminUserId}'` : '';
+    let result;
+    let actionTypesResult;
 
-    const result = await sql`
-      SELECT
-        COUNT(*) as total_actions,
-        COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as recent_actions
-      FROM admin_logs
-      ${sql.unsafe(whereClause)}
-    `;
+    if (adminUserId) {
+      result = await sql`
+        SELECT
+          COUNT(*) as total_actions,
+          COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as recent_actions
+        FROM admin_logs
+        WHERE admin_user_id = ${adminUserId}
+      `;
 
-    const actionTypesResult = await sql`
-      SELECT
-        action,
-        COUNT(*) as count
-      FROM admin_logs
-      ${sql.unsafe(whereClause)}
-      GROUP BY action
-      ORDER BY count DESC
-    `;
+      actionTypesResult = await sql`
+        SELECT
+          action,
+          COUNT(*) as count
+        FROM admin_logs
+        WHERE admin_user_id = ${adminUserId}
+        GROUP BY action
+        ORDER BY count DESC
+      `;
+    } else {
+      result = await sql`
+        SELECT
+          COUNT(*) as total_actions,
+          COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as recent_actions
+        FROM admin_logs
+      `;
+
+      actionTypesResult = await sql`
+        SELECT
+          action,
+          COUNT(*) as count
+        FROM admin_logs
+        GROUP BY action
+        ORDER BY count DESC
+      `;
+    }
 
     const actionsByType: Record<string, number> = {};
     actionTypesResult.rows.forEach((row: any) => {

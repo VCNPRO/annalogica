@@ -43,7 +43,7 @@ export default function Dashboard() {
         // Reset progress for files that were uploading or processing
         const restoredFiles = parsedFiles.map(file => {
           if (file.status === 'uploading' || file.status === 'processing') {
-            return { ...file, status: 'error', uploadProgress: 0, processingProgress: 0 };
+            return { ...file, status: 'error' as FileStatus, uploadProgress: 0, processingProgress: 0 };
           }
           return file;
         });

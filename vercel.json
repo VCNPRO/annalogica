@@ -1,18 +1,4 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/cleanup",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/reset-quotas",
-      "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/check-notifications",
-      "schedule": "0 */6 * * *"
-    }
-  ],
   "functions": {
     "app/api/inngest/route.ts": {
       "maxDuration": 300
