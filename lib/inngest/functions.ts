@@ -1,15 +1,7 @@
 import { inngest } from './client';
 import { assemblyAIBreaker } from '@/lib/circuit-breakers';
 import { TranscriptionJobDB } from '@/lib/db';
-import {
-  transcribeAudio,
-  saveTranscriptionResults,
-  saveSpeakersReport,
-  generateSummary,
-  saveSummary,
-  type TranscriptionResult,
-  type SummaryResult
-} from '@/lib/assemblyai-client';
+import type { TranscriptionResult, TranscriptionOptions } from '@/lib/assemblyai-client';
 import { logTranscription, logSummary } from '@/lib/usage-tracking';
 
 /**
@@ -42,7 +34,7 @@ export const transcribeFile = inngest.createFunction(
 
     const transcriptionResult = await step.run('transcribe-audio', async () => {
       // The breaker will wrap the call to AssemblyAI
-      const result = await assemblyAIBreaker.fire({ audioUrl, language: job.language, speakerLabels: true });
+      const result = await assemblyAIBreaker.fire({ audioUrl, language: job.language as TranscriptionOptions['language'], speakerLabels: true });
 
       // Check if the circuit breaker returned a fallback error
       if (result.error) {
