@@ -201,7 +201,7 @@ export default function Dashboard() {
             } else {
               // Progressive increase based on audio duration, but cap at 90
               const baseProgress = Math.floor((elapsed / estimatedTotalTime) * 100);
-              processingProgress = Math.min(90, baseProgress);
+              processingProgress = Math.min(98, baseProgress);
 
               // Calculate remaining time
               const remainingProgress = 100 - processingProgress;
@@ -1147,9 +1147,9 @@ export default function Dashboard() {
                           <div className="flex justify-between items-center mb-1">
                             <div className="flex items-center gap-1.5">
                               <span className={`text-xs ${textSecondary}`}>
-                                {(file.processingProgress || 0) >= 90 ? '🟡 Finalizando...' : 'Procesando'}
+                                {(file.processingProgress || 0) >= 98 ? '🟡 Finalizando...' : 'Procesando'}
                               </span>
-                              {(file.processingProgress || 0) >= 90 && (
+                              {(file.processingProgress || 0) >= 98 && (
                                 <span className={`text-xs ${textSecondary} italic`}>(Generando resumen)</span>
                               )}
                             </div>
