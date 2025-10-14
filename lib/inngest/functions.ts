@@ -1,4 +1,5 @@
 import { inngest } from './client';
+import { assemblyAIBreaker } from '@/lib/circuit-breakers';
 import { TranscriptionJobDB } from '@/lib/db';
 import {
   transcribeAudio,
