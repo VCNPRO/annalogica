@@ -95,20 +95,11 @@ export const transcribeFile = inngest.createFunction(
       }
     });
 
-    await step.run('update-status-transcribed', async () => {
-      await TranscriptionJobDB.updateStatus(jobId, 'transcribed');
-    });
-
-    // Automatically trigger summarization after transcription completes
-    await step.run('trigger-summarization', async () => {
-      await inngest.send({
-        name: 'task/summarize',
-        data: { jobId }
-      });
-      console.log(`[Inngest] Triggered summarization for job ${jobId}`);
+    await step.run('update-status-completed', async () => {
+      await TranscriptionJobDB.updateStatus(jobId, 'completed');
     });
 
     console.log(`[Inngest] Transcription task for job ${jobId} completed.`);
-    return { status: 'transcribed' };
+    return { status: 'completed' };
   }
 );
