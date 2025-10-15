@@ -52,11 +52,16 @@ export const transcribeFile = inngest.createFunction(
     });
 
     await step.run('save-results-and-metadata', async () => {
+      console.log(`[Inngest] Step: save-results-and-metadata - START for job ${jobId}`);
+
+      console.log(`[Inngest] ...saving transcription results...`);
       const urls = await saveTranscriptionResults(transcriptionResult, filename, audioUrl);
+      console.log(`[Inngest] ...transcription results saved.`);
 
       // Generate and save speakers report (with error handling to avoid breaking transcription)
       let speakersUrl: string | undefined = undefined;
       try {
+        console.log(`[Inngest] ...saving speakers report...`);
         speakersUrl = await saveSpeakersReport(transcriptionResult, filename);
         console.log('[Inngest] Speakers report saved successfully:', speakersUrl);
       } catch (error: any) {
@@ -70,6 +75,7 @@ export const transcribeFile = inngest.createFunction(
 
       const metadata = { speakers };
 
+      console.log(`[Inngest] ...updating database with results...`);
       await TranscriptionJobDB.updateResults(jobId, {
         assemblyaiId: transcriptionResult.id,
         txtUrl: urls.txtUrl,
@@ -79,8 +85,13 @@ export const transcribeFile = inngest.createFunction(
         audioDuration: transcriptionResult.audioDuration,
         metadata,
       });
+      console.log(`[Inngest] ...database updated.`);
 
+      console.log(`[Inngest] ...logging transcription usage...`);
       await logTranscription(userId, filename, transcriptionResult.audioDuration);
+      console.log(`[Inngest] ...usage logged.`);
+
+      console.log(`[Inngest] Step: save-results-and-metadata - END for job ${jobId}`);
     });
 
     // CLEANUP: Delete original audio file from Vercel Blob after successful transcription
