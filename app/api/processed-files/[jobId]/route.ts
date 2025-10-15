@@ -3,7 +3,7 @@ import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { del } from '@vercel/blob';
 
-export async function DELETE(request: NextRequest, context: { params: { jobId: string } }) {
+export async function DELETE(request: NextRequest, params: { jobId: string }) {
   try {
     const auth = verifyRequestAuth(request);
 
@@ -14,7 +14,7 @@ export async function DELETE(request: NextRequest, context: { params: { jobId: s
       );
     }
 
-    const { jobId } = context.params;
+    const { jobId } = params;
 
     // First, get the job details to retrieve blob URLs
     const job = await TranscriptionJobDB.findById(jobId);
