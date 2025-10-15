@@ -9,7 +9,7 @@ resetTimeout: 30000, // 30 segundos antes de reintentar (estado HALF-OPEN)
 };
 
 // Crear el Circuit Breaker envolviendo la función original de transcripción
-export const assemblyAIBreaker = new CircuitBreaker(transcribeAudio, assemblyAIOpt
+export const assemblyAIBreaker = new CircuitBreaker(transcribeAudio, assemblyAIOptions);
 
 // Definir una respuesta de fallback para cuando el circuito esté abierto
 assemblyAIBreaker.fallback(() => ({

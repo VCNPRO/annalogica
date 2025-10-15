@@ -519,15 +519,14 @@ console.error('[Process] ❌ Error:', err);
 setError(`Error procesando ${file.name}: ${err.message}`);
 setUploadedFiles(prev => prev.map(f =>
 f.id === file.id ? { ...f, status: 'error' } : f
-));
-}
-} else {
-console.log('[Process] ⏭️ Skipping file (no Transcribir action):, file.name);
-}
-}
+          ));
+        }
+      } else {
+        console.log('[Process] ⏭️ Skipping file (no Transcribir action):', file.name);
+      }
+    }
 
-console.log('[Process] 🏁 Finished! Processed', processedCount, 'files');
-
+    console.log('[Process] 🏁 Finished! Processed', processedCount, 'files');
 if (processedCount > 0) {
 alert(`✅ ${processedCount} archivo(s) enviado(s) a procesamiento!\n\nPuedes ver el progreso en la tabla de archivos.`);
 } else {
