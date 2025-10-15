@@ -515,6 +515,46 @@ export default function Dashboard() {
 
 
 
+  const handleDeleteSelectedCompletedFiles = async () => {
+    const selectedCompletedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedFileIds.has(f.id));
+
+    if (selectedCompletedFiles.length === 0) {
+      alert('Selecciona al menos un archivo completado para eliminar.');
+      return;
+    }
+
+    if (!confirm(`¿Estás seguro de que quieres eliminar ${selectedCompletedFiles.length} archivo(s) procesado(s) seleccionado(s) y todos sus resultados?`)) {
+      return;
+    }
+
+    let successfulDeletions = 0;
+    for (const file of selectedCompletedFiles) {
+      if (file.jobId) {
+        try {
+          const res = await fetch(`/api/processed-files/${file.jobId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || `Error al eliminar ${file.name}`);
+          }
+          successfulDeletions++;
+        } catch (err: any) {
+          console.error(`Error deleting job ${file.jobId}:`, err);
+          setError(`Error al eliminar ${file.name}: ${err.message}`);
+        }
+      }
+    }
+
+    if (successfulDeletions > 0) {
+      setUploadedFiles(prev => prev.filter(file => !(file.status === 'completed' && selectedFileIds.has(file.id))));
+      setSelectedFileIds(new Set());
+      alert(`${successfulDeletions} archivo(s) procesado(s) eliminado(s) correctamente.`);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       // SECURITY: Llamar a endpoint de logout para limpiar cookie httpOnly
@@ -1329,6 +1369,14 @@ export default function Dashboard() {
                   title="Elegir carpeta de descarga"
                 >
                   📁 Carpeta Descarga
+                </button>
+                <button
+                  onClick={handleDeleteSelectedCompletedFiles}
+                  disabled={uploadedFiles.filter(f => f.status === 'completed' && selectedFileIds.has(f.id)).length === 0}
+                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
+                  title="Eliminar archivos procesados seleccionados"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Eliminar Seleccionados
                 </button>
               </div>
             </div>
