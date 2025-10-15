@@ -1249,7 +1249,7 @@ title="Eliminar"
 <div className="flex justify-between items-center mb-1">
 <div className="flex items-center gap-3">
 <span className={`text-xs ${textSecondary}`} title="Tiempo transcurrido">
-⏱️ formatElapsedTime(file.processingStartTime)}
+⏱️ {formatElapsedTime(file.processingStartTime)}
 </span>
 <span className={`text-xs ${textSecondary}`} title="Tamaño del archivo">
 📦 {formatFileSize(file.fileSize)}
