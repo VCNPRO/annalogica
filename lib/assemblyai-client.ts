@@ -1,468 +1,378 @@
-import { AssemblyAI } from 'assemblyai';
-import { put, del } from '@vercel/blob';
-
-// Initialize AssemblyAI client
-export function getAssemblyAIClient() {
-  const apiKey = process.env.ASSEMBLYAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('ASSEMBLYAI_API_KEY environment variable is not set');
-  }
-  return new AssemblyAI({ apiKey });
-}
-
-export interface TranscriptionOptions {
-  audioUrl: string;
-  language?: 'es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt' | 'auto';
-  speakerLabels?: boolean;
-  dualChannel?: boolean;
-}
-
-export interface TranscriptionResult {
-  id: string;
-  text: string;
-  words: Array<{
-    text: string;
-    start: number;
-    end: number;
-    confidence: number;
-    speaker?: string;
-  }>;
-  utterances?: Array<{
-    text: string;
-    start: number;
-    end: number;
-    confidence: number;
-    speaker: string;
-  }>;
-  audioDuration: number;
-}
-
-/**
- * Transcribe audio using AssemblyAI
- * Uses polling to wait for completion (async-friendly)
- */
-export async function transcribeAudio(
-  options: TranscriptionOptions
-): Promise<TranscriptionResult> {
-  const client = getAssemblyAIClient();
-
-  console.log('[AssemblyAI] Starting transcription for:', options.audioUrl);
-
-  // Submit transcription job
-const transcript = await client.transcripts.transcribe({
-  audio_url: options.audioUrl,
-  language_code: ['es', 'en', 'ca', 'eu', 'gl', 'pt'].includes(options.language || '') ? options.language as ('es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt') : undefined,
-  language_detection: options.language === 'auto',
-  speaker_labels: options.speakerLabels ?? true, // Enable by default
-  dual_channel: options.dualChannel ?? false,
-
-  // 🔽 Funciones avanzadas de AssemblyAI
-  summarization: true,
-  summary_type: 'bullets', // o 'paragraph'
-  iab_categories: true,
-  auto_chapters: true
-});
-
-      // Enable key phrases only for English (not available in Spanish)
-    auto_highlights: options.language === 'en' || options.language === 'auto',
-  });
-
-  console.log('[AssemblyAI] Transcription completed:', transcript.id);
-  console.log('[AssemblyAI] Status:', transcript.status);
-
-  // Check for errors
-  if (transcript.status === 'error') {
-    throw new Error(`AssemblyAI transcription failed: ${transcript.error}`);
-  }
-
-  if (!transcript.text) {
-    throw new Error('AssemblyAI returned empty transcription');
-  }
-
-  // Return structured result
-  return {
-    id: transcript.id,
-    text: transcript.text,
-    words: transcript.words?.map(w => ({
-      text: w.text,
-      start: w.start,
-      end: w.end,
-      confidence: w.confidence,
-      speaker: w.speaker || undefined
-    })) || [],
-    utterances: transcript.utterances?.map(u => ({
-      text: u.text,
-      start: u.start,
-      end: u.end,
-      confidence: u.confidence,
-      speaker: u.speaker
-    })),
-    audioDuration: transcript.audio_duration || 0
-  };
-}
-
-/**
- * Generate SRT subtitle file from transcript
- */
-export function generateSRT(result: TranscriptionResult): string {
-  if (!result.utterances || result.utterances.length === 0) {
-    // Fallback: Use words if no speaker diarization
-    if (result.words.length === 0) {
-      return '';
-    }
-
-    let srt = '';
-    const wordsPerSubtitle = 10;
-    for (let i = 0; i < result.words.length; i += wordsPerSubtitle) {
-      const chunk = result.words.slice(i, i + wordsPerSubtitle);
-      const start = chunk[0].start;
-      const end = chunk[chunk.length - 1].end;
-      const text = chunk.map(w => w.text).join(' ');
-
-      srt += `${Math.floor(i / wordsPerSubtitle) + 1}\n`;
-      srt += `${formatTimestamp(start)} --> ${formatTimestamp(end)}\n`;
-      srt += `${text}\n\n`;
-    }
-    return srt;
-  }
-
-  // Use utterances (speaker-aware)
-  let srt = '';
-  result.utterances.forEach((utterance, index) => {
-    srt += `${index + 1}\n`;
-    srt += `${formatTimestamp(utterance.start)} --> ${formatTimestamp(utterance.end)}\n`;
-
-    // Include speaker label
-    const speaker = utterance.speaker || 'Speaker';
-    srt += `[${speaker}] ${utterance.text.trim()}\n\n`;
-  });
-
-  return srt;
-}
-
-/**
- * Generate VTT subtitle file from transcript
- */
-export function generateVTT(result: TranscriptionResult): string {
-  const srt = generateSRT(result);
-  if (!srt) {
-    return 'WEBVTT\n\n';
-  }
-
-  // Convert SRT to VTT (replace commas with periods in timestamps)
-  const vtt = 'WEBVTT\n\n' + srt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
-  return vtt;
-}
-
-/**
- * Format timestamp for SRT (HH:MM:SS,mmm)
- */
-function formatTimestamp(milliseconds: number): string {
-  const totalSeconds = Math.floor(milliseconds / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const ms = milliseconds % 1000;
-
-  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)},${pad(ms, 3)}`;
-}
-
-function pad(num: number, size = 2): string {
-  return String(num).padStart(size, '0');
-}
-
-/**
- * Save transcription results to Vercel Blob
- */
-export async function saveTranscriptionResults(
-  result: TranscriptionResult,
-  filename: string,
-  originalFileUrl: string // Add this parameter
-): Promise<{
-  txtUrl: string;
-  srtUrl: string;
-  vttUrl: string;
-}> {
-  const baseName = filename.replace(/\.[^/.]+$/, '');
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-
-  if (!blobToken) {
-    throw new Error('BLOB_READ_WRITE_TOKEN not configured');
-  }
-
-  // Save TXT
-  const txtBlob = await put(`${baseName}.txt`, result.text, {
-    access: 'public',
-    contentType: 'text/plain; charset=utf-8',
-    token: blobToken,
-    addRandomSuffix: true
-  });
-
-  // Save SRT
-  const srtContent = generateSRT(result);
-  const srtBlob = await put(`${baseName}.srt`, srtContent, {
-    access: 'public',
-    contentType: 'text/plain; charset=utf-8',
-    token: blobToken,
-    addRandomSuffix: true
-  });
-
-  // Save VTT
-  const vttContent = generateVTT(result);
-  const vttBlob = await put(`${baseName}.vtt`, vttContent, {
-    access: 'public',
-    contentType: 'text/vtt; charset=utf-8',
-    token: blobToken,
-    addRandomSuffix: true
-  });
-
-  return {
-    txtUrl: txtBlob.url,
-    srtUrl: srtBlob.url,
-    vttUrl: vttBlob.url
-  };
-
-  // Delete original file after successful processing
-  try {
-    await del(originalFileUrl, { token: blobToken });
-    console.log(`[Vercel Blob] Deleted original file: ${originalFileUrl}`);
-  } catch (deleteError: any) {
-    console.error(`[Vercel Blob] Failed to delete original file ${originalFileUrl}:`, deleteError.message);
-  }
-}
-
-export interface SummaryResult {
-  summary: string;
-  tags: string[];
-}
-
-/**
- * Generate summary and tags using Claude API
- */
-export async function generateSummary(text: string): Promise<SummaryResult> {
-  const apiKey = process.env.CLAUDE_API_KEY;
-  if (!apiKey) {
-    throw new Error('CLAUDE_API_KEY not configured');
-  }
-
-  if (text.length < 100) {
-    return { summary: '', tags: [] }; // Skip for very short texts
-  }
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-7-sonnet-20250219',
-        max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: `Resume el siguiente texto en español en 3-4 párrafos. Después del resumen, añade una sección llamada "Tags:" seguida de una lista de 5-7 tags/categorías principales separadas por comas (por ejemplo: Tags: tecnología, negocios, educación).\n\nTexto:\n${text.slice(0, 8000)}`
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Claude API error: ${error}`);
-    }
-
-    const data = await response.json();
-    const fullText = data.content[0].text;
-
-    // Parse summary and tags
-    let summary = fullText;
-    let tags: string[] = [];
-
-    const tagsMarker = /\n(Tags|Categorías):/i;
-    const match = fullText.match(tagsMarker);
-
-    if (match && match.index) {
-      summary = fullText.slice(0, match.index).trim();
-      const tagsString = fullText.slice(match.index + match[0].length).trim();
-      tags = tagsString.split(',').map((tag: string) => tag.trim()).filter(Boolean);
-    }
-
-    return { summary, tags };
-
-  } catch (error: any) {
-    console.error('[Claude] Summary generation failed:', error.message);
-    return { summary: '', tags: [] }; // Don't fail the entire job
-  }
-}
-
-/**
- * Save summary to Vercel Blob
- */
-export async function saveSummary(
-  summary: string,
-  filename: string
-): Promise<string> {
-  const baseName = filename.replace(/\.[^/.]+$/, '');
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-
-  if (!blobToken) {
-    throw new Error('BLOB_READ_WRITE_TOKEN not configured');
-  }
-
-  const summaryBlob = await put(`${baseName}-summary.txt`, summary, {
-    access: 'public',
-    contentType: 'text/plain; charset=utf-8',
-    token: blobToken,
-    addRandomSuffix: true
-  });
-
-  return summaryBlob.url;
-}
-
-/**
- * Generate speakers/participants report from transcription
- */
-export function generateSpeakersReport(result: TranscriptionResult, detailed: boolean = false): string {
-  if (!result.utterances || result.utterances.length === 0) {
-    return 'No se detectaron oradores en esta transcripción.';
-  }
-
-  // Extract unique speakers, filtering out undefined/null values
-  const speakers = [...new Set(result.utterances.map(u => u.speaker).filter(Boolean))].sort();
-
-  if (speakers.length === 0) {
-    return 'No se detectaron oradores en esta transcripción.';
-  }
-
-  // Validate audioDuration to avoid division by zero
-  if (!result.audioDuration || result.audioDuration <= 0) {
-    return 'Error: La duración del audio no es válida para generar el reporte.';
-  }
-
-  // Calculate statistics for each speaker
-  const speakerStats = speakers.map(speaker => {
-    const utterances = result.utterances!.filter(u => u.speaker === speaker);
-
-    // Calculate total words, filtering empty text
-    const totalWords = utterances.reduce((sum, u) => {
-      const text = u.text?.trim() || '';
-      if (text.length === 0) return sum;
-      return sum + text.split(/\s+/).length;
-    }, 0);
-
-    const totalDuration = utterances.reduce((sum, u) => sum + (u.end - u.start), 0);
-    const interventions = utterances.length;
-
-    return {
-      speaker,
-      interventions,
-      totalWords,
-      totalDuration,
-      utterances
-    };
-  });
-
-  // Sort by total duration (most active speaker first)
-  speakerStats.sort((a, b) => b.totalDuration - a.totalDuration);
-
-  // Generate report
-  let report = '='.repeat(60) + '\n';
-  report += 'ANÁLISIS DE ORADORES / INTERVINIENTES\n';
-  report += '='.repeat(60) + '\n\n';
-
-  report += `Total de oradores detectados: ${speakers.length}\n`;
-  report += `Duración total del audio: ${formatDuration(result.audioDuration)}\n\n`;
-
-  report += '-'.repeat(60) + '\n';
-  report += 'RESUMEN POR ORADOR\n';
-  report += '-'.repeat(60) + '\n\n';
-
-  speakerStats.forEach((stats, index) => {
-    // Safe percentage calculation
-    const percentage = result.audioDuration > 0
-      ? ((stats.totalDuration / result.audioDuration) * 100).toFixed(1)
-      : '0.0';
-
-    // Safe average calculation
-    const avgDuration = stats.interventions > 0
-      ? formatDuration(stats.totalDuration / stats.interventions)
-      : '0:00';
-
-    report += `${index + 1}. ${stats.speaker}\n`;
-    report += `   Intervenciones: ${stats.interventions}\n`;
-    report += `   Palabras pronunciadas: ${stats.totalWords}\n`;
-    report += `   Tiempo total: ${formatDuration(stats.totalDuration)} (${percentage}% del total)\n`;
-    report += `   Promedio por intervención: ${avgDuration}\n\n`;
-  });
-
-  // Detailed timeline - ONLY if requested
-  if (detailed) {
-    report += '-'.repeat(60) + '\n';
-    report += 'LÍNEA DE TIEMPO DETALLADA\n';
-    report += '-'.repeat(60) + '\n\n';
-
-    result.utterances.forEach((utterance, index) => {
-      const startTime = formatTimestampSimple(utterance.start);
-      const endTime = formatTimestampSimple(utterance.end);
-      const duration = formatDuration(utterance.end - utterance.start);
-
-      report += `[${startTime} → ${endTime}] (${duration})\n`;
-      report += `${utterance.speaker}: ${utterance.text.trim()}\n\n`;
-    });
-  }
-
-  return report;
-}
-
-/**
- * Format milliseconds to readable duration (MM:SS)
- */
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${pad(seconds)}`;
-}
-
-/**
- * Format timestamp for simple display (HH:MM:SS)
- */
-function formatTimestampSimple(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${pad(minutes)}:${pad(seconds)}`;
-  }
-  return `${minutes}:${pad(seconds)}`;
-}
-
-/**
- * Save speakers report to Vercel Blob
- */
-export async function saveSpeakersReport(
-  result: TranscriptionResult,
-  filename: string,
-  detailed: boolean = false
-): Promise<string> {
-  const baseName = filename.replace(/\.[^/.]+$/, '');
-  const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-
-  if (!blobToken) {
-    throw new Error('BLOB_READ_WRITE_TOKEN not configured');
-  }
-
-  const report = generateSpeakersReport(result, detailed);
-
-  const speakersBlob = await put(`${baseName}-oradores.txt`, report, {
-    access: 'public',
-    contentType: 'text/plain; charset=utf-8',
-    token: blobToken,
-    addRandomSuffix: true
-  });
-
-  return speakersBlob.url;
-}
+  1 import { AssemblyAI } from 'assemblyai';
+     2 import { put, del } from '@vercel/blob';
+     3
+     4 // Initialize AssemblyAI client
+     5 export function getAssemblyAIClient() {
+     6   const apiKey = process.env.ASSEMBLYAI_API_KEY;
+     7   if (!apiKey) {
+     8     throw new Error('ASSEMBLYAI_API_KEY environment variable is not set');
+     9   }
+    10   return new AssemblyAI({ apiKey });
+    11 }
+    12
+    13 export interface TranscriptionOptions {
+    14   audioUrl: string;
+    15   language?: 'es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt' | 'auto';
+    16   speakerLabels?: boolean;
+    17   dualChannel?: boolean;
+    18 }
+    19
+    20 export interface TranscriptionResult {
+    21   id: string;
+    22   text: string;
+    23   words: Array<{
+    24     text: string;
+    25     start: number;
+    26     end: number;
+    27     confidence: number;
+    28     speaker?: string;
+    29   }>;
+    30   utterances?: Array<{
+    31     text: string;
+    32     start: number;
+    33     end: number;
+    34     confidence: number;
+    35     speaker: string;
+    36   }>;
+    37   audioDuration: number;
+    38 }
+    39
+    40 /**
+    41  * Transcribe audio using AssemblyAI
+    42  * Uses polling to wait for completion (async-friendly)
+    43  */
+    44 export async function transcribeAudio(
+    45   options: TranscriptionOptions
+    46 ): Promise<TranscriptionResult> {
+    47   const client = getAssemblyAIClient();
+    48
+    49   console.log('[AssemblyAI] Starting transcription for:', options.audioUrl);
+    50
+    51   // Submit transcription job
+    52   const transcript = await client.transcripts.transcribe({
+    53     audio_url: options.audioUrl,
+    54     language_code: ['es', 'en', 'ca', 'eu', 'gl', 'pt'].includes(options.language || '') ? options.language as ('es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt') : undefined,
+    55     language_detection: options.language === 'auto',
+    56     speaker_labels: options.speakerLabels ?? true, // Enable by default
+    57     dual_channel: options.dualChannel ?? false,
+    58
+    59     // 🔽 Funciones avanzadas de AssemblyAI
+    60     summarization: true,
+    61     summary_type: 'bullets', // o 'paragraph'
+    62     iab_categories: true,
+    63     auto_chapters: true,
+    64
+    65     // Enable key phrases only for English (not available in Spanish)
+    66     auto_highlights: options.language === 'en' || options.language === 'auto'
+    67   });
+    68
+    69   console.log('[AssemblyAI] Transcription completed:', transcript.id);
+    70   console.log('[AssemblyAI] Status:', transcript.status);
+    71
+    72   // Check for errors
+    73   if (transcript.status === 'error') {
+    74     throw new Error(`AssemblyAI transcription failed: ${transcript.error}`);
+    75   }
+    76
+    77   if (!transcript.text) {
+    78     throw new Error('AssemblyAI returned empty transcription');
+    79   }
+    80
+    81   // Return structured result
+    82   return {
+    83     id: transcript.id,
+    84     text: transcript.text,
+    85     words: transcript.words?.map(w => ({
+    86       text: w.text,
+    87       start: w.start,
+    88       end: w.end,
+    89       confidence: w.confidence,
+    90       speaker: w.speaker || undefined
+    91     })) || [],
+    92     utterances: transcript.utterances?.map(u => ({
+    93       text: u.text,
+    94       start: u.start,
+    95       end: u.end,
+    96       confidence: u.confidence,
+    97       speaker: u.speaker
+    98     })),
+    99     audioDuration: transcript.audio_duration || 0
+   100   };
+   101 }
+   102
+   103 /**
+   104  * Generate SRT subtitle file from transcript
+   105  */
+   106 export function generateSRT(result: TranscriptionResult): string {
+   107   if (!result.utterances || result.utterances.length === 0) {
+   108     // Fallback: Use words if no speaker diarization
+   109     if (result.words.length === 0) {
+   110       return '';
+   111     }
+   112
+   113     let srt = '';
+   114     const wordsPerSubtitle = 10;
+   115     for (let i = 0; i < result.words.length; i += wordsPerSubtitle) {
+   116       const chunk = result.words.slice(i, i + wordsPerSubtitle);
+   117       const start = chunk[0].start;
+   118       const end = chunk[chunk.length - 1].end;
+   119       const text = chunk.map(w => w.text).join(' ');
+   120
+   121       srt += `${Math.floor(i / wordsPerSubtitle) + 1}\n`;
+   122       srt += `${formatTimestamp(start)} --> ${formatTimestamp(end)}\n`;
+   123       srt += `${text}\n\n`;
+   124     }
+   125     return srt;
+   126   }
+   127
+   128   // Use utterances (speaker-aware)
+   129   let srt = '';
+   130   result.utterances.forEach((utterance, index) => {
+   131     srt += `${index + 1}\n`;
+   132     srt += `${formatTimestamp(utterance.start)} --> ${formatTimestamp(utterance.end)}\n`;
+   133
+   134     // Include speaker label
+   135     const speaker = utterance.speaker || 'Speaker';
+   136     srt += `[${speaker}] ${utterance.text.trim()}\n\n`;
+   137   });
+   138
+   139   return srt;
+   140 }
+   141
+   142 /**
+   143  * Generate VTT subtitle file from transcript
+   144  */
+   145 export function generateVTT(result: TranscriptionResult): string {
+   146   const srt = generateSRT(result);
+   147   if (!srt) {
+   148     return 'WEBVTT\n\n';
+   149   }
+   150
+   151   // Convert SRT to VTT (replace commas with periods in timestamps)
+   152   const vtt = 'WEBVTT\n\n' + srt.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+   153   return vtt;
+   154 }
+   155
+   156 /**
+   157  * Format timestamp for SRT (HH:MM:SS,mmm)
+   158  */
+   159 function formatTimestamp(milliseconds: number): string {
+   160   const totalSeconds = Math.floor(milliseconds / 1000);
+   161   const hours = Math.floor(totalSeconds / 3600);
+   162   const minutes = Math.floor((totalSeconds % 3600) / 60);
+   163   const seconds = totalSeconds % 60;
+   164   const ms = milliseconds % 1000;
+   165
+   166   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)},${pad(ms, 3)}`;
+   167 }
+   168
+   169 function pad(num: number, size = 2): string {
+   170   return String(num).padStart(size, '0');
+   171 }
+   172
+   173 /**
+   174  * Save transcription results to Vercel Blob
+   175  */
+   176 export async function saveTranscriptionResults(
+   177   result: TranscriptionResult,
+   178   filename: string,
+   179   originalFileUrl: string // Add this parameter
+   180 ): Promise<{
+   181   txtUrl: string;
+   182   srtUrl: string;
+   183   vttUrl: string;
+   184 }> {
+   185   const baseName = filename.replace(/\.[^/.]+$/, '');
+   186   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+   187
+   188   if (!blobToken) {
+   189     throw new Error('BLOB_READ_WRITE_TOKEN not configured');
+   190   }
+   191
+   192   // Save TXT
+   193   const txtBlob = await put(`${baseName}.txt`, result.text, {
+   194     access: 'public',
+   195     contentType: 'text/plain; charset=utf-8',
+   196     token: blobToken,
+   197     addRandomSuffix: true
+   198   });
+   199
+   200   // Save SRT
+   201   const srtContent = generateSRT(result);
+   202   const srtBlob = await put(`${baseName}.srt`, srtContent, {
+   203     access: 'public',
+   204     contentType: 'text/plain; charset=utf-8',
+   205     token: blobToken,
+   206     addRandomSuffix: true
+   207   });
+   208
+   209   // Save VTT
+   210   const vttContent = generateVTT(result);
+   211   const vttBlob = await put(`${baseName}.vtt`, vttContent, {
+   212     access: 'public',
+   213     contentType: 'text/vtt; charset=utf-8',
+   214     token: blobToken,
+   215     addRandomSuffix: true
+   216   });
+   217
+   218   // Delete original file after successful processing
+   219   try {
+   220     await del(originalFileUrl, { token: blobToken });
+   221     console.log(`[Vercel Blob] Deleted original file: ${originalFileUrl}`);
+   222   } catch (deleteError: any) {
+   223     console.error(`[Vercel Blob] Failed to delete original file ${originalFileUrl}:`, deleteError.message);
+   224   }
+   225
+   226   return {
+   227     txtUrl: txtBlob.url,
+   228     srtUrl: srtBlob.url,
+   229     vttUrl: vttBlob.url
+   230   };
+   231 }
+   232
+   233 /**
+   234  * Generate speakers/participants report from transcription
+   235  */
+   236 export function generateSpeakersReport(result: TranscriptionResult, detailed: boolean = false): string {
+   237   if (!result.utterances || result.utterances.length === 0) {
+   238     return 'No se detectaron oradores en esta transcripción.';
+   239   }
+   240
+   241   // Extract unique speakers, filtering out undefined/null values
+   242   const speakers = [...new Set(result.utterances.map(u => u.speaker).filter(Boolean))].sort();
+   243
+   244   if (speakers.length === 0) {
+   245     return 'No se detectaron oradores en esta transcripción.';
+   246   }
+   247
+   248   // Validate audioDuration to avoid division by zero
+   249   if (!result.audioDuration || result.audioDuration <= 0) {
+   250     return 'Error: La duración del audio no es válida para generar el reporte.';
+   251   }
+   252
+   253   // Calculate statistics for each speaker
+   254   const speakerStats = speakers.map(speaker => {
+   255     const utterances = result.utterances!.filter(u => u.speaker === speaker);
+   256
+   257     // Calculate total words, filtering empty text
+   258     const totalWords = utterances.reduce((sum, u) => {
+   259       const text = u.text?.trim() || '';
+   260       if (text.length === 0) return sum;
+   261       return sum + text.split(/\s+/).length;
+   262     }, 0);
+   263
+   264     const totalDuration = utterances.reduce((sum, u) => sum + (u.end - u.start), 0);
+   265     const interventions = utterances.length;
+   266
+   267     return {
+   268       speaker,
+   269       interventions,
+   270       totalWords,
+   271       totalDuration,
+   272       utterances
+   273     };
+   274   });
+   275
+   276   // Sort by total duration (most active speaker first)
+   277   speakerStats.sort((a, b) => b.totalDuration - a.totalDuration);
+   278
+   279   // Generate report
+   280   let report = '='.repeat(60) + '\n';
+   281   report += 'ANÁLISIS DE ORADORES / INTERVINIENTES\n';
+   282   report += '='.repeat(60) + '\n\n';
+   283
+   284   report += `Total de oradores detectados: ${speakers.length}\n`;
+   285   report += `Duración total del audio: ${formatDuration(result.audioDuration)}\n\n`;
+   286
+   287   report += '-'.repeat(60) + '\n';
+   288   report += 'RESUMEN POR ORADOR\n';
+   289   report += '-'.repeat(60) + '\n\n';
+   290
+   291   speakerStats.forEach((stats, index) => {
+   292     // Safe percentage calculation
+   293     const percentage = result.audioDuration > 0
+   294       ? ((stats.totalDuration / result.audioDuration) * 100).toFixed(1)
+   295       : '0.0';
+   296
+   297     // Safe average calculation
+   298     const avgDuration = stats.interventions > 0
+   299       ? formatDuration(stats.totalDuration / stats.interventions)
+   300       : '0:00';
+   301
+   302     report += `${index + 1}. ${stats.speaker}\n`;
+   303     report += `   Intervenciones: ${stats.interventions}\n`;
+   304     report += `   Palabras pronunciadas: ${stats.totalWords}\n`;
+   305     report += `   Tiempo total: ${formatDuration(stats.totalDuration)} (${percentage}% del total)\n`;
+   306     report += `   Promedio por intervención: ${avgDuration}\n\n`;
+   307   });
+   308
+   309   // Detailed timeline - ONLY if requested
+   310   if (detailed) {
+   311     report += '-'.repeat(60) + '\n';
+   312     report += 'LÍNEA DE TIEMPO DETALLADA\n';
+   313     report += '-'.repeat(60) + '\n\n';
+   314
+   315     result.utterances.forEach((utterance, index) => {
+   316       const startTime = formatTimestampSimple(utterance.start);
+   317       const endTime = formatTimestampSimple(utterance.end);
+   318       const duration = formatDuration(utterance.end - utterance.start);
+   319
+   320       report += `[${startTime} → ${endTime}] (${duration})\n`;
+   321       report += `${utterance.speaker}: ${utterance.text.trim()}\n\n`;
+   322     });
+   323   }
+   324
+   325   return report;
+   326 }
+   327
+   328 /**
+   329  * Format milliseconds to readable duration (MM:SS)
+   330  */
+   331 function formatDuration(ms: number): string {
+   332   const totalSeconds = Math.floor(ms / 1000);
+   333   const minutes = Math.floor(totalSeconds / 60);
+   334   const seconds = totalSeconds % 60;
+   335   return `${minutes}:${pad(seconds)}`;
+   336 }
+   337
+   338 /**
+   339  * Format timestamp for simple display (HH:MM:SS)
+   340  */
+   341 function formatTimestampSimple(ms: number): string {
+   342   const totalSeconds = Math.floor(ms / 1000);
+   343   const hours = Math.floor(totalSeconds / 3600);
+   344   const minutes = Math.floor((totalSeconds % 3600) / 60);
+   345   const seconds = totalSeconds % 60;
+   346
+   347   if (hours > 0) {
+   348     return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+   349   }
+   350   return `${minutes}:${pad(seconds)}`;
+   351 }
+   352
+   353 /**
+   354  * Save speakers report to Vercel Blob
+   355  */
+   356 export async function saveSpeakersReport(
+   357   result: TranscriptionResult,
+   358   filename: string,
+   359   detailed: boolean = false
+   360 ): Promise<string> {
+   361   const baseName = filename.replace(/\.[^/.]+$/, '');
+   362   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+   363
+   364   if (!blobToken) {
+   365     throw new Error('BLOB_READ_WRITE_TOKEN not configured');
+   366   }
+   367
+   368   const report = generateSpeakersReport(result, detailed);
+   369
+   370   const speakersBlob = await put(`${baseName}-oradores.txt`, report, {
+   371     access: 'public',
+   372     contentType: 'text/plain; charset=utf-8',
+   373     token: blobToken,
+   374     addRandomSuffix: true
+   375   });
+   376
+   377   return speakersBlob.url;
+   378 }
