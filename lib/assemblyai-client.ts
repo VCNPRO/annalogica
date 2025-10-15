@@ -49,14 +49,21 @@ export async function transcribeAudio(
   console.log('[AssemblyAI] Starting transcription for:', options.audioUrl);
 
   // Submit transcription job
-  const transcript = await client.transcripts.transcribe({
-    audio_url: options.audioUrl,
-    language_code: ['es', 'en', 'ca', 'eu', 'gl', 'pt'].includes(options.language || '') ? options.language as ('es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt') : undefined,
-    language_detection: options.language === 'auto',
-    speaker_labels: options.speakerLabels ?? true, // Enable by default
-    dual_channel: options.dualChannel ?? false,
+const transcript = await client.transcripts.transcribe({
+  audio_url: options.audioUrl,
+  language_code: ['es', 'en', 'ca', 'eu', 'gl', 'pt'].includes(options.language || '') ? options.language as ('es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt') : undefined,
+  language_detection: options.language === 'auto',
+  speaker_labels: options.speakerLabels ?? true, // Enable by default
+  dual_channel: options.dualChannel ?? false,
 
-    // Enable key phrases only for English (not available in Spanish)
+  // 🔽 Funciones avanzadas de AssemblyAI
+  summarization: true,
+  summary_type: 'bullets', // o 'paragraph'
+  iab_categories: true,
+  auto_chapters: true
+});
+
+      // Enable key phrases only for English (not available in Spanish)
     auto_highlights: options.language === 'en' || options.language === 'auto',
   });
 
