@@ -3,7 +3,7 @@ import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { del } from '@vercel/blob';
 
-export async function DELETE(request: NextRequest, params: { jobId: string }) {
+export async function DELETE(request: NextRequest, params: any) {
   try {
     const auth = verifyRequestAuth(request);
 
