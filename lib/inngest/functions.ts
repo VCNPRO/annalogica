@@ -1,11 +1,11 @@
 import { inngest } from './client';
-import { assemblyAIBreaker } from '@/lib/circuit-breakers';
+import { assemblyAIBreaker, claudeBreaker } from '@/lib/circuit-breakers'; // Added claudeBreaker
 import { TranscriptionJobDB } from '@/lib/db';
 import {
   transcribeAudio,
   saveTranscriptionResults,
   saveSpeakersReport,
-  generateSummary,
+  generateSummary, // generateSummary will be called via claudeBreaker
   saveSummary,
   type TranscriptionResult,
   type SummaryResult,
@@ -149,7 +149,16 @@ export const summarizeFile = inngest.createFunction(
     }
 
     const { summary, tags } = await step.run('generate-summary-and-tags', async () => {
-        return await generateSummary(transcriptionText);
+        // The breaker will wrap the call to Claude
+        const result = await claudeBreaker.fire(transcriptionText);
+
+        // Type guard to check for the fallback response
+        if ('error' in result) {
+          // Throw an error to force Inngest to retry the step later
+          throw new Error(result.error as string);
+        }
+
+        return result;
     });
 
     if (!summary) {
