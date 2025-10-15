@@ -89,12 +89,12 @@ export async function POST(request: NextRequest): Promise<Response> {
           clientPayload: JSON.stringify({ ...payload, userId: auth.userId }), // Pass userId to clientPayload
         };
       },
-      onUploadCompleted: async ({ blob, clientPayload }) => {
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
         console.log('[blob-upload] Upload completed:', blob.url);
 
-        const payload = typeof clientPayload === 'string'
-          ? JSON.parse(clientPayload)
-          : clientPayload;
+        const payload = typeof tokenPayload === 'string'
+          ? JSON.parse(tokenPayload)
+          : tokenPayload;
 
         const userId = payload?.userId;
         const filename = payload?.filename || 'unknown';
