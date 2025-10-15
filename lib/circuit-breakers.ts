@@ -18,19 +18,19 @@ error: 'AssemblyAI service is temporarily unavailable. Please try again later.',
 
 // Event listeners para logging (muy útil para monitorización y depuración)
 assemblyAIBreaker.on('open', () => {
-console.error(`[Circuit Breaker] OPEN: The AssemblyAI breaker has opened. Servic
+console.error(`[Circuit Breaker] OPEN: The AssemblyAI breaker has opened. Service is unavailable.`);
 });
 
 assemblyAIBreaker.on('close', () => {
-console.log(`[Circuit Breaker] CLOSE: The AssemblyAI breaker has closed. Service
+console.log(`[Circuit Breaker] CLOSE: The AssemblyAI breaker has closed. Service is operational.`);
 });
 
 assemblyAIBreaker.on('halfOpen', () => {
-console.warn(`[Circuit Breaker] HALF-OPEN: The AssemblyAI breaker is testing the
+console.warn(`[Circuit Breaker] HALF-OPEN: The AssemblyAI breaker is testing the connection.`);
 });
 
 assemblyAIBreaker.on('fallback', (result) => {
-console.warn(`[Circuit Breaker] FALLBACK: Executing fallback for AssemblyAI. Res
+console.warn(`[Circuit Breaker] FALLBACK: Executing fallback for AssemblyAI. Result: ${result}`);
 });
 
    

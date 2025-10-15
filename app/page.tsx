@@ -530,7 +530,7 @@ f.id === file.id ? { ...f, status: 'error' } : f
 if (processedCount > 0) {
 alert(`✅ ${processedCount} archivo(s) enviado(s) a procesamiento!\n\nPuedes ver el progreso en la tabla de archivos.`);
 } else {
-alert('⚠️ No se procesó ningún archivo. Verifica que tengan la acción "Transcribir" seleccionada.);
+alert('⚠️ No se procesó ningún archivo. Verifica que tengan la acción "Transcribir" seleccionada.');
 }
 
 // Deselect all after processing
