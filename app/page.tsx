@@ -245,8 +245,7 @@ return () => clearInterval(interval);
 const getFileType = (mimeType: string): 'audio' | 'video' | 'text' => {
 if (mimeType.startsWith('audio/')) return 'audio';
 if (mimeType.startsWith('video/')) return 'video';
-if (mimeType.startsWith('text/') || mimeType === 'application/pdf' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return
-'text';
+if (mimeType.startsWith('text/') || mimeType === 'application/pdf' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'text';
 return 'text'; // Default to text if unknown, or handle as error
 };
 

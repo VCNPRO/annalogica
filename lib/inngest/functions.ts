@@ -1,14 +1,11 @@
 import { inngest } from './client';
-import { assemblyAIBreaker, claudeBreaker } from '@/lib/circuit-breakers'; // Added claudeBreaker
+import { assemblyAIBreaker } from '@/lib/circuit-breakers';
 import { TranscriptionJobDB } from '@/lib/db';
 import {
   transcribeAudio,
   saveTranscriptionResults,
   saveSpeakersReport,
-  generateSummary, // generateSummary will be called via claudeBreaker
-  saveSummary,
   type TranscriptionResult,
-  type SummaryResult,
   type TranscriptionOptions
 } from '@/lib/assemblyai-client';
 import { logTranscription, logSummary } from '@/lib/usage-tracking';
@@ -113,83 +110,5 @@ export const transcribeFile = inngest.createFunction(
 
     console.log(`[Inngest] Transcription task for job ${jobId} completed.`);
     return { status: 'transcribed' };
-  }
-);
-
-/**
- * [Task] Summarize File
- * Triggered on-demand. Generates summary and tags for a completed transcription.
- */
-export const summarizeFile = inngest.createFunction(
-  {
-    id: 'task-summarize-file',
-    name: 'Task: Summarize File',
-    retries: 1,
-  },
-  { event: 'task/summarize' },
-  async ({ event, step }) => {
-    const { jobId } = event.data;
-    const job = await TranscriptionJobDB.findById(jobId);
-
-    if (!job || !job.txt_url) {
-      console.error(`[Inngest] Job ${jobId} not found or not transcribed yet for summarization.`);
-      return { error: 'Job not found or not transcribed' };
-    }
-    const { user_id: userId, filename, metadata } = job;
-
-    const transcriptionText = await step.run('fetch-transcription-text', async () => {
-        const response = await fetch(job.txt_url!);
-        if (!response.ok) throw new Error('Failed to fetch transcription text for summary');
-        return await response.text();
-    });
-
-    if (transcriptionText.length < 100) {
-        console.log(`[Inngest] Skipping summary for job ${jobId} (text too short)`);
-        return { status: 'skipped', reason: 'Text too short' };
-    }
-
-    const { summary, tags } = await step.run('generate-summary-and-tags', async () => {
-        // The breaker will wrap the call to Claude
-        const result = await claudeBreaker.fire(transcriptionText);
-
-        // Type guard to check for the fallback response
-        if ('error' in result) {
-          // Throw an error to force Inngest to retry the step later
-          throw new Error(result.error as string);
-        }
-
-        return result;
-    });
-
-    if (!summary) {
-        console.warn(`[Inngest] Summary generation returned empty for job ${jobId}. Marking as failed.`);
-        await step.run('update-status-failed', async () => {
-          await TranscriptionJobDB.updateStatus(jobId, 'failed', 'Summary generation failed');
-        });
-        return { status: 'failed', reason: 'Empty summary generated' };
-    }
-
-    const summaryUrl = await step.run('save-summary', async () => {
-        return await saveSummary(summary, filename);
-    });
-
-    await step.run('update-db-with-summary', async () => {
-        const newMetadata = { ...metadata, tags };
-        await TranscriptionJobDB.updateResults(jobId, {
-            summaryUrl,
-            metadata: newMetadata,
-        });
-
-        const tokensInput = Math.ceil(transcriptionText.slice(0, 8000).length / 4);
-        const tokensOutput = Math.ceil(summary.length / 4);
-        await logSummary(userId, tokensInput, tokensOutput, 'sonnet');
-    });
-
-    await step.run('update-status-completed', async () => {
-      await TranscriptionJobDB.updateStatus(jobId, 'completed');
-    });
-
-    console.log(`[Inngest] Summarization task for job ${jobId} completed.`);
-    return { status: 'completed' };
   }
 );
