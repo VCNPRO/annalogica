@@ -411,7 +411,7 @@ export default function Dashboard() {
   const handleApplyAction = (actionName: string) => {
     setUploadedFiles(prevFiles =>
       prevFiles.map(file =>
-        selectedFileIds.has(file.id)
+        selectedUploadedFileIds.has(file.id)
           ? {
               ...file,
               actions: file.actions.includes(actionName)
