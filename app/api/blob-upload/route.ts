@@ -1,4 +1,7 @@
+import { NextRequest, NextResponse } from 'next/server';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
+import { verifyRequestAuth } from '@/lib/auth';
+import { TranscriptionJobDB } from '@/lib/db';
 
 // File size limits (in bytes)
 const MAX_FILE_SIZE_AUDIO = 500 * 1024 * 1024; // 500 MB
@@ -25,7 +28,16 @@ const ALLOWED_VIDEO_TYPES = [
   'video/x-msvideo',
 ];
 
-export async function POST(request: Request): Promise<Response> {
+export async function POST(request: NextRequest): Promise<Response> {
+  const auth = verifyRequestAuth(request);
+
+  if (!auth) {
+    return NextResponse.json(
+      { error: 'No autenticado' },
+      { status: 401 }
+    );
+  }
+
   const body = (await request.json()) as HandleUploadBody;
 
   try {
@@ -42,8 +54,10 @@ export async function POST(request: Request): Promise<Response> {
 
         const fileSize = payload?.size || 0;
         const fileType = payload?.type || '';
+        const filename = payload?.filename || 'unknown';
+        const language = payload?.language || 'auto'; // Default language
 
-        console.log('[blob-upload] File info:', { size: fileSize, type: fileType });
+        console.log('[blob-upload] File info:', { size: fileSize, type: fileType, filename, language });
 
         // Validate file type
         const isAudioAllowed = ALLOWED_AUDIO_TYPES.includes(fileType);
@@ -67,14 +81,43 @@ export async function POST(request: Request): Promise<Response> {
 
         console.log('[blob-upload] All validations passed');
 
+        // Add userId to clientPayload for onUploadCompleted
         return {
           allowedContentTypes: [...ALLOWED_AUDIO_TYPES, ...ALLOWED_VIDEO_TYPES],
           addRandomSuffix: true,
           maximumSizeInBytes: MAX_FILE_SIZE_VIDEO,
+          clientPayload: JSON.stringify({ ...payload, userId: auth.userId }), // Pass userId to clientPayload
         };
       },
-      onUploadCompleted: async ({ blob }) => {
+      onUploadCompleted: async ({ blob, clientPayload }) => {
         console.log('[blob-upload] Upload completed:', blob.url);
+
+        const payload = typeof clientPayload === 'string'
+          ? JSON.parse(clientPayload)
+          : clientPayload;
+
+        const userId = payload?.userId;
+        const filename = payload?.filename || 'unknown';
+        const language = payload?.language || 'auto';
+        const audioSizeBytes = payload?.size || 0;
+
+        if (!userId) {
+          console.error('[blob-upload] userId not found in clientPayload after upload completion.');
+          return; // Or throw an error, depending on desired behavior
+        }
+
+        try {
+          await TranscriptionJobDB.create(
+            userId,
+            filename,
+            blob.url,
+            language,
+            audioSizeBytes
+          );
+          console.log(`[blob-upload] Transcription job created for user ${userId} with audio URL: ${blob.url}`);
+        } catch (dbError) {
+          console.error('[blob-upload] Error saving transcription job to DB:', dbError);
+        }
       },
     });
 

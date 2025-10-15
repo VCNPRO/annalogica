@@ -1220,7 +1220,7 @@ export default function Dashboard() {
                   <span className="text-green-500 text-sm">✅</span>
                   <h2 className={`text-sm font-medium ${textPrimary}`}>Todos los Archivos Completados</h2>
                 </div>
-                <p className={`text-xs ${textSecondary}`}>Archivos procesados listos para descargar</p>
+
 
                 <div className="flex items-center gap-2 mt-2">
                   <span className={`text-xs ${textSecondary}`}>Formato:</span>
@@ -1254,9 +1254,6 @@ export default function Dashboard() {
                     />
                     <span className={`text-xs ${textSecondary}`}>Ambos</span>
                   </label>
-                </div>
-
-                <div className="flex items-center gap-2 mt-2">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1264,9 +1261,12 @@ export default function Dashboard() {
                       checked={!createSubfolders}
                       onChange={(e) => setCreateSubfolders(!e.target.checked)}
                     />
-                    <span className={`text-xs ${textSecondary}`}>No crear sub-carpetas</span>
+                    <span className={`text-xs ${textSecondary}`}>Guardar junto con los originales</span>
                   </label>
                 </div>
+                <p className={`text-xs ${textSecondary}`}>Archivos procesados listos para descargar</p>
+
+
               </div>
               <div className="flex gap-2">
                 <button
