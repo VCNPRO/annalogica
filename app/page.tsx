@@ -1445,6 +1445,10 @@ export default function Dashboard() {
                       >
                         📥 Descargar
                       </button>
+                       <Link href={`/results?jobId=${file.jobId}`} target="_blank" className="px-2 py-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-xs font-medium
+      transition-colors">
+                         👁️Ver
+                      </Link>
                     </div>
                   </div>
                 ))
