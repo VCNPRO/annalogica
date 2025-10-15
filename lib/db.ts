@@ -324,6 +324,15 @@ export const TranscriptionJobDB = {
     return (result.rowCount ?? 0) > 0;
   },
 
+  // Delete a specific transcription job by ID and userId
+  delete: async (id: string, userId: string): Promise<boolean> => {
+    const result = await sql`
+      DELETE FROM transcription_jobs
+      WHERE id = ${id} AND user_id = ${userId}
+    `;
+    return (result.rowCount ?? 0) > 0;
+  },
+
   // Delete old completed jobs (cleanup)
   deleteOld: async (daysOld = 30): Promise<number> => {
     const result = await sql`
