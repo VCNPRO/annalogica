@@ -48,6 +48,8 @@ const client = getAssemblyAIClient();
 
 console.log('[AssemblyAI] Starting transcription for:', options.audioUrl);
 
+const isEnglish = options.language === 'en' || options.language === 'auto';
+
 // Submit transcription job
 const transcript = await client.transcripts.transcribe({
 speech_model: 'universal',
@@ -57,14 +59,14 @@ language_detection: options.language === 'auto',
 speaker_labels: options.speakerLabels ?? true, // Enable by default
 dual_channel: options.dualChannel ?? false,
 
-// 🔽 Funciones avanzadas de AssemblyAI
-summarization: true,
+// 🔽 Funciones avanzadas de AssemblyAI (algunas solo para inglés)
+summarization: isEnglish,
 summary_type: 'bullets', // o 'paragraph'
-iab_categories: true,
-auto_chapters: true,
+iab_categories: true, // Topic detection
+auto_chapters: isEnglish,
 
 // Enable key phrases only for English (not available in Spanish)
-auto_highlights: options.language === 'en' || options.language === 'auto'
+auto_highlights: isEnglish
 });
 
 console.log('[AssemblyAI] Transcription completed:', transcript.id);
