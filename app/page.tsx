@@ -80,7 +80,8 @@ export default function Dashboard() {
     }
   }, [uploadedFiles]);
 
-  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+  const [selectedUploadedFileIds, setSelectedUploadedFileIds] = useState<Set<string>>(new Set());
+  const [selectedCompletedFileIds, setSelectedCompletedFileIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState('es');
   const [targetLanguage, setTargetLanguage] = useState('en');
@@ -365,23 +366,45 @@ export default function Dashboard() {
     e.stopPropagation();
   }, []);
 
-  const handleFileSelect = (fileId: string) => {
-    setSelectedFileIds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(fileId)) {
-        newSet.delete(fileId);
-      } else {
-        newSet.add(fileId);
-      }
-      return newSet;
-    });
+  const handleFileSelect = (fileId: string, type: 'uploaded' | 'completed') => {
+    if (type === 'uploaded') {
+      setSelectedUploadedFileIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(fileId)) {
+          newSet.delete(fileId);
+        } else {
+          newSet.add(fileId);
+        }
+        return newSet;
+      });
+    } else { // type === 'completed'
+      setSelectedCompletedFileIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(fileId)) {
+          newSet.delete(fileId);
+        } else {
+          newSet.add(fileId);
+        }
+        return newSet;
+      });
+    }
   };
 
-  const handleSelectAll = () => {
-    if (selectedFileIds.size === uploadedFiles.length) {
-      setSelectedFileIds(new Set()); // Deselect all
+  const handleSelectAllUploaded = () => {
+    const currentUploadedFiles = uploadedFiles.filter(f => f.status !== 'completed');
+    if (selectedUploadedFileIds.size === currentUploadedFiles.length) {
+      setSelectedUploadedFileIds(new Set()); // Deselect all uploaded
     } else {
-      setSelectedFileIds(new Set(uploadedFiles.map(file => file.id))); // Select all
+      setSelectedUploadedFileIds(new Set(currentUploadedFiles.map(file => file.id))); // Select all uploaded
+    }
+  };
+
+  const handleSelectAllCompleted = () => {
+    const currentCompletedFiles = uploadedFiles.filter(f => f.status === 'completed');
+    if (selectedCompletedFileIds.size === currentCompletedFiles.length) {
+      setSelectedCompletedFileIds(new Set()); // Deselect all completed
+    } else {
+      setSelectedCompletedFileIds(new Set(currentCompletedFiles.map(file => file.id))); // Select all completed
     }
   };
 
@@ -401,16 +424,16 @@ export default function Dashboard() {
   };
 
   const handleProcessSelectedFiles = async () => {
-    console.log('[Process] Button clicked! Selected files:', selectedFileIds.size);
+    console.log('[Process] Button clicked! Selected files:', selectedUploadedFileIds.size);
     console.log('[Process] Uploaded files:', uploadedFiles.map(f => ({ id: f.id, name: f.name, actions: f.actions, blobUrl: f.blobUrl })));
 
-    if (selectedFileIds.size === 0) {
+    if (selectedUploadedFileIds.size === 0) {
       alert('Por favor, selecciona al menos un archivo para procesar.');
       return;
     }
 
-    const filesToProcess = uploadedFiles.filter(file => selectedFileIds.has(file.id));
-    console.log('[Process] Files to process (after filter):', filesToProcess.map(f => ({ name: f.name, actions: f.actions })));
+    const filesToProcess = uploadedFiles.filter(file => selectedUploadedFileIds.has(file.id));
+    console.log('[Process] Files to process (after filter):', filesToProcess.map(f => ({ name: f.name, actions: f.name })));
 
     // Verificar que tengan acciones seleccionadas
     const filesWithoutActions = filesToProcess.filter(f => f.actions.length === 0);
@@ -510,7 +533,7 @@ export default function Dashboard() {
     }
 
     // Deselect all after processing
-    setSelectedFileIds(new Set());
+    setSelectedUploadedFileIds(new Set());
   };
 
 
@@ -1076,8 +1099,8 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
-                    checked={selectedFileIds.size === uploadedFiles.length && uploadedFiles.length > 0}
-                    onChange={handleSelectAll}
+                    checked={selectedUploadedFileIds.size === uploadedFiles.filter(f => f.status !== 'completed').length && uploadedFiles.filter(f => f.status !== 'completed').length > 0}
+                    onChange={handleSelectAllUploaded}
                     className="form-checkbox h-4 w-4 text-orange-500 rounded"
                   />
                   <span className="text-orange-500 text-sm">📁</span>
@@ -1142,8 +1165,8 @@ export default function Dashboard() {
                     <div className="flex items-center gap-4 mb-2">
                       <input
                         type="checkbox"
-                        checked={selectedFileIds.has(file.id)}
-                        onChange={() => handleFileSelect(file.id)}
+                        checked={selectedUploadedFileIds.has(file.id)}
+                        onChange={() => handleFileSelect(file.id, 'uploaded')}
                         className="form-checkbox h-4 w-4 text-orange-500 rounded"
                       />
                       <span className={`text-xs ${textPrimary} flex-1 truncate`}>{file.name}</span>
@@ -1250,15 +1273,8 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
-                    checked={uploadedFiles.filter(f => f.status === 'completed').length > 0 && selectedFileIds.size === uploadedFiles.filter(f => f.status === 'completed').length}
-                    onChange={() => {
-                      const completedFiles = uploadedFiles.filter(f => f.status === 'completed');
-                      if (selectedFileIds.size === completedFiles.length) {
-                        setSelectedFileIds(new Set());
-                      } else {
-                        setSelectedFileIds(new Set(completedFiles.map(f => f.id)));
-                      }
-                    }}
+                    checked={selectedCompletedFileIds.size === uploadedFiles.filter(f => f.status === 'completed').length && uploadedFiles.filter(f => f.status === 'completed').length > 0}
+                    onChange={handleSelectAllCompleted}
                     className="form-checkbox h-4 w-4 text-orange-500 rounded"
                   />
                   <span className="text-green-500 text-sm">✅</span>
@@ -1315,7 +1331,7 @@ export default function Dashboard() {
               <div className="flex gap-2">
                 <button
                   onClick={async () => {
-                    const completedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedFileIds.has(f.id));
+                    const completedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id));
                     if (completedFiles.length === 0) {
                       alert('Selecciona al menos un archivo completado para descargar.');
                       return;
@@ -1346,7 +1362,7 @@ export default function Dashboard() {
                       }
                     }
                   }}
-                  disabled={uploadedFiles.filter(f => f.status === 'completed' && selectedFileIds.has(f.id)).length === 0}
+                  disabled={uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id)).length === 0}
                   className="px-3 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
                 >
                   📥 Descargar Seleccionados
@@ -1372,7 +1388,7 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={handleDeleteSelectedCompletedFiles}
-                  disabled={uploadedFiles.filter(f => f.status === 'completed' && selectedFileIds.has(f.id)).length === 0}
+                  disabled={uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id)).length === 0}
                   className="px-3 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
                   title="Eliminar archivos procesados seleccionados"
                 >
@@ -1392,8 +1408,8 @@ export default function Dashboard() {
                     <div className="flex items-center gap-4">
                       <input
                         type="checkbox"
-                        checked={selectedFileIds.has(file.id)}
-                        onChange={() => handleFileSelect(file.id)}
+                        checked={selectedCompletedFileIds.has(file.id)}
+                        onChange={() => handleFileSelect(file.id, 'completed')}
                         className="form-checkbox h-4 w-4 text-orange-500 rounded"
                       />
                       <span className={`text-xs ${textPrimary} flex-1 truncate`}>{file.name}</span>
