@@ -853,10 +853,14 @@ export default function Dashboard() {
               onDrop={handleDrop} // Add drop handler
               onDragOver={handleDragOver} // Add drag over handler
             >
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-orange-500 text-sm">📁</span>
-                <h2 className={`text-sm font-medium ${textPrimary}`}>Carga de Archivos</h2>
-              </div>
+            <Link href="/" className={`flex items-center gap-2 p-3 rounded-lg ${hover} ${textPrimary}`}>
+              <span className="text-orange-500">📁</span>
+              <span>Cargar y Procesar</span>
+            </Link>
+            <Link href="/processed-files" className={`flex items-center gap-2 p-3 rounded-lg ${hover} ${textPrimary}`}>
+              <span className="text-green-500">✅</span>
+              <span>Archivos Procesados</span>
+            </Link>
               <p className={`text-xs ${textSecondary} mb-3`}>
                 Archivos admitidos: Audio, Video, TXT, DOCX, PDF.
               </p>
