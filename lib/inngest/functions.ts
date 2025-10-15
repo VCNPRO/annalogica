@@ -39,16 +39,22 @@ export const transcribeFile = inngest.createFunction(
     });
 
     const transcriptionResult = await step.run('transcribe-audio', async () => {
-      // The breaker will wrap the call to AssemblyAI
-      const result = await assemblyAIBreaker.fire({ audioUrl, language: job.language as TranscriptionOptions['language'], speakerLabels: true });
+      try {
+        // DEBUG: Bypassing circuit breaker to get the original error.
+        console.log('[Inngest] DEBUG: Bypassing circuit breaker to get original error.');
+        const result = await transcribeAudio({ audioUrl, language: job.language as TranscriptionOptions['language'], speakerLabels: true });
 
-      // Type guard to check for the fallback response
-      if ('error' in result) {
-        // Throw an error to force Inngest to retry the step later
-        throw new Error(result.error as string);
+        // Type guard to check for a fallback-like response (less likely now)
+        if (result && 'error' in result) {
+          throw new Error(result.error as string);
+        }
+
+        return result;
+      } catch (e: any) {
+        console.error('[Inngest] FATAL: The direct call to AssemblyAI failed. The original error was:', e);
+        // Re-throw the error so Inngest knows the step failed and will retry
+        throw e;
       }
-
-      return result;
     });
 
     await step.run('save-results-and-metadata', async () => {
