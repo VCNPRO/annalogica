@@ -50,6 +50,7 @@ console.log('[AssemblyAI] Starting transcription for:', options.audioUrl);
 
 // Submit transcription job
 const transcript = await client.transcripts.transcribe({
+speech_model: 'universal',
 audio_url: options.audioUrl,
 language_code: ['es', 'en', 'ca', 'eu', 'gl', 'pt'].includes(options.language || '') ? options.language as ('es' | 'en' | 'ca' | 'eu' | 'gl' | 'pt') : undefined,
 language_detection: options.language === 'auto',
