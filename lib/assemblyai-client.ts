@@ -1,4 +1,4 @@
-  1 import { AssemblyAI } from 'assemblyai';
+     1 import { AssemblyAI } from 'assemblyai';
      2 import { put, del } from '@vercel/blob';
      3
      4 // Initialize AssemblyAI client
