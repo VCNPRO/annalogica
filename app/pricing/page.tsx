@@ -52,7 +52,7 @@ export default function PricingPage() {
 
     if (planId === 'empresarial') {
       // Redirigir a contacto para plan empresarial
-      window.location.href = 'mailto:soporte@annalogica.eu?subject=Consulta Plan Empresarial';
+      window.location.href = 'mailto:infopreus@annalogica.eu?subject=Consulta Plan Empresarial';
       return;
     }
 
@@ -366,10 +366,10 @@ export default function PricingPage() {
             ¿Tienes alguna pregunta? Estamos aquí para ayudarte.
           </p>
           <a
-            href="mailto:soporte@annalogica.eu"
+            href="mailto:support@annalogica.eu"
             className="text-orange-500 hover:text-orange-600 font-semibold"
           >
-            soporte@annalogica.eu
+            support@annalogica.eu
           </a>
         </div>
       </div>
