@@ -308,9 +308,215 @@ export async function saveSummary(
 }
 
 /**
+ * Identify speaker names and roles using LeMUR
+ */
+export async function identifySpeakersWithLeMUR(
+  transcriptId: string,
+  language: string = 'es'
+): Promise<Record<string, { name?: string; role?: string }>> {
+  const client = getAssemblyAIClient();
+
+  try {
+    console.log('[LeMUR] Identifying speakers for transcript:', transcriptId);
+
+    // Prompts for different languages
+    const prompts: Record<string, string> = {
+      'es': `Analiza la transcripción e identifica a cada orador (Speaker A, Speaker B, etc.) con su nombre real y cargo/profesión SI SE MENCIONAN en el audio.
+
+Reglas importantes:
+- SOLO incluye nombres y cargos que se mencionen EXPLÍCITAMENTE en la conversación
+- Si una persona se presenta diciendo "Soy Juan Pérez, director de..." extrae ese nombre y cargo
+- Si alguien menciona "el ministro dijo..." o "la doctora explicó..." extrae ese cargo
+- Si NO hay información sobre un speaker, NO inventes datos
+- Busca patrones como: presentaciones, títulos profesionales, cargos mencionados
+
+Devuelve ÚNICAMENTE un JSON con este formato (sin texto adicional):
+{
+  "Speaker A": {"name": "Nombre Real", "role": "Cargo/Profesión"},
+  "Speaker B": {"role": "Cargo si no hay nombre"},
+  "Speaker C": {}
+}
+
+Si no hay información de identificación, devuelve un objeto vacío {} para ese speaker.`,
+
+      'en': `Analyze the transcription and identify each speaker (Speaker A, Speaker B, etc.) with their real name and job title/profession IF MENTIONED in the audio.
+
+Important rules:
+- ONLY include names and titles that are EXPLICITLY mentioned in the conversation
+- If someone introduces themselves saying "I'm John Doe, director of..." extract that name and title
+- If someone mentions "the minister said..." or "the doctor explained..." extract that title
+- If there's NO information about a speaker, DO NOT make up data
+- Look for patterns like: introductions, professional titles, mentioned positions
+
+Return ONLY a JSON with this format (no additional text):
+{
+  "Speaker A": {"name": "Real Name", "role": "Job Title/Profession"},
+  "Speaker B": {"role": "Title if no name available"},
+  "Speaker C": {}
+}
+
+If there's no identifying information, return an empty object {} for that speaker.`,
+
+      'ca': `Analitza la transcripció i identifica cada orador (Speaker A, Speaker B, etc.) amb el seu nom real i càrrec/professió SI ES MENCIONEN a l'àudio.
+
+Regles importants:
+- NOMÉS inclou noms i càrrecs que es mencionin EXPLÍCITAMENT a la conversa
+- Si una persona es presenta dient "Sóc Joan Pérez, director de..." extreu aquest nom i càrrec
+- Si algú menciona "el ministre va dir..." o "la doctora va explicar..." extreu aquest càrrec
+- Si NO hi ha informació sobre un speaker, NO inventis dades
+- Busca patrons com: presentacions, títols professionals, càrrecs mencionats
+
+Retorna ÚNICAMENT un JSON amb aquest format (sense text addicional):
+{
+  "Speaker A": {"name": "Nom Real", "role": "Càrrec/Professió"},
+  "Speaker B": {"role": "Càrrec si no hi ha nom"},
+  "Speaker C": {}
+}
+
+Si no hi ha informació d'identificació, retorna un objecte buit {} per aquest speaker.`,
+
+      'eu': `Aztertu transkripzioa eta identifikatu hizlari bakoitza (Speaker A, Speaker B, etab.) beren izen erreala eta kargua/lanbidearekin AUDIOAN AIPATZEN BADIRA.
+
+Arau garrantzitsuak:
+- SOILIK sartu elkarrizketan ESPLIZITUKI aipatzen diren izenak eta karguak
+- Norbait aurkezten bada "Ni naiz Juan Perez, zuzendaria..." esanez, atera izen eta kargu hori
+- Norbaitek "ministroak esan zuen..." edo "doktoreak azaldu zuen..." aipatzen badu, atera kargu hori
+- Speaker bati buruzko informaziorik EZ badago, EZ asmatu daturik
+- Bilatu ereduak hala nola: aurkezpenak, lan tituluak, aipatutako karguak
+
+Itzuli SOILIK JSON bat formatu honekin (testu gehigarririk gabe):
+{
+  "Speaker A": {"name": "Izen Erreala", "role": "Kargua/Lanbidea"},
+  "Speaker B": {"role": "Kargua izenik ez badago"},
+  "Speaker C": {}
+}
+
+Identifikazio informaziorik ez badago, itzuli objektu huts bat {} speaker horrentzat.`,
+
+      'gl': `Analiza a transcrición e identifica a cada orador (Speaker A, Speaker B, etc.) co seu nome real e cargo/profesión SE SE MENCIONAN no audio.
+
+Regras importantes:
+- SÓ inclúe nomes e cargos que se mencionen EXPLÍCITAMENTE na conversa
+- Se unha persoa se presenta dicindo "Son Xoán Pérez, director de..." extrae ese nome e cargo
+- Se alguén menciona "o ministro dixo..." ou "a doutora explicou..." extrae ese cargo
+- Se NON hai información sobre un speaker, NON inventes datos
+- Busca patróns como: presentacións, títulos profesionais, cargos mencionados
+
+Devolve ÚNICAMENTE un JSON con este formato (sen texto adicional):
+{
+  "Speaker A": {"name": "Nome Real", "role": "Cargo/Profesión"},
+  "Speaker B": {"role": "Cargo se non hai nome"},
+  "Speaker C": {}
+}
+
+Se non hai información de identificación, devolve un obxecto baleiro {} para ese speaker.`,
+
+      'pt': `Analise a transcrição e identifique cada orador (Speaker A, Speaker B, etc.) com seu nome real e cargo/profissão SE MENCIONADOS no áudio.
+
+Regras importantes:
+- APENAS inclua nomes e cargos que sejam EXPLICITAMENTE mencionados na conversa
+- Se alguém se apresenta dizendo "Sou João Pereira, diretor de..." extraia esse nome e cargo
+- Se alguém menciona "o ministro disse..." ou "a doutora explicou..." extraia esse cargo
+- Se NÃO houver informação sobre um speaker, NÃO invente dados
+- Procure por padrões como: apresentações, títulos profissionais, cargos mencionados
+
+Retorne APENAS um JSON com este formato (sem texto adicional):
+{
+  "Speaker A": {"name": "Nome Real", "role": "Cargo/Profissão"},
+  "Speaker B": {"role": "Cargo se não houver nome"},
+  "Speaker C": {}
+}
+
+Se não houver informação de identificação, retorne um objeto vazio {} para esse speaker.`,
+
+      'fr': `Analysez la transcription et identifiez chaque orateur (Speaker A, Speaker B, etc.) avec son nom réel et son poste/profession S'ILS SONT MENTIONNÉS dans l'audio.
+
+Règles importantes:
+- N'incluez QUE les noms et postes EXPLICITEMENT mentionnés dans la conversation
+- Si quelqu'un se présente en disant "Je suis Jean Dupont, directeur de..." extrayez ce nom et ce poste
+- Si quelqu'un mentionne "le ministre a dit..." ou "la docteure a expliqué..." extrayez ce poste
+- S'il n'y a PAS d'information sur un speaker, N'inventez PAS de données
+- Cherchez des patterns comme: présentations, titres professionnels, postes mentionnés
+
+Retournez UNIQUEMENT un JSON avec ce format (sans texte supplémentaire):
+{
+  "Speaker A": {"name": "Nom Réel", "role": "Poste/Profession"},
+  "Speaker B": {"role": "Poste si pas de nom"},
+  "Speaker C": {}
+}
+
+S'il n'y a pas d'information d'identification, retournez un objet vide {} pour ce speaker.`,
+
+      'de': `Analysieren Sie die Transkription und identifizieren Sie jeden Sprecher (Speaker A, Speaker B, usw.) mit seinem echten Namen und Beruf/Position FALLS IM AUDIO ERWÄHNT.
+
+Wichtige Regeln:
+- Nehmen Sie NUR Namen und Positionen auf, die EXPLIZIT in der Unterhaltung erwähnt werden
+- Wenn sich jemand vorstellt mit "Ich bin Hans Müller, Direktor von..." extrahieren Sie diesen Namen und Position
+- Wenn jemand erwähnt "der Minister sagte..." oder "die Ärztin erklärte..." extrahieren Sie diese Position
+- Wenn es KEINE Informationen über einen Sprecher gibt, erfinden Sie KEINE Daten
+- Suchen Sie nach Mustern wie: Vorstellungen, Berufstitel, erwähnte Positionen
+
+Geben Sie NUR ein JSON in diesem Format zurück (ohne zusätzlichen Text):
+{
+  "Speaker A": {"name": "Echter Name", "role": "Position/Beruf"},
+  "Speaker B": {"role": "Position falls kein Name"},
+  "Speaker C": {}
+}
+
+Falls keine identifizierenden Informationen vorhanden sind, geben Sie ein leeres Objekt {} für diesen Sprecher zurück.`,
+
+      'it': `Analizza la trascrizione e identifica ogni oratore (Speaker A, Speaker B, ecc.) con il suo nome reale e carica/professione SE MENZIONATI nell'audio.
+
+Regole importanti:
+- Includi SOLO nomi e cariche ESPLICITAMENTE menzionati nella conversazione
+- Se qualcuno si presenta dicendo "Sono Giovanni Rossi, direttore di..." estrai quel nome e carica
+- Se qualcuno menziona "il ministro ha detto..." o "la dottoressa ha spiegato..." estrai quella carica
+- Se NON ci sono informazioni su un speaker, NON inventare dati
+- Cerca pattern come: presentazioni, titoli professionali, cariche menzionate
+
+Restituisci SOLO un JSON con questo formato (senza testo aggiuntivo):
+{
+  "Speaker A": {"name": "Nome Reale", "role": "Carica/Professione"},
+  "Speaker B": {"role": "Carica se non c'è nome"},
+  "Speaker C": {}
+}
+
+Se non ci sono informazioni identificative, restituisci un oggetto vuoto {} per quello speaker.`,
+    };
+
+    const prompt = prompts[language] || prompts['es'];
+
+    const result = await client.lemur.task({
+      transcript_ids: [transcriptId],
+      prompt: prompt,
+      final_model: 'anthropic/claude-3-5-sonnet',
+    });
+
+    // Parse JSON response
+    try {
+      const cleaned = result.response.trim().replace(/```json\n?/g, '').replace(/```\n?/g, '');
+      const speakerIdentities = JSON.parse(cleaned);
+      console.log('[LeMUR] Speaker identification successful:', speakerIdentities);
+      return speakerIdentities;
+    } catch (parseError) {
+      console.error('[LeMUR] Failed to parse speaker identification JSON:', parseError);
+      return {};
+    }
+
+  } catch (error: any) {
+    console.error('[LeMUR] Speaker identification failed:', error.message);
+    return {}; // Return empty object on failure
+  }
+}
+
+/**
  * Generate speakers/participants report from transcription
  */
-export function generateSpeakersReport(result: TranscriptionResult, detailed: boolean = false): string {
+export function generateSpeakersReport(
+  result: TranscriptionResult,
+  detailed: boolean = false,
+  speakerIdentities?: Record<string, { name?: string; role?: string }>
+): string {
   if (!result.utterances || result.utterances.length === 0) {
     return 'No se detectaron oradores en esta transcripción.';
   }
@@ -326,6 +532,26 @@ export function generateSpeakersReport(result: TranscriptionResult, detailed: bo
   if (!result.audioDuration || result.audioDuration <= 0) {
     return 'Error: La duración del audio no es válida para generar el reporte.';
   }
+
+  // Helper function to format speaker name with identity
+  const formatSpeakerName = (speaker: string): string => {
+    if (!speakerIdentities || !speakerIdentities[speaker]) {
+      return speaker;
+    }
+
+    const identity = speakerIdentities[speaker];
+    const parts: string[] = [speaker];
+
+    if (identity.name) {
+      parts.push(identity.name);
+    }
+
+    if (identity.role) {
+      parts.push(`(${identity.role})`);
+    }
+
+    return parts.join(' - ');
+  };
 
   // Calculate statistics for each speaker
   const speakerStats = speakers.map(speaker => {
@@ -376,7 +602,7 @@ export function generateSpeakersReport(result: TranscriptionResult, detailed: bo
       ? formatDuration(stats.totalDuration / stats.interventions)
       : '0:00';
 
-    report += `${index + 1}. ${stats.speaker}\n`;
+    report += `${index + 1}. ${formatSpeakerName(stats.speaker)}\n`;
     report += `   Intervenciones: ${stats.interventions}\n`;
     report += `   Palabras pronunciadas: ${stats.totalWords}\n`;
     report += `   Tiempo total: ${formatDuration(stats.totalDuration)} (${percentage}% del total)\n`;
@@ -433,7 +659,8 @@ function formatTimestampSimple(ms: number): string {
 export async function saveSpeakersReport(
   result: TranscriptionResult,
   filename: string,
-  detailed: boolean = false
+  detailed: boolean = false,
+  speakerIdentities?: Record<string, { name?: string; role?: string }>
 ): Promise<string> {
   const baseName = filename.replace(/\.[^/.]+$/, '');
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
@@ -442,7 +669,7 @@ export async function saveSpeakersReport(
     throw new Error('BLOB_READ_WRITE_TOKEN not configured');
   }
 
-  const report = generateSpeakersReport(result, detailed);
+  const report = generateSpeakersReport(result, detailed, speakerIdentities);
 
   const speakersBlob = await put(`${baseName}-oradores.txt`, report, {
     access: 'public',
