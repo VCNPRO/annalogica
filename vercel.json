@@ -6,5 +6,23 @@
     "app/api/process/route.ts": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/check-alerts",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/refresh-metrics",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/update-user-costs",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/cleanup",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }
