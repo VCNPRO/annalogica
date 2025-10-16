@@ -90,6 +90,13 @@ export default function Dashboard() {
   const [downloadDirHandle, setDownloadDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [createSubfolders, setCreateSubfolders] = useState(true);
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
+  const [notification, setNotification] = useState<{message: string; type: 'success' | 'error' | 'info'} | null>(null);
+
+  // Show notification function
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4000); // Auto-hide after 4 seconds
+  };
 
   useEffect(() => {
     // SECURITY: Verificar autenticación mediante cookie httpOnly
@@ -428,7 +435,7 @@ export default function Dashboard() {
     console.log('[Process] Uploaded files:', uploadedFiles.map(f => ({ id: f.id, name: f.name, actions: f.actions, blobUrl: f.blobUrl })));
 
     if (selectedUploadedFileIds.size === 0) {
-      alert('Por favor, selecciona al menos un archivo para procesar.');
+      showNotification('Por favor, selecciona al menos un archivo para procesar.', 'info');
       return;
     }
 
@@ -439,7 +446,7 @@ export default function Dashboard() {
     const filesWithoutActions = filesToProcess.filter(f => f.actions.length === 0);
     if (filesWithoutActions.length > 0) {
       console.log('[Process] Files without actions:', filesWithoutActions.map(f => f.name));
-      alert(`⚠️ ALERTA: Los siguientes archivos no tienen acciones seleccionadas:\n\n${filesWithoutActions.map(f => '• ' + f.name).join('\n')}\n\nPor favor, haz click en "📝 Transcribir" primero.`);
+      showNotification('Los archivos seleccionados no tienen acciones. Haz clic en "Transcribir" primero.', 'error');
       return;
     }
 
@@ -447,7 +454,7 @@ export default function Dashboard() {
     const filesWithoutUrl = filesToProcess.filter(f => !f.blobUrl);
     if (filesWithoutUrl.length > 0) {
       console.log('[Process] Files without blobUrl:', filesWithoutUrl.map(f => f.name));
-      alert('Algunos archivos no se cargaron correctamente. Por favor, recárgalos.');
+      showNotification('Algunos archivos no se cargaron correctamente. Por favor, recárgalos.', 'error');
       return;
     }
 
@@ -527,9 +534,9 @@ export default function Dashboard() {
     console.log('[Process] 🏁 Finished! Processed', processedCount, 'files');
 
     if (processedCount > 0) {
-      alert(`✅ ${processedCount} archivo(s) enviado(s) a procesamiento!\n\nPuedes ver el progreso en la tabla de archivos.`);
+      showNotification(`${processedCount} archivo(s) enviado(s) a procesamiento. Ver progreso abajo.`, 'success');
     } else {
-      alert('⚠️ No se procesó ningún archivo. Verifica que tengan la acción "Transcribir" seleccionada.');
+      showNotification('No se procesó ningún archivo. Verifica las acciones seleccionadas.', 'error');
     }
 
     // Deselect all after processing
@@ -542,7 +549,7 @@ export default function Dashboard() {
     const selectedCompletedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id));
 
     if (selectedCompletedFiles.length === 0) {
-      alert('Selecciona al menos un archivo completado para eliminar.');
+      showNotification('Selecciona al menos un archivo completado para eliminar.', 'info');
       return;
     }
 
@@ -574,7 +581,7 @@ export default function Dashboard() {
     if (successfulDeletions > 0) {
       setUploadedFiles(prev => prev.filter(file => !(file.status === 'completed' && selectedCompletedFileIds.has(file.id))));
       setSelectedCompletedFileIds(new Set());
-      alert(`${successfulDeletions} archivo(s) procesado(s) eliminado(s) correctamente.`);
+      showNotification(`${successfulDeletions} archivo(s) eliminado(s) correctamente.`, 'success');
     }
   };
 
@@ -739,11 +746,11 @@ export default function Dashboard() {
         await saveBlob(fileHandle, vttBlob);
       }
 
-      alert(`✅ Archivos para "${file.name}" guardados en la carpeta: ${baseName}`);
+      showNotification(`✅ Archivos para "${file.name}" guardados en la carpeta: ${baseName}`, 'success');
 
     } catch (error) {
       console.error('Error downloading organized files:', error);
-      alert(`Error al descargar los archivos para "${file.name}". Inténtalo de nuevo.`);
+      showNotification(`Error al descargar los archivos para "${file.name}". Inténtalo de nuevo.`, 'error');
     }
   };
 
@@ -862,9 +869,22 @@ export default function Dashboard() {
 
   return (
     <div className={`min-h-screen ${bgPrimary}`}>
+      {/* Toast Notification - Positioned at top center */}
+      {notification && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in-down">
+          <div className={`px-4 py-3 rounded-lg shadow-lg ${
+            notification.type === 'success' ? 'bg-green-500 text-white' :
+            notification.type === 'error' ? 'bg-red-500 text-white' :
+            'bg-blue-500 text-white'
+          } max-w-md`}>
+            <p className="text-sm font-medium">{notification.message}</p>
+          </div>
+        </div>
+      )}
+
       <div className="fixed top-6 right-6 z-40 flex items-center gap-2">
-        <button 
-          onClick={() => alert('Guía de usuario próximamente')} 
+        <button
+          onClick={() => showNotification('Guía de usuario próximamente', 'info')}
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
           title="Guía de usuario"
         >
@@ -1117,10 +1137,10 @@ export default function Dashboard() {
                   onClick={() => {
                     const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id) && f.status !== 'completed');
                     if (selectedFiles.length === 0) {
-                      alert('Selecciona archivos para reiniciar su procesamiento');
+                      showNotification('Selecciona archivos para reiniciar su procesamiento', 'info');
                       return;
                     }
-                    if (confirm(`¿Reiniciar el procesamiento de ${selectedFiles.length} archivo(s) seleccionado(s)?`)) {
+                    if (confirm(`¿Reiniciar el procesamiento de ${selectedFiles.length} archivo(s)?`)) {
                       setUploadedFiles(prev => prev.map(f => {
                         if (selectedUploadedFileIds.has(f.id) && f.status !== 'completed') {
                           return {
@@ -1130,13 +1150,13 @@ export default function Dashboard() {
                             uploadProgress: 100,
                             processingStartTime: undefined,
                             estimatedTimeRemaining: undefined,
-                            actions: [] // Limpiar acciones para que se vuelvan a seleccionar
+                            actions: []
                           };
                         }
                         return f;
                       }));
                       setSelectedUploadedFileIds(new Set());
-                      alert('Archivos reiniciados. Selecciona las acciones de IA y haz clic en "Procesar Archivos".');
+                      showNotification('Archivos reiniciados. Selecciona acciones y procesa.', 'success');
                     }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
@@ -1149,12 +1169,13 @@ export default function Dashboard() {
                   onClick={() => {
                     const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id) && f.status !== 'completed');
                     if (selectedFiles.length === 0) {
-                      alert('Selecciona archivos para eliminar');
+                      showNotification('Selecciona archivos para eliminar', 'info');
                       return;
                     }
-                    if (confirm(`¿Eliminar ${selectedFiles.length} archivo(s) seleccionado(s)?`)) {
+                    if (confirm(`¿Eliminar ${selectedFiles.length} archivo(s)?`)) {
                       setUploadedFiles(prev => prev.filter(f => !(selectedUploadedFileIds.has(f.id) && f.status !== 'completed')));
                       setSelectedUploadedFileIds(new Set());
+                      showNotification('Archivos eliminados', 'success');
                     }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
@@ -1335,12 +1356,12 @@ export default function Dashboard() {
                   onClick={async () => {
                     const completedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id));
                     if (completedFiles.length === 0) {
-                      alert('Selecciona al menos un archivo completado para descargar.');
+                      showNotification('Selecciona al menos un archivo completado para descargar.', 'info');
                       return;
                     }
 
                     if (!downloadDirHandle && 'showDirectoryPicker' in window) {
-                      alert('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".');
+                      showNotification('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".', 'info');
                       return;
                     }
 
@@ -1359,7 +1380,7 @@ export default function Dashboard() {
                           }
                         } catch (err) {
                           console.error('Error downloading files:', err);
-                          alert(`Error al descargar ${file.name}.`);
+                          showNotification(`Error al descargar ${file.name}.`, 'error');
                         }
                       }
                     }
@@ -1372,13 +1393,13 @@ export default function Dashboard() {
                 <button
                   onClick={async () => {
                     if (!('showDirectoryPicker' in window)) {
-                      alert('Tu navegador no soporta la selección de carpetas. Las descargas se realizarán individualmente.');
+                      showNotification('Tu navegador no soporta la selección de carpetas. Las descargas se realizarán individualmente.', 'info');
                       return;
                     }
                     try {
                       const handle = await (window as any).showDirectoryPicker();
                       setDownloadDirHandle(handle);
-                      alert(`Carpeta de descarga seleccionada: "${handle.name}".\n\nLas próximas descargas se guardarán aquí.`);
+                      showNotification(`Carpeta de descarga seleccionada: "${handle.name}". Las próximas descargas se guardarán aquí.`, 'success');
                     } catch (err) {
                       console.error('Error al seleccionar la carpeta:', err);
                     }
@@ -1423,7 +1444,7 @@ export default function Dashboard() {
                           if (!file.jobId) return;
 
                           if (!downloadDirHandle && 'showDirectoryPicker' in window) {
-                            alert('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".');
+                            showNotification('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".', 'info');
                             return;
                           }
 
@@ -1440,7 +1461,7 @@ export default function Dashboard() {
                             }
                           } catch (err) {
                             console.error('Error downloading file:', err);
-                            alert(`Error al descargar ${file.name}.`);
+                            showNotification(`Error al descargar ${file.name}.`, 'error');
                           }
                         }}
                         className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
