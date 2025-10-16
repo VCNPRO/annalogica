@@ -35,7 +35,6 @@ export async function GET() {
     'UPSTASH_REDIS_REST_URL',
     'UPSTASH_REDIS_REST_TOKEN',
     'ASSEMBLYAI_API_KEY',
-    'CLAUDE_API_KEY',
     'INNGEST_EVENT_KEY',
     'INNGEST_SIGNING_KEY'
   ];
