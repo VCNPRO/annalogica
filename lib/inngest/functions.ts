@@ -59,24 +59,47 @@ export const transcribeFile = inngest.createFunction(
       const urls = await saveTranscriptionResults(transcriptionResult, filename, audioUrl);
 
       // Identify speakers using LeMUR (with error handling to avoid breaking transcription)
+      console.log('[DEBUG] ========== SPEAKER IDENTIFICATION START ==========');
+      console.log('[DEBUG] Calling identifySpeakersWithLeMUR with:', {
+        transcriptId: transcriptionResult.id,
+        language: job.language || 'es',
+        utterancesCount: transcriptionResult.utterances?.length || 0,
+        speakers: transcriptionResult.utterances
+          ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))]
+          : []
+      });
+
       let speakerIdentities: Record<string, { name?: string; role?: string }> = {};
       try {
         speakerIdentities = await identifySpeakersWithLeMUR(transcriptionResult.id, job.language || 'es');
+        console.log('[DEBUG] Speaker identities result:', JSON.stringify(speakerIdentities, null, 2));
+        console.log('[DEBUG] Has any identities?', Object.keys(speakerIdentities).length > 0);
+        console.log('[DEBUG] Identity keys:', Object.keys(speakerIdentities));
         console.log('[Inngest] Speaker identification completed:', speakerIdentities);
       } catch (error: any) {
+        console.error('[DEBUG] EXCEPTION in identifySpeakersWithLeMUR:', error.message);
+        console.error('[DEBUG] Error stack:', error.stack);
         console.error('[Inngest] Failed to identify speakers (non-fatal):', error.message);
         // Continue without speaker identification
       }
 
       // Generate and save speakers report (with error handling to avoid breaking transcription)
+      console.log('[DEBUG] ========== SPEAKERS REPORT GENERATION START ==========');
+      console.log('[DEBUG] Generating speakers report with identities:', speakerIdentities);
+      console.log('[DEBUG] Identities count:', Object.keys(speakerIdentities).length);
+
       let speakersUrl: string | undefined = undefined;
       try {
         speakersUrl = await saveSpeakersReport(transcriptionResult, filename, false, speakerIdentities);
+        console.log('[DEBUG] Speakers report saved successfully:', speakersUrl);
         console.log('[Inngest] Speakers report saved successfully:', speakersUrl);
       } catch (error: any) {
+        console.error('[DEBUG] EXCEPTION in saveSpeakersReport:', error.message);
+        console.error('[DEBUG] Error stack:', error.stack);
         console.error('[Inngest] Failed to save speakers report (non-fatal):', error.message);
         // Don't fail the entire job - speakers report is supplementary
       }
+      console.log('[DEBUG] ========== SPEAKERS REPORT GENERATION END ==========');
 
       const speakers = transcriptionResult.utterances
         ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))].sort()

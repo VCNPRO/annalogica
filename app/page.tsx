@@ -890,19 +890,26 @@ export default function Dashboard() {
         >
           <HelpCircle className={`h-4 w-4 ${textSecondary}`} />
         </button>
-        <button 
-          onClick={() => setDarkMode(!darkMode)} 
+        <button
+          onClick={() => setDarkMode(!darkMode)}
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
+          title="Cambiar tema"
         >
           {darkMode ? <Sun className="h-4 w-4 text-zinc-400" /> : <Moon className="h-4 w-4 text-gray-600" />}
+        </button>
+        <button
+          onClick={() => router.push('/pricing')}
+          className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
+          title="Ver planes y precios"
+        >
+          <span className="text-lg">💳</span>
         </button>
         <button
           onClick={() => router.push('/settings')}
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
           title="Ajustes"
         >
-          <span className={`text-sm ${textSecondary}`}>Ajustes</span>
-          <span>⚙️</span>
+          <span className="text-lg">⚙️</span>
         </button>
         <button
           onClick={handleLogout}
