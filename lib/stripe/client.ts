@@ -2,15 +2,21 @@
 import Stripe from 'stripe';
 import { STRIPE_CONFIG, PlanType, PLAN_QUOTAS } from './config';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY no está configurada en las variables de entorno');
-}
+// Inicializar cliente de Stripe solo si la clave está configurada
+export const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-09-30.clover',
+      typescript: true,
+    })
+  : null;
 
-// Inicializar cliente de Stripe con la última versión de API
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-09-30.clover',
-  typescript: true,
-});
+// Helper para verificar que Stripe está configurado
+function ensureStripeConfigured(): Stripe {
+  if (!stripe) {
+    throw new Error('STRIPE_SECRET_KEY no está configurada en las variables de entorno');
+  }
+  return stripe;
+}
 
 /**
  * Crea un nuevo cliente de Stripe
@@ -23,7 +29,8 @@ export async function createStripeCustomer(params: {
   userId: number;
 }): Promise<Stripe.Customer> {
   try {
-    const customer = await stripe.customers.create({
+    const stripeClient = ensureStripeConfigured();
+    const customer = await stripeClient.customers.create({
       email: params.email,
       name: params.name,
       metadata: {
@@ -52,7 +59,8 @@ export async function createCheckoutSession(params: {
   cancelUrl: string;
 }): Promise<Stripe.Checkout.Session> {
   try {
-    const session = await stripe.checkout.sessions.create({
+    const stripeClient = ensureStripeConfigured();
+    const session = await stripeClient.checkout.sessions.create({
       customer: params.customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -96,7 +104,8 @@ export async function createCustomerPortalSession(params: {
   returnUrl: string;
 }): Promise<Stripe.BillingPortal.Session> {
   try {
-    const session = await stripe.billingPortal.sessions.create({
+    const stripeClient = ensureStripeConfigured();
+    const session = await stripeClient.billingPortal.sessions.create({
       customer: params.customerId,
       return_url: params.returnUrl,
     });
@@ -115,7 +124,8 @@ export async function createCustomerPortalSession(params: {
  */
 export async function getSubscription(subscriptionId: string): Promise<Stripe.Subscription | null> {
   try {
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const stripeClient = ensureStripeConfigured();
+    const subscription = await stripeClient.subscriptions.retrieve(subscriptionId);
     return subscription;
   } catch (error) {
     console.error('[STRIPE] Error retrieving subscription:', error);
@@ -130,7 +140,8 @@ export async function getSubscription(subscriptionId: string): Promise<Stripe.Su
  */
 export async function cancelSubscriptionAtPeriodEnd(subscriptionId: string): Promise<Stripe.Subscription> {
   try {
-    const subscription = await stripe.subscriptions.update(subscriptionId, {
+    const stripeClient = ensureStripeConfigured();
+    const subscription = await stripeClient.subscriptions.update(subscriptionId, {
       cancel_at_period_end: true,
     });
 
@@ -148,7 +159,8 @@ export async function cancelSubscriptionAtPeriodEnd(subscriptionId: string): Pro
  */
 export async function reactivateSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
   try {
-    const subscription = await stripe.subscriptions.update(subscriptionId, {
+    const stripeClient = ensureStripeConfigured();
+    const subscription = await stripeClient.subscriptions.update(subscriptionId, {
       cancel_at_period_end: false,
     });
 
@@ -167,7 +179,8 @@ export async function reactivateSubscription(subscriptionId: string): Promise<St
  */
 export async function getCustomerInvoices(customerId: string, limit: number = 10): Promise<Stripe.Invoice[]> {
   try {
-    const invoices = await stripe.invoices.list({
+    const stripeClient = ensureStripeConfigured();
+    const invoices = await stripeClient.invoices.list({
       customer: customerId,
       limit,
     });
@@ -262,7 +275,8 @@ export function constructWebhookEvent(
   }
 
   try {
-    return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+    const stripeClient = ensureStripeConfigured();
+    return stripeClient.webhooks.constructEvent(payload, signature, webhookSecret);
   } catch (error) {
     console.error('[STRIPE] Webhook signature verification failed:', error);
     throw new Error('Verificación de webhook fallida');
