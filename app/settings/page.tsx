@@ -4,9 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Moon, Sun, Globe, Settings as SettingsIcon, Download, Clock, Info, HelpCircle, LogOut } from 'lucide-react';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
+import { useNotification } from '@/hooks/useNotification';
+import { Toast } from '@/components/Toast';
 
 export default function Settings() {
   const router = useRouter();
+  const { notification, showNotification } = useNotification();
   const [user, setUser] = useState<any>(null);
   const [subscriptionData, setSubscriptionData] = useState<{
     plan: string;
@@ -103,7 +106,7 @@ export default function Settings() {
 
   const saveOptions = () => {
     localStorage.setItem('defaultOptions', JSON.stringify(defaultOptions));
-    alert('✅ Preferencias guardadas correctamente');
+    showNotification('✅ Preferencias guardadas correctamente', 'success');
   };
 
   const handleLogout = async () => {
@@ -122,7 +125,7 @@ export default function Settings() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      alert('No se pudo copiar el ID');
+      showNotification('No se pudo copiar el ID', 'error');
     }
   };
 
@@ -142,6 +145,8 @@ export default function Settings() {
 
   return (
     <div className={`min-h-screen ${bgPrimary}`}>
+      <Toast notification={notification} />
+
       {/* Top Banner */}
       <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
         Modo Producción - Usuario: {user?.email || 'Usuario'}
@@ -150,7 +155,7 @@ export default function Settings() {
       {/* Top Right Actions */}
       <div className="fixed top-16 right-6 z-40 flex items-center gap-2">
         <button
-          onClick={() => alert('Guía de usuario próximamente')}
+          onClick={() => showNotification('Guía de usuario próximamente', 'info')}
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
           title="Guía de usuario"
         >

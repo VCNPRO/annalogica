@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Trash2, Download } from 'lucide-react';
 import jsPDF from 'jspdf'; // Assuming jsPDF is used for PDF generation
+import { useNotification } from '@/hooks/useNotification';
+import { Toast } from '@/components/Toast';
 
 interface ProcessedJob {
   id: string;
@@ -29,6 +31,7 @@ interface User {
 
 export default function ProcessedFilesPage() {
   const router = useRouter();
+  const { notification, showNotification } = useNotification();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true); // Assuming dark mode state is managed here
@@ -102,10 +105,10 @@ export default function ProcessedFilesPage() {
       }
 
       setProcessedJobs(prev => prev.filter(job => job.id !== jobId));
-      alert('Archivo procesado eliminado correctamente.');
+      showNotification('Archivo procesado eliminado correctamente.', 'success');
     } catch (err: any) {
       console.error('Error deleting job:', err);
-      setError(err.message);
+      showNotification(`Error al eliminar: ${err.message}`, 'error');
     }
   };
 
@@ -286,6 +289,8 @@ export default function ProcessedFilesPage() {
 
   return (
     <div className="min-h-screen bg-black">
+      <Toast notification={notification} />
+
       <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
         Pre-producción Beta-tester - Usuario: {user?.name || user?.email || 'Usuario'}
       </div>

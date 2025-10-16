@@ -4,11 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Zap, Building2, GraduationCap, Radio } from 'lucide-react';
 import { PRICING_PLANS, PlanType } from '@/lib/stripe/config';
+import { useNotification } from '@/hooks/useNotification';
+import { Toast } from '@/components/Toast';
 
 type TargetType = 'all' | 'individual' | 'empresa' | 'institucional';
 
 export default function PricingPage() {
   const router = useRouter();
+  const { notification, showNotification } = useNotification();
   const [selectedTarget, setSelectedTarget] = useState<TargetType>('all');
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -84,7 +87,7 @@ export default function PricingPage() {
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al iniciar el proceso de pago. Por favor, inténtalo de nuevo.');
+      showNotification('Error al iniciar el proceso de pago. Por favor, inténtalo de nuevo.', 'error');
     } finally {
       setLoading(false);
     }
@@ -97,6 +100,8 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <Toast notification={notification} />
+
       {/* Header */}
       <div className="border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
