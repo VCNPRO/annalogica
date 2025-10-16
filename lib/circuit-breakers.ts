@@ -3,7 +3,7 @@ import { transcribeAudio, TranscriptionOptions } from './assemblyai-client';
 
 // Opciones para el Circuit Breaker de AssemblyAI
 const assemblyAIOptions: CircuitBreaker.Options = {
-  timeout: 45000, // 45 segundos de tiempo de espera para la llamada
+  timeout: 600000, // 10 minutos de tiempo de espera para archivos largos
   errorThresholdPercentage: 50, // Si el 50% de las llamadas fallan, abrir el circuito
   resetTimeout: 30000, // 30 segundos antes de reintentar (estado HALF-OPEN)
 };
