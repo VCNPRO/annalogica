@@ -1080,16 +1080,19 @@ export default function Dashboard() {
                 className={`p-2 ${bgSecondary} rounded-lg shadow-sm ${border} border ${textPrimary} text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                style={{ minWidth: '150px' }}
+                style={{ minWidth: '180px' }}
+                title="Selecciona el idioma del audio/video"
             >
-                <option value="auto">Detección automática</option>
-                <option value="es">Español</option>
-                <option value="ca">Català</option>
-                <option value="eu">Euskera</option>
-                <option value="gl">Gallego</option>
-                <option value="pt">Português</option>
-                <option value="en">English</option>
-                <option value="fr">Français</option>
+                <option value="auto">🌐 Detección automática</option>
+                <option value="es">🇪🇸 Español</option>
+                <option value="ca">🇪🇸 Català</option>
+                <option value="eu">🇪🇸 Euskera</option>
+                <option value="gl">🇪🇸 Gallego</option>
+                <option value="pt">🇵🇹 Português</option>
+                <option value="en">🇬🇧 English</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="de">🇩🇪 Deutsch</option>
+                <option value="it">🇮🇹 Italiano</option>
             </select>
         </div>
 
