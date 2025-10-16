@@ -256,7 +256,7 @@ export async function generateSummaryWithLeMUR(transcriptId: string, language: s
     const result = await client.lemur.task({
       transcript_ids: [transcriptId],
       prompt: prompt,
-      final_model: 'anthropic/claude-3-5-haiku',
+      final_model: 'anthropic/claude-3-5-haiku-20241022',
     });
 
     const fullText = result.response;
@@ -489,7 +489,7 @@ Se non ci sono informazioni identificative, restituisci un oggetto vuoto {} per 
     const result = await client.lemur.task({
       transcript_ids: [transcriptId],
       prompt: prompt,
-      final_model: 'anthropic/claude-3-5-haiku',
+      final_model: 'anthropic/claude-3-5-haiku-20241022',
     });
 
     // Parse JSON response
