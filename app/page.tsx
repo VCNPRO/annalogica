@@ -862,11 +862,7 @@ export default function Dashboard() {
 
   return (
     <div className={`min-h-screen ${bgPrimary}`}>
-      <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
-        Pre-producción Beta-tester - Usuario: {user?.name || user?.email || 'Usuario'}
-      </div>
-
-      <div className="fixed top-16 right-6 z-40 flex items-center gap-2">
+      <div className="fixed top-6 right-6 z-40 flex items-center gap-2">
         <button 
           onClick={() => alert('Guía de usuario próximamente')} 
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
@@ -903,27 +899,19 @@ export default function Dashboard() {
           <div className="flex flex-col mb-6">
             <div className="flex items-baseline gap-x-3">
               <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>
-              <span className="text-white">trabajando para</span>
+              <span className={textSecondary}>trabajando para</span>
             </div>
             {(user?.name || user?.email) && (
-              <p className={`${textPrimary} -mt-1 ml-1`}>{user.name || user.email}</p>
+              <p className={`${textPrimary} text-xl font-semibold -mt-1 ml-1`}>{user.name || user.email}</p>
             )}
           </div>
 
           <div className="mb-6">
-            <div 
+            <div
               className={`border-2 border-dashed ${darkMode ? 'border-zinc-700' : 'border-gray-300'} rounded-lg p-4 text-center cursor-pointer hover:border-orange-400 transition-colors`}
-              onDrop={handleDrop} // Add drop handler
-              onDragOver={handleDragOver} // Add drag over handler
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
             >
-            <Link href="/" className={`flex items-center gap-2 p-3 rounded-lg ${hover} ${textPrimary}`}>
-              <span className="text-orange-500">📁</span>
-              <span>Cargar y Procesar</span>
-            </Link>
-            <Link href="/processed-files" className={`flex items-center gap-2 p-3 rounded-lg ${hover} ${textPrimary}`}>
-              <span className="text-green-500">✅</span>
-              <span>Archivos Procesados</span>
-            </Link>
               <p className={`text-xs ${textSecondary} mb-3`}>
                 Archivos admitidos: Audio, Video, TXT, DOCX, PDF.
               </p>
@@ -960,107 +948,38 @@ export default function Dashboard() {
               <span className="text-orange-500 text-sm">🤖</span>
               <h2 className={`text-sm font-medium ${textPrimary}`}>Acciones IA</h2>
             </div>
-            <p className={`text-xs ${textSecondary} mb-3`}>Selecciona archivos y aplica una acción de IA.</p>
+            <p className={`text-xs ${textSecondary} mb-3`}>Selecciona archivos y haz clic en la acción deseada.</p>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  if (!canTranscribe) {
+                    alert('Selecciona archivos de audio o video para transcribir.');
+                    return;
+                  }
+                  handleProcessSelectedFiles();
+                }}
+                className={`w-full p-2 ${canTranscribe ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
+                disabled={!canTranscribe}
+              >
+                📝 Transcribir
+              </button>
 
+              <button
+                onClick={() => alert('Función de resumen disponible próximamente')}
+                className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+              >
+                📋 Resumir
+              </button>
 
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleApplyAction('Transcribir')}
-                  className={`p-2 ${canTranscribe ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
-                  disabled={!canTranscribe}
-                >
-                  📝 Transcribir
-                </button>
-                <button
-                  onClick={handleProcessSelectedFiles}
-                  className="p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium transition-colors"
-                >
-                  🚀 Procesar Archivos
-                </button>
-              </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <button
-                                onClick={() => handleApplyAction('Resumir')}
-                                className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                              >
-                                📋 Resumir
-                              </button>
-                              <div className="flex items-center justify-around gap-1 text-xs">
-                                <label className="flex items-center gap-1">
-                                  <input
-                                    type="radio"
-                                    className="accent-orange-500 scale-75"
-                                    name="summary"
-                                    checked={summaryType === 'short'}
-                                    onChange={() => setSummaryType('short')}
-                                  />
-                                  <span className={textSecondary}>Corto</span>
-                                </label>
-                                <label className="flex items-center gap-1">
-                                  <input
-                                    type="radio"
-                                    className="accent-orange-500 scale-75"
-                                    name="summary"
-                                    checked={summaryType === 'detailed'}
-                                    onChange={() => setSummaryType('detailed')}
-                                  />
-                                  <span className={textSecondary}>Detallado</span>
-                                </label>
-                              </div>
-                            </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleApplyAction('SRT')}
-                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                >
-                  📄 Generar SRT
-                </button>
-                <button
-                  onClick={() => handleApplyAction('VTT')}
-                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                >
-                  📄 Generar VTT
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleApplyAction('Oradores')}
-                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                >
-                  🎙️ Detectar Oradores
-                </button>
-                <button
-                  onClick={() => handleApplyAction('Aplicar Tags')}
-                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                >
-                  🏷️ Aplicar Tags
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleApplyAction('Traducir')}
-                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                >
-                  🌐 Traducir
-                </button>
-                <select
-                  className={`p-2 border ${border} ${bgSecondary} ${textPrimary} rounded-md text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
-                  value={targetLanguage}
-                  onChange={(e) => setTargetLanguage(e.target.value)}
-                >
-                  <option value="en">Inglés</option>
-                  <option value="es">Español</option>
-                  <option value="fr">Français</option>
-                  <option value="ca">Català</option>
-                </select>
-              </div>
-                          </div>
-                        </div>
+              <Link
+                href="/processed-files"
+                className="block w-full p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium text-center transition-colors"
+              >
+                ✅ Archivos Procesados
+              </Link>
+            </div>
+          </div>
               
                                   <div className="mt-auto pt-6 text-center">
             <p className="text-xs text-zinc-500">
@@ -1114,39 +1033,13 @@ export default function Dashboard() {
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    if (uploadedFiles.some(f => f.status === 'processing' || f.status === 'pending')) {
-                      if (confirm('Hay archivos procesándose. ¿Reiniciar de todos modos?')) {
-                        setUploadedFiles([]);
-                        setSelectedUploadedFileIds(new Set());
-                        setSelectedCompletedFileIds(new Set());
-                        setError(null);
-                        localStorage.removeItem('uploadedFiles'); // Limpiar localStorage
-                      }
-                    } else if (uploadedFiles.length > 0) {
-                      if (confirm('¿Estás seguro de que quieres limpiar todos los archivos?')) {
-                        setUploadedFiles([]);
-                        setSelectedUploadedFileIds(new Set());
-                        setSelectedCompletedFileIds(new Set());
-                        setError(null);
-                        localStorage.removeItem('uploadedFiles'); // Limpiar localStorage
-                      }
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
-                  title="Reiniciar - Limpiar todo y empezar de nuevo"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Reiniciar
-                </button>
-                <button
-                  onClick={() => {
-                    const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id));
+                    const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id) && f.status !== 'completed');
                     if (selectedFiles.length === 0) {
                       alert('Selecciona archivos para eliminar');
                       return;
                     }
                     if (confirm(`¿Eliminar ${selectedFiles.length} archivo(s) seleccionado(s)?`)) {
-                      setUploadedFiles(prev => prev.filter(f => !selectedUploadedFileIds.has(f.id)));
+                      setUploadedFiles(prev => prev.filter(f => !(selectedUploadedFileIds.has(f.id) && f.status !== 'completed')));
                       setSelectedUploadedFileIds(new Set());
                     }
                   }}
@@ -1319,17 +1212,7 @@ export default function Dashboard() {
                     />
                     <span className={`text-xs ${textSecondary}`}>Ambos</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="form-checkbox h-4 w-4 text-orange-500 bg-transparent border-zinc-600 rounded accent-orange-500"
-                      checked={!createSubfolders}
-                      onChange={(e) => setCreateSubfolders(!e.target.checked)}
-                    />
-                    <span className={`text-xs ${textSecondary}`}>Guardar junto con los originales</span>
-                  </label>
                 </div>
-                <p className={`text-xs ${textSecondary}`}>Archivos procesados listos para descargar</p>
 
 
               </div>
@@ -1393,11 +1276,11 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={handleDeleteSelectedCompletedFiles}
-                  disabled={uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id)).length === 0}
-                  className="px-3 py-1.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
                   title="Eliminar archivos procesados seleccionados"
                 >
-                  <Trash2 className="h-3.5 w-3.5" /> Eliminar Seleccionados
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Eliminar
                 </button>
               </div>
             </div>
