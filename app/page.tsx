@@ -951,24 +951,32 @@ export default function Dashboard() {
             <p className={`text-xs ${textSecondary} mb-3`}>Selecciona archivos y aplica acciones.</p>
 
             <div className="space-y-2">
-              {/* 1. Transcribir */}
-              <button
-                onClick={() => handleApplyAction('Transcribir')}
-                className={`w-full p-2 ${canTranscribe ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
-                disabled={!canTranscribe}
-              >
-                📝 Transcribir
-              </button>
+              {/* Fila 1: Transcribir + Oradores */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleApplyAction('Transcribir')}
+                  className={`p-2 ${canTranscribe ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
+                  disabled={!canTranscribe}
+                >
+                  📝 Transcribir
+                </button>
+                <button
+                  onClick={() => handleApplyAction('Oradores')}
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  🎙️ Oradores
+                </button>
+              </div>
 
-              {/* 2. Resumen con opciones */}
-              <div className="space-y-1">
+              {/* Fila 2: Resumen + opciones Corto/Detallado */}
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleApplyAction('Resumir')}
-                  className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
                 >
                   📋 Resumen
                 </button>
-                <div className="flex items-center justify-center gap-3 text-xs">
+                <div className="flex items-center justify-around gap-1 text-xs">
                   <label className="flex items-center gap-1">
                     <input
                       type="radio"
@@ -992,15 +1000,15 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 3. Subtítulos con opciones */}
-              <div className="space-y-1">
+              {/* Fila 3: Subtítulos + opciones SRT/VTT */}
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleApplyAction('Subtítulos')}
-                  className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
                 >
                   📄 Subtítulos
                 </button>
-                <div className="flex items-center justify-center gap-3 text-xs">
+                <div className="flex items-center justify-around gap-1 text-xs">
                   <label className="flex items-center gap-1">
                     <input
                       type="checkbox"
@@ -1024,37 +1032,29 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* 4. Oradores */}
-              <button
-                onClick={() => handleApplyAction('Oradores')}
-                className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-              >
-                🎙️ Oradores
-              </button>
+              {/* Fila 4: Etiquetas + Archivos Procesados */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => handleApplyAction('Etiquetas')}
+                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  🏷️ Etiquetas
+                </button>
+                <Link
+                  href="/processed-files"
+                  className="flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  ✅ Archivos Procesados
+                </Link>
+              </div>
 
-              {/* 5. Etiquetas */}
-              <button
-                onClick={() => handleApplyAction('Etiquetas')}
-                className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-              >
-                🏷️ Etiquetas
-              </button>
-
-              {/* Procesar archivos */}
+              {/* Fila 5: Procesar Archivos - ancho completo */}
               <button
                 onClick={handleProcessSelectedFiles}
-                className="w-full p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors mt-4"
+                className="w-full p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors mt-2"
               >
                 🚀 Procesar Archivos
               </button>
-
-              {/* Archivos Procesados */}
-              <Link
-                href="/processed-files"
-                className="block w-full p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium text-center transition-colors"
-              >
-                ✅ Archivos Procesados
-              </Link>
             </div>
           </div>
 
