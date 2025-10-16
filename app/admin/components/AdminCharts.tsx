@@ -170,6 +170,7 @@ interface AlertSeverityData {
   severity: string;
   count: number;
   color: string;
+  [key: string]: string | number;
 }
 
 export function AlertSeverityChart({ data }: { data: AlertSeverityData[] }) {
