@@ -60,7 +60,11 @@ export const transcribeFile = inngest.createFunction(
       const actions: string[] = job.metadata?.actions || [];
       console.log('[Inngest] Processing with actions:', actions);
 
-      const urls = await saveTranscriptionResults(transcriptionResult, filename, audioUrl);
+      // Check if subtitles were requested
+      const generateSubtitles = actions.includes('Subtítulos') || actions.includes('SRT') || actions.includes('VTT');
+      console.log('[Inngest] Generate subtitles?', generateSubtitles);
+
+      const urls = await saveTranscriptionResults(transcriptionResult, filename, audioUrl, generateSubtitles);
 
       // Initialize metadata with existing actions
       const metadata: any = { actions };
@@ -128,13 +132,13 @@ export const transcribeFile = inngest.createFunction(
         metadata,
       };
 
-      // Only include SRT/VTT if subtitles were requested
-      if (actions.includes('Subtítulos') || actions.includes('SRT') || actions.includes('VTT')) {
-        console.log('[Inngest] ✅ Subtítulos requested - including SRT/VTT URLs');
+      // Include SRT/VTT URLs if they were generated
+      if (urls.srtUrl && urls.vttUrl) {
+        console.log('[Inngest] ✅ Including SRT/VTT URLs in database');
         updateData.srtUrl = urls.srtUrl;
         updateData.vttUrl = urls.vttUrl;
       } else {
-        console.log('[Inngest] ⏭️ Subtítulos NOT requested - skipping SRT/VTT');
+        console.log('[Inngest] ⏭️ No SRT/VTT URLs to save');
       }
 
       // Include speakers URL if processed

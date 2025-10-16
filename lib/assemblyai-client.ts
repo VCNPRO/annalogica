@@ -170,11 +170,12 @@ function pad(num: number, size = 2): string {
 export async function saveTranscriptionResults(
   result: TranscriptionResult,
   filename: string,
-  originalFileUrl: string // Add this parameter
+  originalFileUrl: string, // Add this parameter
+  generateSubtitles: boolean = false // NEW: Control subtitle generation
 ): Promise<{
   txtUrl: string;
-  srtUrl: string;
-  vttUrl: string;
+  srtUrl?: string;
+  vttUrl?: string;
 }> {
   const baseName = filename.replace(/\.[^/.]+$/, '');
   const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
@@ -183,7 +184,7 @@ export async function saveTranscriptionResults(
     throw new Error('BLOB_READ_WRITE_TOKEN not configured');
   }
 
-  // Save TXT
+  // Always save TXT
   const txtBlob = await put(`${baseName}.txt`, result.text, {
     access: 'public',
     contentType: 'text/plain; charset=utf-8',
@@ -191,29 +192,39 @@ export async function saveTranscriptionResults(
     addRandomSuffix: true
   });
 
-  // Save SRT
-  const srtContent = generateSRT(result);
-  const srtBlob = await put(`${baseName}.srt`, srtContent, {
-    access: 'public',
-    contentType: 'text/plain; charset=utf-8',
-    token: blobToken,
-    addRandomSuffix: true
-  });
-
-  // Save VTT
-  const vttContent = generateVTT(result);
-  const vttBlob = await put(`${baseName}.vtt`, vttContent, {
-    access: 'public',
-    contentType: 'text/vtt; charset=utf-8',
-    token: blobToken,
-    addRandomSuffix: true
-  });
-
-  return {
-    txtUrl: txtBlob.url,
-    srtUrl: srtBlob.url,
-    vttUrl: vttBlob.url
+  const response: { txtUrl: string; srtUrl?: string; vttUrl?: string } = {
+    txtUrl: txtBlob.url
   };
+
+  // Conditionally save SRT/VTT only if requested
+  if (generateSubtitles) {
+    console.log('[Vercel Blob] ✅ Generating subtitles (SRT/VTT) as requested');
+
+    // Save SRT
+    const srtContent = generateSRT(result);
+    const srtBlob = await put(`${baseName}.srt`, srtContent, {
+      access: 'public',
+      contentType: 'text/plain; charset=utf-8',
+      token: blobToken,
+      addRandomSuffix: true
+    });
+
+    // Save VTT
+    const vttContent = generateVTT(result);
+    const vttBlob = await put(`${baseName}.vtt`, vttContent, {
+      access: 'public',
+      contentType: 'text/vtt; charset=utf-8',
+      token: blobToken,
+      addRandomSuffix: true
+    });
+
+    response.srtUrl = srtBlob.url;
+    response.vttUrl = vttBlob.url;
+  } else {
+    console.log('[Vercel Blob] ⏭️ Skipping subtitle generation (not requested)');
+  }
+
+  return response;
 
   // Delete original file after successful processing
   try {
