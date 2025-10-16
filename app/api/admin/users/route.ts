@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
+import { verifyAdmin, verifyRequestAuth } from '@/lib/auth';
 import {
   getAllUsersWithMetrics,
   getUserDetails,
@@ -17,8 +17,8 @@ import {
 export async function GET(request: Request) {
   try {
     // Verificar autenticación y rol admin
-    const auth = await verifyAuth(request);
-    if (!auth || auth.role !== 'admin') {
+    const isAdmin = await verifyAdmin(request);
+    if (!isAdmin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
@@ -56,10 +56,13 @@ export async function GET(request: Request) {
 // PATCH /api/admin/users - Actualizar usuario
 export async function PATCH(request: Request) {
   try {
-    const auth = await verifyAuth(request);
-    if (!auth || auth.role !== 'admin') {
+    const isAdmin = await verifyAdmin(request);
+    if (!isAdmin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
+
+    const auth = verifyRequestAuth(request);
+    const adminUserId = auth?.userId || 'admin';
 
     const body = await request.json();
     const { userId, field, value } = body;
@@ -75,24 +78,24 @@ export async function PATCH(request: Request) {
 
     switch (field) {
       case 'accountType':
-        success = await updateUserAccountType(userId, value, auth.userId);
+        success = await updateUserAccountType(userId, value, adminUserId);
         break;
       case 'accountStatus':
         success = await updateUserAccountStatus(
           userId,
           value,
-          auth.userId,
+          adminUserId,
           body.reason
         );
         break;
       case 'notes':
-        success = await updateUserNotes(userId, value, auth.userId);
+        success = await updateUserNotes(userId, value, adminUserId);
         break;
       case 'tags':
-        success = await updateUserTags(userId, value, auth.userId);
+        success = await updateUserTags(userId, value, adminUserId);
         break;
       case 'monthlyBudget':
-        success = await setUserMonthlyBudget(userId, value, auth.userId);
+        success = await setUserMonthlyBudget(userId, value, adminUserId);
         break;
       default:
         return NextResponse.json(

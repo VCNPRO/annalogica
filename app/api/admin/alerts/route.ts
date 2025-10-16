@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
+import { verifyAdmin, verifyRequestAuth } from '@/lib/auth';
 import {
   getActiveAlerts,
   resolveAlert,
@@ -15,8 +15,8 @@ import {
 // GET /api/admin/alerts - Obtener alertas activas
 export async function GET(request: Request) {
   try {
-    const auth = await verifyAuth(request);
-    if (!auth || auth.role !== 'admin') {
+    const isAdmin = await verifyAdmin(request);
+    if (!isAdmin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
@@ -46,8 +46,8 @@ export async function GET(request: Request) {
 // POST /api/admin/alerts - Ejecutar verificación manual de alertas
 export async function POST(request: Request) {
   try {
-    const auth = await verifyAuth(request);
-    if (!auth || auth.role !== 'admin') {
+    const isAdmin = await verifyAdmin(request);
+    if (!isAdmin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
@@ -87,11 +87,12 @@ export async function POST(request: Request) {
 // PATCH /api/admin/alerts - Resolver alerta
 export async function PATCH(request: Request) {
   try {
-    const auth = await verifyAuth(request);
-    if (!auth || auth.role !== 'admin') {
+    const isAdmin = await verifyAdmin(request);
+    if (!isAdmin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
+    const auth = verifyRequestAuth(request);
     const body = await request.json();
     const { alertId, notes } = body;
 
@@ -102,7 +103,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const success = await resolveAlert(alertId, auth.userId, notes);
+    const success = await resolveAlert(alertId, auth?.userId || 'admin', notes);
 
     if (success) {
       return NextResponse.json({ success: true });

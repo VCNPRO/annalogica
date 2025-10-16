@@ -84,6 +84,7 @@ interface UserDistributionData {
   name: string;
   value: number;
   color: string;
+  [key: string]: string | number;
 }
 
 export function UserDistributionChart({ data }: { data: UserDistributionData[] }) {

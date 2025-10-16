@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { verifyAuth } from '@/lib/auth';
+import { verifyAdmin } from '@/lib/auth';
 import { getPlatformStatistics } from '@/lib/admin-users';
 
 // GET /api/admin/stats - Obtener estadísticas de la plataforma
 export async function GET(request: Request) {
   try {
-    const auth = await verifyAuth(request);
-    if (!auth || auth.role !== 'admin') {
+    const isAdmin = await verifyAdmin(request);
+    if (!isAdmin) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 403 });
     }
 
