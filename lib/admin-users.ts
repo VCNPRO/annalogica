@@ -266,9 +266,11 @@ export async function updateUserTags(
   adminUserId: string
 ): Promise<boolean> {
   try {
+    // Convertir array a formato PostgreSQL
+    const tagsArray = `{${tags.map(tag => `"${tag.replace(/"/g, '\\"')}"`).join(',')}}`;
     await sql`
       UPDATE users
-      SET tags = ${tags},
+      SET tags = ${tagsArray}::text[],
           updated_at = NOW()
       WHERE id = ${userId}
     `;
