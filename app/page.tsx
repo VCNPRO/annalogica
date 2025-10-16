@@ -948,45 +948,127 @@ export default function Dashboard() {
               <span className="text-orange-500 text-sm">🤖</span>
               <h2 className={`text-sm font-medium ${textPrimary}`}>Acciones IA</h2>
             </div>
-            <p className={`text-xs ${textSecondary} mb-3`}>Selecciona archivos y haz clic en la acción deseada.</p>
+            <p className={`text-xs ${textSecondary} mb-3`}>Selecciona archivos y aplica acciones.</p>
 
             <div className="space-y-2">
+              {/* 1. Transcribir */}
               <button
-                onClick={() => {
-                  if (!canTranscribe) {
-                    alert('Selecciona archivos de audio o video para transcribir.');
-                    return;
-                  }
-                  handleProcessSelectedFiles();
-                }}
+                onClick={() => handleApplyAction('Transcribir')}
                 className={`w-full p-2 ${canTranscribe ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
                 disabled={!canTranscribe}
               >
                 📝 Transcribir
               </button>
 
+              {/* 2. Resumen con opciones */}
+              <div className="space-y-1">
+                <button
+                  onClick={() => handleApplyAction('Resumir')}
+                  className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  📋 Resumen
+                </button>
+                <div className="flex items-center justify-center gap-3 text-xs">
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      className="accent-orange-500 scale-75"
+                      name="summary"
+                      checked={summaryType === 'short'}
+                      onChange={() => setSummaryType('short')}
+                    />
+                    <span className={textSecondary}>Corto</span>
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      className="accent-orange-500 scale-75"
+                      name="summary"
+                      checked={summaryType === 'detailed'}
+                      onChange={() => setSummaryType('detailed')}
+                    />
+                    <span className={textSecondary}>Detallado</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* 3. Subtítulos con opciones */}
+              <div className="space-y-1">
+                <button
+                  onClick={() => handleApplyAction('Subtítulos')}
+                  className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  📄 Subtítulos
+                </button>
+                <div className="flex items-center justify-center gap-3 text-xs">
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-3 w-3 text-orange-500 rounded accent-orange-500"
+                      onChange={(e) => {
+                        if (e.target.checked) handleApplyAction('SRT');
+                      }}
+                    />
+                    <span className={textSecondary}>SRT</span>
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      className="form-checkbox h-3 w-3 text-orange-500 rounded accent-orange-500"
+                      onChange={(e) => {
+                        if (e.target.checked) handleApplyAction('VTT');
+                      }}
+                    />
+                    <span className={textSecondary}>VTT</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* 4. Oradores */}
               <button
-                onClick={() => alert('Función de resumen disponible próximamente')}
+                onClick={() => handleApplyAction('Oradores')}
                 className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
               >
-                📋 Resumir
+                🎙️ Oradores
               </button>
 
+              {/* 5. Etiquetas */}
+              <button
+                onClick={() => handleApplyAction('Etiquetas')}
+                className="w-full p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+              >
+                🏷️ Etiquetas
+              </button>
+
+              {/* Procesar archivos */}
+              <button
+                onClick={handleProcessSelectedFiles}
+                className="w-full p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors mt-4"
+              >
+                🚀 Procesar Archivos
+              </button>
+
+              {/* Archivos Procesados */}
               <Link
                 href="/processed-files"
-                className="block w-full p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-xs font-medium text-center transition-colors"
+                className="block w-full p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium text-center transition-colors"
               >
                 ✅ Archivos Procesados
               </Link>
             </div>
           </div>
-              
-                                  <div className="mt-auto pt-6 text-center">
-            <p className="text-xs text-zinc-500">
-              annalogica by videoconversion digital lab, S.L.
+
+          <div className="mt-auto pt-6 border-t border-zinc-800">
+            <p className={`text-xs ${textSecondary} text-center mb-1`}>
+              © 2025 Annalogica. Todos los derechos reservados.
             </p>
-            <p className="text-xs text-zinc-500">
-              From Barcelona with love
+            <div className="flex justify-center gap-3 text-xs mb-2">
+              <a href="/privacy" className={`${textSecondary} hover:text-orange-500`}>Privacidad</a>
+              <a href="/terms" className={`${textSecondary} hover:text-orange-500`}>Términos</a>
+              <a href="mailto:legal@annalogica.eu" className={`${textSecondary} hover:text-orange-500`}>Contacto</a>
+            </div>
+            <p className={`text-xs ${textSecondary} text-center`}>
+              support@annalogica.eu
             </p>
           </div>
         </div>
@@ -1031,6 +1113,32 @@ export default function Dashboard() {
                 <p className={`text-xs ${textSecondary}`}>Archivos en proceso de subida y procesamiento</p>
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (uploadedFiles.some(f => f.status === 'processing' || f.status === 'pending')) {
+                      if (confirm('Hay archivos procesándose. ¿Reiniciar de todos modos?')) {
+                        setUploadedFiles([]);
+                        setSelectedUploadedFileIds(new Set());
+                        setSelectedCompletedFileIds(new Set());
+                        setError(null);
+                        localStorage.removeItem('uploadedFiles');
+                      }
+                    } else if (uploadedFiles.length > 0) {
+                      if (confirm('¿Estás seguro de que quieres limpiar todos los archivos?')) {
+                        setUploadedFiles([]);
+                        setSelectedUploadedFileIds(new Set());
+                        setSelectedCompletedFileIds(new Set());
+                        setError(null);
+                        localStorage.removeItem('uploadedFiles');
+                      }
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
+                  title="Reiniciar - Limpiar todo y empezar de nuevo"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Reiniciar
+                </button>
                 <button
                   onClick={() => {
                     const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id) && f.status !== 'completed');
