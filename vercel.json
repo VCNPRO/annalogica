@@ -9,20 +9,12 @@
   },
   "crons": [
     {
-      "path": "/api/cron/check-alerts",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/refresh-metrics",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/update-user-costs",
+      "path": "/api/cron/maintenance",
       "schedule": "0 2 * * *"
     },
     {
-      "path": "/api/cron/cleanup",
-      "schedule": "0 3 * * *"
+      "path": "/api/cron/monitoring",
+      "schedule": "0 8 * * *"
     }
   ]
 }

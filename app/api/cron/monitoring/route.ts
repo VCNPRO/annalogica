@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
-import { checkHighCostUsers, checkQuotaExceeded } from '@/lib/admin-alerts';
+import { sql } from '@vercel/postgres';
 import { logger } from '@/lib/logger';
+import { checkHighCostUsers, checkQuotaExceeded } from '@/lib/admin-alerts';
 
 /**
- * Cron Job: Verificación de alertas cada hora
+ * Cron Job de Monitoreo Diario (8:00 AM UTC)
+ * - Verificar alertas de costes altos
+ * - Verificar alertas de cuotas excedidas
+ * - Enviar notificaciones por email
+ *
  * Configurado en vercel.json
  */
 export async function GET(request: Request) {
@@ -20,15 +25,18 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    logger.info('Starting alert checks cron job');
+    logger.info('Starting monitoring cron job');
+    const startTime = Date.now();
 
-    // Ejecutar verificaciones
+    // Ejecutar verificaciones de alertas
     const highCostAlerts = await checkHighCostUsers();
     const quotaAlerts = await checkQuotaExceeded();
 
     const totalAlertsCreated = highCostAlerts + quotaAlerts;
+    const duration = Date.now() - startTime;
 
-    logger.info('Alert checks completed', {
+    logger.info('Monitoring cron completed', {
+      duration,
       highCostAlerts,
       quotaAlerts,
       totalAlertsCreated,
@@ -36,13 +44,14 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
+      duration,
       highCostAlerts,
       quotaAlerts,
       totalAlertsCreated,
       timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
-    logger.error('Error in alert checks cron', error);
+    logger.error('Error in monitoring cron', error);
     return NextResponse.json(
       { error: 'Internal server error', message: error.message },
       { status: 500 }
