@@ -1115,26 +1115,32 @@ export default function Dashboard() {
               <div className="flex gap-2">
                 <button
                   onClick={() => {
-                    if (uploadedFiles.some(f => f.status === 'processing' || f.status === 'pending')) {
-                      if (confirm('Hay archivos procesándose. ¿Reiniciar de todos modos?')) {
-                        setUploadedFiles([]);
-                        setSelectedUploadedFileIds(new Set());
-                        setSelectedCompletedFileIds(new Set());
-                        setError(null);
-                        localStorage.removeItem('uploadedFiles');
-                      }
-                    } else if (uploadedFiles.length > 0) {
-                      if (confirm('¿Estás seguro de que quieres limpiar todos los archivos?')) {
-                        setUploadedFiles([]);
-                        setSelectedUploadedFileIds(new Set());
-                        setSelectedCompletedFileIds(new Set());
-                        setError(null);
-                        localStorage.removeItem('uploadedFiles');
-                      }
+                    const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id) && f.status !== 'completed');
+                    if (selectedFiles.length === 0) {
+                      alert('Selecciona archivos para reiniciar su procesamiento');
+                      return;
+                    }
+                    if (confirm(`¿Reiniciar el procesamiento de ${selectedFiles.length} archivo(s) seleccionado(s)?`)) {
+                      setUploadedFiles(prev => prev.map(f => {
+                        if (selectedUploadedFileIds.has(f.id) && f.status !== 'completed') {
+                          return {
+                            ...f,
+                            status: 'pending' as FileStatus,
+                            processingProgress: 0,
+                            uploadProgress: 100,
+                            processingStartTime: undefined,
+                            estimatedTimeRemaining: undefined,
+                            actions: [] // Limpiar acciones para que se vuelvan a seleccionar
+                          };
+                        }
+                        return f;
+                      }));
+                      setSelectedUploadedFileIds(new Set());
+                      alert('Archivos reiniciados. Selecciona las acciones de IA y haz clic en "Procesar Archivos".');
                     }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
-                  title="Reiniciar - Limpiar todo y empezar de nuevo"
+                  title="Reiniciar procesamiento de archivos seleccionados"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
                   Reiniciar
