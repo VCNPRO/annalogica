@@ -5,7 +5,7 @@ export interface GuideSection {
   content: string | string[];
 }
 
-export function generateUserGuidePDF(): PDFDocument {
+export function generateUserGuidePDF(): any {
   const doc = new PDFDocument({
     size: 'A4',
     margins: { top: 50, bottom: 50, left: 50, right: 50 },
