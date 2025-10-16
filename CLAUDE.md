@@ -31,9 +31,9 @@ npm run start
 
 ### Funcionalidades
 1. ✅ Carga archivos audio/video → Vercel Blob
-2. ✅ Transcripción → Replicate Whisper
-3. ✅ Generación SRT + TXT
-4. ✅ Resúmenes → Claude API
+2. ✅ Transcripción → AssemblyAI
+3. ✅ Generación SRT + TXT + VTT + Speakers
+4. ✅ Resúmenes y Tags → AssemblyAI LeMUR (multiidioma)
 5. ✅ Descarga PDF
 6. ✅ Dashboard con dark/light mode
 7. ✅ Autenticación JWT
@@ -47,11 +47,12 @@ npm run start
 
 ### Configuración Requerida
 Editar `.env.local` con tus tokens:
+- `ASSEMBLYAI_API_KEY` → https://www.assemblyai.com/dashboard/api-keys
 - `BLOB_READ_WRITE_TOKEN` → Vercel Dashboard
-- `REPLICATE_API_TOKEN` → https://replicate.com/account/api-tokens
-- `CLAUDE_API_KEY` → https://console.anthropic.com/settings/keys
 - `JWT_SECRET` → ✅ Ya generado automáticamente
 - `CRON_SECRET` → Generar token aleatorio para seguridad del cron job
+
+**NOTA:** Ya NO se necesita `CLAUDE_API_KEY`. Se usa AssemblyAI LeMUR para resúmenes.
 
 ### Retención de Archivos
 **IMPORTANTE**: Política de almacenamiento actualizada (2025-10-10)

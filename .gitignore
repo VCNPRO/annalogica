@@ -59,3 +59,4 @@ npm-debug.log*
 
 # Special Windows files
 nul
+.env*.local

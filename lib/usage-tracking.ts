@@ -9,13 +9,9 @@ const COSTS = {
   // Replicate Whisper
   WHISPER_PER_RUN: 0.00046,
 
-  // Claude API (Sonnet 4.5)
-  CLAUDE_INPUT_PER_1M: 3.0,
-  CLAUDE_OUTPUT_PER_1M: 15.0,
-
-  // Claude Haiku (alternative - cheaper)
-  HAIKU_INPUT_PER_1M: 0.80,
-  HAIKU_OUTPUT_PER_1M: 4.0,
+  // AssemblyAI LeMUR (uses Claude 3.5 Sonnet)
+  LEMUR_INPUT_PER_1M: 3.0,
+  LEMUR_OUTPUT_PER_1M: 15.0,
 };
 
 export interface UsageLog {
@@ -81,17 +77,16 @@ export async function logTranscription(
 }
 
 /**
- * Log summary generation (Claude)
+ * Log summary generation (AssemblyAI LeMUR)
  */
 export async function logSummary(
   userId: string,
   tokensInput: number,
-  tokensOutput: number,
-  model: 'sonnet' | 'haiku' = 'sonnet'
+  tokensOutput: number
 ): Promise<void> {
-  // Calculate cost based on model
-  const inputCost = model === 'sonnet' ? COSTS.CLAUDE_INPUT_PER_1M : COSTS.HAIKU_INPUT_PER_1M;
-  const outputCost = model === 'sonnet' ? COSTS.CLAUDE_OUTPUT_PER_1M : COSTS.HAIKU_OUTPUT_PER_1M;
+  // Calculate cost using LeMUR pricing (same as Claude 3.5 Sonnet)
+  const inputCost = COSTS.LEMUR_INPUT_PER_1M;
+  const outputCost = COSTS.LEMUR_OUTPUT_PER_1M;
 
   const costUSD =
     (tokensInput / 1_000_000) * inputCost +
@@ -105,7 +100,7 @@ export async function logSummary(
       ${tokensInput},
       ${tokensOutput},
       ${costUSD},
-      ${JSON.stringify({ model, service: 'anthropic-claude' })}
+      ${JSON.stringify({ service: 'assemblyai-lemur' })}
     )
   `;
 }

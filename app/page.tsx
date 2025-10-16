@@ -411,7 +411,7 @@ export default function Dashboard() {
   const handleApplyAction = (actionName: string) => {
     setUploadedFiles(prevFiles =>
       prevFiles.map(file =>
-        selectedFileIds.has(file.id)
+        selectedUploadedFileIds.has(file.id)
           ? {
               ...file,
               actions: file.actions.includes(actionName)
@@ -539,7 +539,7 @@ export default function Dashboard() {
 
 
   const handleDeleteSelectedCompletedFiles = async () => {
-    const selectedCompletedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedFileIds.has(f.id));
+    const selectedCompletedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id));
 
     if (selectedCompletedFiles.length === 0) {
       alert('Selecciona al menos un archivo completado para eliminar.');
@@ -572,8 +572,8 @@ export default function Dashboard() {
     }
 
     if (successfulDeletions > 0) {
-      setUploadedFiles(prev => prev.filter(file => !(file.status === 'completed' && selectedFileIds.has(file.id))));
-      setSelectedFileIds(new Set());
+      setUploadedFiles(prev => prev.filter(file => !(file.status === 'completed' && selectedCompletedFileIds.has(file.id))));
+      setSelectedCompletedFileIds(new Set());
       alert(`${successfulDeletions} archivo(s) procesado(s) eliminado(s) correctamente.`);
     }
   };
@@ -850,7 +850,7 @@ export default function Dashboard() {
     );
   }
 
-  const selectedFiles = uploadedFiles.filter(file => selectedFileIds.has(file.id));
+  const selectedFiles = uploadedFiles.filter(file => selectedUploadedFileIds.has(file.id));
   const canTranscribe = selectedFiles.some(file => file.fileType === 'audio' || file.fileType === 'video');
 
   const bgPrimary = darkMode ? 'bg-black' : 'bg-gray-50';
@@ -1114,14 +1114,16 @@ export default function Dashboard() {
                     if (uploadedFiles.some(f => f.status === 'processing' || f.status === 'pending')) {
                       if (confirm('Hay archivos procesándose. ¿Reiniciar de todos modos?')) {
                         setUploadedFiles([]);
-                        setSelectedFileIds(new Set());
+                        setSelectedUploadedFileIds(new Set());
+                        setSelectedCompletedFileIds(new Set());
                         setError(null);
                         localStorage.removeItem('uploadedFiles'); // Limpiar localStorage
                       }
                     } else if (uploadedFiles.length > 0) {
                       if (confirm('¿Estás seguro de que quieres limpiar todos los archivos?')) {
                         setUploadedFiles([]);
-                        setSelectedFileIds(new Set());
+                        setSelectedUploadedFileIds(new Set());
+                        setSelectedCompletedFileIds(new Set());
                         setError(null);
                         localStorage.removeItem('uploadedFiles'); // Limpiar localStorage
                       }
@@ -1135,14 +1137,14 @@ export default function Dashboard() {
                 </button>
                 <button
                   onClick={() => {
-                    const selectedFiles = uploadedFiles.filter(f => selectedFileIds.has(f.id));
+                    const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id));
                     if (selectedFiles.length === 0) {
                       alert('Selecciona archivos para eliminar');
                       return;
                     }
                     if (confirm(`¿Eliminar ${selectedFiles.length} archivo(s) seleccionado(s)?`)) {
-                      setUploadedFiles(prev => prev.filter(f => !selectedFileIds.has(f.id)));
-                      setSelectedFileIds(new Set());
+                      setUploadedFiles(prev => prev.filter(f => !selectedUploadedFileIds.has(f.id)));
+                      setSelectedUploadedFileIds(new Set());
                     }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"

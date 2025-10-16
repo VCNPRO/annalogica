@@ -1,11 +1,11 @@
 import { inngest } from './client';
-import { assemblyAIBreaker, claudeBreaker } from '@/lib/circuit-breakers'; // Added claudeBreaker
+import { assemblyAIBreaker } from '@/lib/circuit-breakers';
 import { TranscriptionJobDB } from '@/lib/db';
 import {
   transcribeAudio,
   saveTranscriptionResults,
   saveSpeakersReport,
-  generateSummary, // generateSummary will be called via claudeBreaker
+  generateSummaryWithLeMUR,
   saveSummary,
   type TranscriptionResult,
   type SummaryResult,
@@ -137,25 +137,17 @@ export const summarizeFile = inngest.createFunction(
     }
     const { user_id: userId, filename, metadata } = job;
 
-    const transcriptionText = await step.run('fetch-transcription-text', async () => {
-        const response = await fetch(job.txt_url!);
-        if (!response.ok) throw new Error('Failed to fetch transcription text for summary');
-        return await response.text();
-    });
-
-    if (transcriptionText.length < 100) {
-        console.log(`[Inngest] Skipping summary for job ${jobId} (text too short)`);
-        return { status: 'skipped', reason: 'Text too short' };
+    if (!job.assemblyai_id) {
+        console.error(`[Inngest] Job ${jobId} does not have AssemblyAI transcript ID for LeMUR`);
+        return { error: 'No AssemblyAI transcript ID available' };
     }
 
     const { summary, tags } = await step.run('generate-summary-and-tags', async () => {
-        // The breaker will wrap the call to Claude
-        const result = await claudeBreaker.fire(transcriptionText);
+        // Use LeMUR with the transcript ID directly
+        const result = await generateSummaryWithLeMUR(job.assemblyai_id!, job.language || 'es');
 
-        // Type guard to check for the fallback response
-        if ('error' in result) {
-          // Throw an error to force Inngest to retry the step later
-          throw new Error(result.error as string);
+        if (!result.summary) {
+          throw new Error('LeMUR returned empty summary');
         }
 
         return result;
@@ -180,9 +172,10 @@ export const summarizeFile = inngest.createFunction(
             metadata: newMetadata,
         });
 
-        const tokensInput = Math.ceil(transcriptionText.slice(0, 8000).length / 4);
+        // Estimate tokens for LeMUR usage tracking
+        const tokensInput = Math.ceil((job.txt_url?.length || 0) / 4); // Approximate
         const tokensOutput = Math.ceil(summary.length / 4);
-        await logSummary(userId, tokensInput, tokensOutput, 'sonnet');
+        await logSummary(userId, tokensInput, tokensOutput);
     });
 
     await step.run('update-status-completed', async () => {

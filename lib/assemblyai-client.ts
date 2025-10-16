@@ -230,49 +230,42 @@ export interface SummaryResult {
 }
 
 /**
- * Generate summary and tags using Claude API
+ * Generate summary and tags using AssemblyAI LeMUR
  */
-export async function generateSummary(text: string): Promise<SummaryResult> {
-  const apiKey = process.env.CLAUDE_API_KEY;
-  if (!apiKey) {
-    throw new Error('CLAUDE_API_KEY not configured');
-  }
-
-  if (text.length < 100) {
-    return { summary: '', tags: [] }; // Skip for very short texts
-  }
+export async function generateSummaryWithLeMUR(transcriptId: string, language: string = 'es'): Promise<SummaryResult> {
+  const client = getAssemblyAIClient();
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-7-sonnet-20250219',
-        max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: `Resume el siguiente texto en español en 3-4 párrafos. Después del resumen, añade una sección llamada "Tags:" seguida de una lista de 5-7 tags/categorías principales separadas por comas (por ejemplo: Tags: tecnología, negocios, educación).\n\nTexto:\n${text.slice(0, 8000)}`
-        }]
-      })
+    console.log('[LeMUR] Generating summary for transcript:', transcriptId);
+
+    // Detect language prompt based on transcript language
+    const prompts: Record<string, string> = {
+      'es': 'Resume el siguiente texto en español en 3-4 párrafos. Después del resumen, añade una sección llamada "Tags:" seguida de una lista de 5-7 tags/categorías principales separadas por comas.',
+      'en': 'Summarize the following text in English in 3-4 paragraphs. After the summary, add a section called "Tags:" followed by a list of 5-7 main tags/categories separated by commas.',
+      'ca': 'Resumeix el següent text en català en 3-4 paràgrafs. Després del resum, afegeix una secció anomenada "Etiquetes:" seguida d\'una llista de 5-7 etiquetes/categories principals separades per comes.',
+      'eu': 'Laburtu ondorengo testua euskaraz 3-4 paragrafoan. Laburpenaren ondoren, gehitu "Etiketak:" izeneko atal bat, komaz bereizitako 5-7 etiketa/kategoria nagusien zerrenda batekin.',
+      'gl': 'Resume o seguinte texto en galego en 3-4 parágrafos. Despois do resumo, engade unha sección chamada "Etiquetas:" seguida dunha lista de 5-7 etiquetas/categorías principais separadas por comas.',
+      'pt': 'Resume o seguinte texto em português em 3-4 parágrafos. Após o resumo, adicione uma seção chamada "Tags:" seguida de uma lista de 5-7 tags/categorias principais separadas por vírgulas.',
+      'fr': 'Résumez le texte suivant en français en 3-4 paragraphes. Après le résumé, ajoutez une section appelée "Tags :" suivie d\'une liste de 5-7 tags/catégories principales séparés par des virgules.',
+      'de': 'Fassen Sie den folgenden Text auf Deutsch in 3-4 Absätzen zusammen. Fügen Sie nach der Zusammenfassung einen Abschnitt mit dem Titel "Tags:" hinzu, gefolgt von einer Liste von 5-7 Haupttags/-kategorien, die durch Kommas getrennt sind.',
+      'it': 'Riassumi il seguente testo in italiano in 3-4 paragrafi. Dopo il riassunto, aggiungi una sezione chiamata "Tag:" seguita da un elenco di 5-7 tag/categorie principali separati da virgole.',
+    };
+
+    const prompt = prompts[language] || prompts['es'];
+
+    const result = await client.lemur.task({
+      transcript_ids: [transcriptId],
+      prompt: prompt,
+      final_model: 'anthropic/claude-3-5-sonnet',
     });
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Claude API error: ${error}`);
-    }
-
-    const data = await response.json();
-    const fullText = data.content[0].text;
+    const fullText = result.response;
 
     // Parse summary and tags
     let summary = fullText;
     let tags: string[] = [];
 
-    const tagsMarker = /\n(Tags|Categorías):/i;
+    const tagsMarker = /\n(Tags|Etiquetas|Etiketak|Categorías):/i;
     const match = fullText.match(tagsMarker);
 
     if (match && match.index) {
@@ -281,10 +274,11 @@ export async function generateSummary(text: string): Promise<SummaryResult> {
       tags = tagsString.split(',').map((tag: string) => tag.trim()).filter(Boolean);
     }
 
+    console.log('[LeMUR] Summary generated successfully');
     return { summary, tags };
 
   } catch (error: any) {
-    console.error('[Claude] Summary generation failed:', error.message);
+    console.error('[LeMUR] Summary generation failed:', error.message);
     return { summary: '', tags: [] }; // Don't fail the entire job
   }
 }
