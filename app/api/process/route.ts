@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
     // Parse and validate request body
     const body = await request.json();
-    const { audioUrl, filename, language } = body;
+    const { audioUrl, filename, language, actions = [] } = body;
 
     // Validate required fields
     validateRequired(body, ['audioUrl', 'filename', 'language']);
@@ -89,6 +89,17 @@ export async function POST(request: Request) {
       throw new ValidationError('Filename debe ser un string no vacío');
     }
 
+    // Validate actions array
+    if (!Array.isArray(actions)) {
+      throw new ValidationError('Actions debe ser un array');
+    }
+
+    logger.info('Process API: Received actions', {
+      userId: user.userId,
+      filename,
+      actions
+    });
+
     // Create job in database
     const job = await TranscriptionJobDB.create(
       user.userId,
@@ -96,6 +107,17 @@ export async function POST(request: Request) {
       audioUrl,
       language
     );
+
+    // Store actions in metadata
+    if (actions.length > 0) {
+      await TranscriptionJobDB.updateResults(job.id, {
+        metadata: { actions }
+      });
+      logger.info('Process API: Actions stored in metadata', {
+        jobId: job.id,
+        actions
+      });
+    }
 
     logger.info('Process API: Job created', {
       jobId: job.id,

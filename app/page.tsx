@@ -480,7 +480,12 @@ export default function Dashboard() {
               'Content-Type': 'application/json'
             },
             credentials: 'include',
-            body: JSON.stringify({ audioUrl: file.blobUrl, filename: file.name, language: language })
+            body: JSON.stringify({
+              audioUrl: file.blobUrl,
+              filename: file.name,
+              language: language,
+              actions: file.actions // ✨ NEW: Send selected actions to API
+            })
           });
 
           console.log('[Process] API Response status:', processRes.status);

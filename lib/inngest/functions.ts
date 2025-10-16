@@ -56,66 +56,93 @@ export const transcribeFile = inngest.createFunction(
     });
 
     await step.run('save-results-and-metadata', async () => {
+      // Get selected actions from metadata
+      const actions: string[] = job.metadata?.actions || [];
+      console.log('[Inngest] Processing with actions:', actions);
+
       const urls = await saveTranscriptionResults(transcriptionResult, filename, audioUrl);
 
-      // Identify speakers using LeMUR (with error handling to avoid breaking transcription)
-      console.log('[DEBUG] ========== SPEAKER IDENTIFICATION START ==========');
-      console.log('[DEBUG] Calling identifySpeakersWithLeMUR with:', {
-        transcriptId: transcriptionResult.id,
-        language: job.language || 'es',
-        utterancesCount: transcriptionResult.utterances?.length || 0,
-        speakers: transcriptionResult.utterances
-          ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))]
-          : []
-      });
+      // Initialize metadata with existing actions
+      const metadata: any = { actions };
 
+      // Conditional processing based on selected actions
       let speakerIdentities: Record<string, { name?: string; role?: string }> = {};
-      try {
-        speakerIdentities = await identifySpeakersWithLeMUR(transcriptionResult.id, job.language || 'es');
-        console.log('[DEBUG] Speaker identities result:', JSON.stringify(speakerIdentities, null, 2));
-        console.log('[DEBUG] Has any identities?', Object.keys(speakerIdentities).length > 0);
-        console.log('[DEBUG] Identity keys:', Object.keys(speakerIdentities));
-        console.log('[Inngest] Speaker identification completed:', speakerIdentities);
-      } catch (error: any) {
-        console.error('[DEBUG] EXCEPTION in identifySpeakersWithLeMUR:', error.message);
-        console.error('[DEBUG] Error stack:', error.stack);
-        console.error('[Inngest] Failed to identify speakers (non-fatal):', error.message);
-        // Continue without speaker identification
-      }
-
-      // Generate and save speakers report (with error handling to avoid breaking transcription)
-      console.log('[DEBUG] ========== SPEAKERS REPORT GENERATION START ==========');
-      console.log('[DEBUG] Generating speakers report with identities:', speakerIdentities);
-      console.log('[DEBUG] Identities count:', Object.keys(speakerIdentities).length);
-
       let speakersUrl: string | undefined = undefined;
-      try {
-        speakersUrl = await saveSpeakersReport(transcriptionResult, filename, false, speakerIdentities);
-        console.log('[DEBUG] Speakers report saved successfully:', speakersUrl);
-        console.log('[Inngest] Speakers report saved successfully:', speakersUrl);
-      } catch (error: any) {
-        console.error('[DEBUG] EXCEPTION in saveSpeakersReport:', error.message);
-        console.error('[DEBUG] Error stack:', error.stack);
-        console.error('[Inngest] Failed to save speakers report (non-fatal):', error.message);
-        // Don't fail the entire job - speakers report is supplementary
-      }
-      console.log('[DEBUG] ========== SPEAKERS REPORT GENERATION END ==========');
 
+      // Process speakers ONLY if "Oradores" action is selected
+      if (actions.includes('Oradores')) {
+        console.log('[Inngest] ✅ Oradores requested - processing speaker identification');
+        console.log('[DEBUG] ========== SPEAKER IDENTIFICATION START ==========');
+        console.log('[DEBUG] Calling identifySpeakersWithLeMUR with:', {
+          transcriptId: transcriptionResult.id,
+          language: job.language || 'es',
+          utterancesCount: transcriptionResult.utterances?.length || 0,
+          speakers: transcriptionResult.utterances
+            ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))]
+            : []
+        });
+
+        try {
+          speakerIdentities = await identifySpeakersWithLeMUR(transcriptionResult.id, job.language || 'es');
+          console.log('[DEBUG] Speaker identities result:', JSON.stringify(speakerIdentities, null, 2));
+          console.log('[DEBUG] Has any identities?', Object.keys(speakerIdentities).length > 0);
+          console.log('[DEBUG] Identity keys:', Object.keys(speakerIdentities));
+          console.log('[Inngest] Speaker identification completed:', speakerIdentities);
+        } catch (error: any) {
+          console.error('[DEBUG] EXCEPTION in identifySpeakersWithLeMUR:', error.message);
+          console.error('[DEBUG] Error stack:', error.stack);
+          console.error('[Inngest] Failed to identify speakers (non-fatal):', error.message);
+        }
+
+        console.log('[DEBUG] ========== SPEAKERS REPORT GENERATION START ==========');
+        console.log('[DEBUG] Generating speakers report with identities:', speakerIdentities);
+        console.log('[DEBUG] Identities count:', Object.keys(speakerIdentities).length);
+
+        try {
+          speakersUrl = await saveSpeakersReport(transcriptionResult, filename, false, speakerIdentities);
+          console.log('[DEBUG] Speakers report saved successfully:', speakersUrl);
+          console.log('[Inngest] Speakers report saved successfully:', speakersUrl);
+        } catch (error: any) {
+          console.error('[DEBUG] EXCEPTION in saveSpeakersReport:', error.message);
+          console.error('[DEBUG] Error stack:', error.stack);
+          console.error('[Inngest] Failed to save speakers report (non-fatal):', error.message);
+        }
+        console.log('[DEBUG] ========== SPEAKERS REPORT GENERATION END ==========');
+      } else {
+        console.log('[Inngest] ⏭️ Oradores NOT requested - skipping speaker processing');
+      }
+
+      // Always collect speaker list (lightweight operation)
       const speakers = transcriptionResult.utterances
         ? [...new Set(transcriptionResult.utterances.map(u => u.speaker).filter(Boolean))].sort()
         : [];
 
-      const metadata = { speakers, speakerIdentities };
+      metadata.speakers = speakers;
+      metadata.speakerIdentities = speakerIdentities;
 
-      await TranscriptionJobDB.updateResults(jobId, {
+      // Build update object conditionally
+      const updateData: any = {
         assemblyaiId: transcriptionResult.id,
         txtUrl: urls.txtUrl,
-        srtUrl: urls.srtUrl,
-        vttUrl: urls.vttUrl,
-        speakersUrl: speakersUrl,
         audioDuration: transcriptionResult.audioDuration,
         metadata,
-      });
+      };
+
+      // Only include SRT/VTT if subtitles were requested
+      if (actions.includes('Subtítulos') || actions.includes('SRT') || actions.includes('VTT')) {
+        console.log('[Inngest] ✅ Subtítulos requested - including SRT/VTT URLs');
+        updateData.srtUrl = urls.srtUrl;
+        updateData.vttUrl = urls.vttUrl;
+      } else {
+        console.log('[Inngest] ⏭️ Subtítulos NOT requested - skipping SRT/VTT');
+      }
+
+      // Include speakers URL if processed
+      if (speakersUrl) {
+        updateData.speakersUrl = speakersUrl;
+      }
+
+      await TranscriptionJobDB.updateResults(jobId, updateData);
 
       await logTranscription(userId, filename, transcriptionResult.audioDuration);
     });
@@ -136,14 +163,25 @@ export const transcribeFile = inngest.createFunction(
       await TranscriptionJobDB.updateStatus(jobId, 'transcribed');
     });
 
-    // Automatically trigger summarization after transcription completes
-    await step.run('trigger-summarization', async () => {
-      await inngest.send({
-        name: 'task/summarize',
-        data: { jobId }
+    // Conditionally trigger summarization ONLY if requested
+    const actions: string[] = job.metadata?.actions || [];
+    if (actions.includes('Resumir') || actions.includes('Etiquetas')) {
+      await step.run('trigger-summarization', async () => {
+        console.log('[Inngest] ✅ Resumir/Etiquetas requested - triggering summarization');
+        await inngest.send({
+          name: 'task/summarize',
+          data: { jobId }
+        });
+        console.log(`[Inngest] Triggered summarization for job ${jobId}`);
       });
-      console.log(`[Inngest] Triggered summarization for job ${jobId}`);
-    });
+    } else {
+      console.log('[Inngest] ⏭️ Resumir/Etiquetas NOT requested - skipping summarization');
+      // Mark as completed immediately since no summary is needed
+      await step.run('mark-completed-no-summary', async () => {
+        await TranscriptionJobDB.updateStatus(jobId, 'completed');
+        console.log(`[Inngest] Job ${jobId} marked as completed (no summary requested)`);
+      });
+    }
 
     console.log(`[Inngest] Transcription task for job ${jobId} completed.`);
     return { status: 'transcribed' };
