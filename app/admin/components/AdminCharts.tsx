@@ -100,7 +100,7 @@ export function UserDistributionChart({ data }: { data: UserDistributionData[] }
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+            label={({ name, percent }: { name: string; percent: number }) => `${name}: ${(percent * 100).toFixed(0)}%`}
             outerRadius={100}
             fill="#8884d8"
             dataKey="value"
@@ -189,7 +189,7 @@ export function AlertSeverityChart({ data }: { data: AlertSeverityData[] }) {
             fill="#8884d8"
             paddingAngle={5}
             dataKey="count"
-            label={({ severity, count }) => `${severity}: ${count}`}
+            label={({ severity, count }: { severity: string; count: number }) => `${severity}: ${count}`}
           >
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
