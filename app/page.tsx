@@ -889,7 +889,7 @@ export default function Dashboard() {
 
       <div className="fixed top-6 right-6 z-40 flex items-center gap-2">
         <button
-          onClick={() => showNotification('Guía de usuario próximamente', 'info')}
+          onClick={() => router.push('/guia')}
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
           title="Guía de usuario"
         >
