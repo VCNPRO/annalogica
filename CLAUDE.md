@@ -74,3 +74,19 @@ Editar `.env.local` con tus tokens:
 - Configurado en `vercel.json`
 - Requiere `CRON_SECRET` en variables de entorno de Vercel
 - Ver detalles completos en `INSTRUCCIONES-ALMACENAMIENTO.md`
+
+## 📖 Guía de Usuario
+
+### Generar PDF de Guía
+```bash
+npm run generate-guide
+```
+
+Esto genera `public/guia-usuario-annalogica.pdf` con:
+- Información actualizada de precios desde annalogica.eu
+- URLs correctas (annalogica.eu)
+- Todos los planes: Free, Básico (€49), Pro (€99), Business (€249), Universidad (€999), Medios (€2.999), Empresarial
+
+### Endpoints
+- `GET /api/user-guide` - Descarga la guía de usuario en PDF
+- `GET /guia-usuario-annalogica.pdf` - Acceso directo al PDF estático
