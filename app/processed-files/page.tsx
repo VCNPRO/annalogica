@@ -111,22 +111,33 @@ export default function ProcessedFilesPage() {
   };
 
   const handleDeleteJob = async (jobId: string) => {
+    console.log('handleDeleteJob called with jobId:', jobId); // Debug log
     if (!confirm('¿Estás seguro de que quieres eliminar este archivo procesado y todos sus resultados?')) {
+      console.log('User cancelled deletion'); // Debug log
       return;
     }
 
     try {
+      console.log('Sending DELETE request to:', `/api/processed-files/${jobId}`); // Debug log
       const res = await fetch(`/api/processed-files/${jobId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
 
+      console.log('DELETE response status:', res.status); // Debug log
+
       if (!res.ok) {
         const errorData = await res.json();
+        console.error('DELETE failed with error:', errorData); // Debug log
         throw new Error(errorData.error || 'Error deleting processed file');
       }
 
-      setProcessedJobs(prev => prev.filter(job => job.id !== jobId));
+      console.log('DELETE successful, updating state'); // Debug log
+      setProcessedJobs(prev => {
+        const updated = prev.filter(job => job.id !== jobId);
+        console.log('Jobs before:', prev.length, 'Jobs after:', updated.length); // Debug log
+        return updated;
+      });
       showNotification('Archivo procesado eliminado correctamente.', 'success');
     } catch (err: any) {
       console.error('Error deleting job:', err);
