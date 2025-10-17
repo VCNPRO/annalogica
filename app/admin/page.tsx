@@ -18,7 +18,6 @@ import {
   XCircle,
   Clock,
 } from 'lucide-react';
-import {
   import dynamic from 'next/dynamic';
   import { prepareChartData } from './components/AdminCharts';
 
