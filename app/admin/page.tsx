@@ -19,12 +19,14 @@ import {
   Clock,
 } from 'lucide-react';
 import {
-  CostTrendChart,
-  UserDistributionChart,
-  UsageStatsChart,
-  AlertSeverityChart,
-  CostByAccountTypeChart,
-  prepareChartData,
+  import dynamic from 'next/dynamic';
+  import { prepareChartData } from './components/AdminCharts';
+
+  const CostTrendChart = dynamic(() => import('./components/AdminCharts').then(mod => ({ default: mod.CostTrendChart })), { ssr: false });
+  const UserDistributionChart = dynamic(() => import('./components/AdminCharts').then(mod => ({ default: mod.UserDistributionChart })), { ssr: false });
+  const UsageStatsChart = dynamic(() => import('./components/AdminCharts').then(mod => ({ default: mod.UsageStatsChart })), { ssr: false });
+  const AlertSeverityChart = dynamic(() => import('./components/AdminCharts').then(mod => ({ default: mod.AlertSeverityChart })), { ssr: false });
+  const CostByAccountTypeChart = dynamic(() => import('./components/AdminCharts').then(mod => ({ default: mod.CostByAccountTypeChart })), { ssr: false });
 } from './components/AdminCharts';
 
 interface PlatformStats {
