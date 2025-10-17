@@ -58,17 +58,12 @@ export async function POST(request: NextRequest) {
       const buffer = Buffer.from(arrayBuffer);
 
       if (fileType === 'application/pdf') {
-        // Extract text from PDF using dynamic import
+        // Extract text from PDF using dynamic import (v1 API)
         console.log('[Document] Extracting text from PDF:', fileName);
-        const { PDFParse } = await import('pdf-parse');
-        const parser = new PDFParse({ data: buffer });
-        try {
-          const pdfData = await parser.getText();
-          extractedText = pdfData.text;
-          console.log('[Document] PDF text extracted, length:', extractedText.length);
-        } finally {
-          await parser.destroy();
-        }
+        const pdfParse = (await import('pdf-parse')).default;
+        const pdfData = await pdfParse(buffer);
+        extractedText = pdfData.text;
+        console.log('[Document] PDF text extracted, length:', extractedText.length);
 
       } else if (fileType === 'text/plain') {
         // Extract text from TXT
