@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         // Extract text from PDF using dynamic import
         console.log('[Document] Extracting text from PDF:', fileName);
         const { PDFParse } = await import('pdf-parse');
-        const pdfData = await PDFParse(buffer);
+        const pdfData = await new PDFParse().parse(buffer);
         extractedText = pdfData.text;
         console.log('[Document] PDF text extracted, length:', extractedText.length);
 
