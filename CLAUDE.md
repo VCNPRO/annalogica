@@ -123,10 +123,14 @@ ADMIN_EMAIL=admin@annalogica.eu # Email para recibir alertas
   - Estadísticas de uso (archivos, transcripciones, resúmenes)
   - Alertas por severidad
   - Costes por tipo de cuenta
-- ✅ **Cron Jobs Automáticos**:
-  - Verificación de alertas cada hora
-  - Actualización de métricas cada 6 horas
-  - Actualización de costes diaria (2:00 AM)
+- ✅ **Cron Job Consolidado** (1 diario - Vercel Free):
+  - Actualización de costes de usuarios
+  - Limpieza de archivos Vercel Blob (>30 días)
+  - Refrescar vista materializada de métricas
+  - Verificación de alertas de costes altos
+  - Verificación de cuotas excedidas
+  - Envío automático de notificaciones por email
+  - Se ejecuta a las 9:00 AM UTC (horario laboral)
 - ✅ **Métricas Avanzadas**: Estadísticas detalladas de uso
 - ✅ **Auditoría Completa**: Logs de todas las acciones admin
 - ✅ **Tags Personalizados**: Etiquetar usuarios (vip, beta, partner, etc.)
@@ -141,11 +145,13 @@ GET  /api/admin/alerts             // Obtener alertas activas
 POST /api/admin/alerts             // Ejecutar verificación alertas
 PATCH /api/admin/alerts            // Resolver alerta
 
-// Cron Jobs (requieren CRON_SECRET)
-GET  /api/cron/check-alerts        // Verificar alertas (cada hora)
-GET  /api/cron/refresh-metrics     // Actualizar métricas (cada 6h)
-GET  /api/cron/update-user-costs   // Actualizar costes (diario)
-GET  /api/cron/cleanup             // Limpieza archivos (diario)
+// Cron Job Consolidado (requiere CRON_SECRET)
+GET  /api/cron/daily-checks        // Ejecuta TODAS las verificaciones diarias:
+                                   // - Actualiza costes de usuarios
+                                   // - Limpia archivos antiguos (>30 días)
+                                   // - Refresca métricas
+                                   // - Verifica alertas de costes y cuotas
+                                   // - Envía notificaciones por email
 ```
 
 ### Documentación
@@ -170,10 +176,8 @@ app/
     │   ├── stats/route.ts
     │   └── alerts/route.ts
     └── cron/
-        ├── check-alerts/route.ts     // Cron alertas (cada hora)
-        ├── refresh-metrics/route.ts  // Cron métricas (cada 6h)
-        ├── update-user-costs/route.ts // Cron costes (diario)
-        └── cleanup/route.ts          // Cron limpieza (diario)
+        └── daily-checks/route.ts     // Cron consolidado (1 diario - Vercel Free)
+                                      // Ejecuta todas las verificaciones
 
 scripts/
 └── apply-admin-migration.js         // Script aplicación migración

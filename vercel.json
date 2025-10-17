@@ -9,12 +9,8 @@
   },
   "crons": [
     {
-      "path": "/api/cron/maintenance",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/monitoring",
-      "schedule": "0 8 * * *"
+      "path": "/api/cron/daily-checks",
+      "schedule": "0 9 * * *"
     }
   ]
 }
