@@ -4,7 +4,6 @@ import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client';
 import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guard';
 import { put } from '@vercel/blob';
-import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
 
 /**
@@ -59,9 +58,10 @@ export async function POST(request: NextRequest) {
       const buffer = Buffer.from(arrayBuffer);
 
       if (fileType === 'application/pdf') {
-        // Extract text from PDF
+        // Extract text from PDF using dynamic import
         console.log('[Document] Extracting text from PDF:', fileName);
-        const pdfData = await pdf(buffer);
+        const pdfParse = (await import('pdf-parse')).default;
+        const pdfData = await pdfParse(buffer);
         extractedText = pdfData.text;
         console.log('[Document] PDF text extracted, length:', extractedText.length);
 
