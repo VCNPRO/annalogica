@@ -432,7 +432,7 @@ export default function Dashboard() {
 
   const handleProcessSelectedFiles = async () => {
     console.log('[Process] Button clicked! Selected files:', selectedUploadedFileIds.size);
-    console.log('[Process] Uploaded files:', uploadedFiles.map(f => ({ id: f.id, name: f.name, actions: f.actions, blobUrl: f.blobUrl })));
+    console.log('[Process] Uploaded files:', uploadedFiles.map(f => ({ id: f.id, name: f.name, actions: f.actions, blobUrl: f.blobUrl, fileType: f.fileType })));
 
     if (selectedUploadedFileIds.size === 0) {
       showNotification('Por favor, selecciona al menos un archivo para procesar.', 'info');
@@ -440,7 +440,7 @@ export default function Dashboard() {
     }
 
     const filesToProcess = uploadedFiles.filter(file => selectedUploadedFileIds.has(file.id));
-    console.log('[Process] Files to process (after filter):', filesToProcess.map(f => ({ name: f.name, actions: f.name })));
+    console.log('[Process] Files to process (after filter):', filesToProcess.map(f => ({ name: f.name, actions: f.actions, fileType: f.fileType })));
 
     // Verificar que tengan acciones seleccionadas
     const filesWithoutActions = filesToProcess.filter(f => f.actions.length === 0);
@@ -461,15 +461,80 @@ export default function Dashboard() {
     setError(null);
 
     console.log('[Process] ✅ All validations passed! Starting processing...');
-    console.log('[Process] Files to process:', filesToProcess.map(f => ({ name: f.name, actions: f.actions, blobUrl: f.blobUrl })));
+    console.log('[Process] Files to process:', filesToProcess.map(f => ({ name: f.name, actions: f.actions, fileType: f.fileType, blobUrl: f.blobUrl })));
 
     let processedCount = 0;
 
-    // Procesar TODOS los archivos con acciones (la transcripción se hace siempre internamente)
+    // Procesar archivos según su tipo
     for (const file of filesToProcess) {
-      console.log('[Process] Processing file:', file.name, 'Actions:', file.actions);
-        try {
-          console.log('[Process] 🚀 Processing file:', file.name, 'blobUrl:', file.blobUrl);
+      console.log('[Process] Processing file:', file.name, 'Type:', file.fileType, 'Actions:', file.actions);
+
+      try {
+        console.log('[Process] 🚀 Processing file:', file.name, 'blobUrl:', file.blobUrl);
+
+        // Determinar si es documento o audio/video
+        const isDocument = file.fileType === 'text';
+
+        if (isDocument) {
+          // Procesar como documento (PDF, TXT, DOCX)
+          console.log('[Process] 📄 Processing as DOCUMENT');
+
+          // Validar que las acciones sean apropiadas para documentos
+          const invalidActions = file.actions.filter(a =>
+            a === 'Transcribir' || a === 'Oradores' || a === 'Subtítulos' || a === 'SRT' || a === 'VTT'
+          );
+
+          if (invalidActions.length > 0) {
+            throw new Error(`Las acciones ${invalidActions.join(', ')} no están disponibles para documentos de texto. Solo puedes usar Resumen y Etiquetas.`);
+          }
+
+          // Descargar el archivo desde Vercel Blob
+          const blobResponse = await fetch(file.blobUrl!);
+          if (!blobResponse.ok) {
+            throw new Error('No se pudo descargar el archivo');
+          }
+          const blob = await blobResponse.blob();
+
+          // Crear FormData para enviar el archivo
+          const formData = new FormData();
+          formData.append('file', blob, file.name);
+          formData.append('actions', JSON.stringify(file.actions));
+          formData.append('summaryType', summaryType);
+          formData.append('language', language);
+
+          const processRes = await fetch('/api/process-document', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+          });
+
+          console.log('[Process] Document API Response status:', processRes.status);
+
+          if (!processRes.ok) {
+            const errorData = await processRes.json();
+            console.error('[Process] Document API Error:', errorData);
+            throw new Error(errorData.error || 'Error al procesar documento');
+          }
+
+          const responseData = await processRes.json();
+          console.log('[Process] Document API Response data:', responseData);
+
+          const jobId = responseData.jobId;
+          console.log('[Process] ✅ Document job created:', jobId, file.name);
+          processedCount++;
+
+          // Update file with jobId
+          setUploadedFiles(prev => prev.map(f => {
+            if (f.id === file.id) {
+              console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
+              return { ...f, jobId, status: 'processing' as const };
+            }
+            return f;
+          }));
+
+        } else {
+          // Procesar como audio/video (la transcripción se hace siempre internamente)
+          console.log('[Process] 🎵 Processing as AUDIO/VIDEO');
 
           // SECURITY: Cookie httpOnly se envía automáticamente
           const processRes = await fetch('/api/process', {
@@ -482,8 +547,8 @@ export default function Dashboard() {
               audioUrl: file.blobUrl,
               filename: file.name,
               language: language,
-              actions: file.actions, // ✨ Send selected actions to API
-              summaryType: summaryType // ✨ Send summary type (short/detailed)
+              actions: file.actions,
+              summaryType: summaryType
             })
           });
 
@@ -492,7 +557,6 @@ export default function Dashboard() {
           if (!processRes.ok) {
             const errorData = await processRes.json();
             console.error('[Process] API Error:', errorData);
-
             throw new Error(errorData.error || 'Error al procesar');
           }
 
@@ -502,34 +566,25 @@ export default function Dashboard() {
           // API wraps response in { success, data: { jobId, status, message } }
           const jobId = responseData.data?.jobId || responseData.jobId;
           console.log('[Process] ✅ Job created:', jobId, file.name);
-          console.log('[Process] Response structure:', {
-            hasData: !!responseData.data,
-            dataJobId: responseData.data?.jobId,
-            directJobId: responseData.jobId
-          });
-          console.log('[Process] Updating file with ID:', file.id, 'New jobId:', jobId);
           processedCount++;
 
           // Update file with jobId
-          setUploadedFiles(prev => {
-            console.log('[Process] Current files before update:', prev.map(f => ({ id: f.id, name: f.name, jobId: f.jobId })));
-            const updated = prev.map(f => {
-              if (f.id === file.id) {
-                console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
-                return { ...f, jobId, status: 'pending' as const };
-              }
-              return f;
-            });
-            console.log('[Process] Files after update:', updated.map(f => ({ id: f.id, name: f.name, jobId: f.jobId })));
-            return updated;
-          });
-        } catch (err: any) {
-          console.error('[Process] ❌ Error:', err);
-          setError(`Error procesando ${file.name}: ${err.message}`);
-          setUploadedFiles(prev => prev.map(f =>
-            f.id === file.id ? { ...f, status: 'error' } : f
-          ));
+          setUploadedFiles(prev => prev.map(f => {
+            if (f.id === file.id) {
+              console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
+              return { ...f, jobId, status: 'pending' as const };
+            }
+            return f;
+          }));
         }
+
+      } catch (err: any) {
+        console.error('[Process] ❌ Error:', err);
+        setError(`Error procesando ${file.name}: ${err.message}`);
+        setUploadedFiles(prev => prev.map(f =>
+          f.id === file.id ? { ...f, status: 'error' } : f
+        ));
+      }
     }
 
     console.log('[Process] 🏁 Finished! Processed', processedCount, 'files');
@@ -857,6 +912,8 @@ export default function Dashboard() {
 
   const selectedFiles = uploadedFiles.filter(file => selectedUploadedFileIds.has(file.id));
   const canTranscribe = selectedFiles.some(file => file.fileType === 'audio' || file.fileType === 'video');
+  const hasDocuments = selectedFiles.some(file => file.fileType === 'text');
+  const hasAudioVideo = selectedFiles.some(file => file.fileType === 'audio' || file.fileType === 'video');
 
   const bgPrimary = darkMode ? 'bg-black' : 'bg-gray-50';
   const bgSecondary = darkMode ? 'bg-zinc-900' : 'bg-white';
@@ -979,15 +1036,18 @@ export default function Dashboard() {
               {/* Fila 1: Transcribir + Oradores */}
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleApplyAction('Transcribir')}
-                  className={`p-2 ${canTranscribe ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
-                  disabled={!canTranscribe}
+                  onClick={() => !hasDocuments && handleApplyAction('Transcribir')}
+                  className={`p-2 ${canTranscribe && !hasDocuments ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
+                  disabled={!canTranscribe || hasDocuments}
+                  title={hasDocuments ? 'No disponible para documentos' : 'Transcribir audio/video a texto'}
                 >
                   📝 Transcribir
                 </button>
                 <button
-                  onClick={() => handleApplyAction('Oradores')}
-                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                  onClick={() => !hasDocuments && handleApplyAction('Oradores')}
+                  className={`p-2 ${hasDocuments ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'} text-white rounded-lg text-xs font-medium transition-colors`}
+                  disabled={hasDocuments}
+                  title={hasDocuments ? 'No disponible para documentos' : 'Identificar y analizar hablantes'}
                 >
                   🎙️ Oradores
                 </button>
@@ -998,6 +1058,7 @@ export default function Dashboard() {
                 <button
                   onClick={() => handleApplyAction('Resumir')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                  title="Generar resumen del contenido"
                 >
                   📋 Resumen
                 </button>
@@ -1028,29 +1089,35 @@ export default function Dashboard() {
               {/* Fila 3: Subtítulos + opciones SRT/VTT */}
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleApplyAction('Subtítulos')}
-                  className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                  onClick={() => !hasDocuments && handleApplyAction('Subtítulos')}
+                  className={`p-2 ${hasDocuments ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'} text-white rounded-lg text-xs font-medium transition-colors`}
+                  disabled={hasDocuments}
+                  title={hasDocuments ? 'No disponible para documentos' : 'Generar archivos de subtítulos'}
                 >
                   📄 Subtítulos
                 </button>
                 <div className="flex items-center justify-around gap-1 text-xs">
-                  <label className="flex items-center gap-1">
+                  <label className={`flex items-center gap-1 ${hasDocuments ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <input
                       type="checkbox"
                       className="form-checkbox h-3 w-3 text-orange-500 rounded accent-orange-500"
                       onChange={(e) => {
-                        if (e.target.checked) handleApplyAction('SRT');
+                        if (e.target.checked && !hasDocuments) handleApplyAction('SRT');
                       }}
+                      disabled={hasDocuments}
+                      title={hasDocuments ? 'No disponible para documentos' : 'Formato SRT'}
                     />
                     <span className={textSecondary}>SRT</span>
                   </label>
-                  <label className="flex items-center gap-1">
+                  <label className={`flex items-center gap-1 ${hasDocuments ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <input
                       type="checkbox"
                       className="form-checkbox h-3 w-3 text-orange-500 rounded accent-orange-500"
                       onChange={(e) => {
-                        if (e.target.checked) handleApplyAction('VTT');
+                        if (e.target.checked && !hasDocuments) handleApplyAction('VTT');
                       }}
+                      disabled={hasDocuments}
+                      title={hasDocuments ? 'No disponible para documentos' : 'Formato VTT'}
                     />
                     <span className={textSecondary}>VTT</span>
                   </label>
@@ -1062,12 +1129,14 @@ export default function Dashboard() {
                 <button
                   onClick={() => handleApplyAction('Etiquetas')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
+                  title="Generar etiquetas temáticas"
                 >
                   🏷️ Etiquetas
                 </button>
                 <Link
                   href="/processed-files"
                   className="flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors"
+                  title="Ver todos los archivos procesados"
                 >
                   ✅ Archivos Procesados
                 </Link>
