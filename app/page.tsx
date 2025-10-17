@@ -446,7 +446,7 @@ export default function Dashboard() {
     const filesWithoutActions = filesToProcess.filter(f => f.actions.length === 0);
     if (filesWithoutActions.length > 0) {
       console.log('[Process] Files without actions:', filesWithoutActions.map(f => f.name));
-      showNotification('Los archivos seleccionados no tienen acciones. Haz clic en "Transcribir" primero.', 'error');
+      showNotification('Selecciona al menos una acción (Oradores, Resumen, Subtítulos, Etiquetas).', 'error');
       return;
     }
 
@@ -465,11 +465,9 @@ export default function Dashboard() {
 
     let processedCount = 0;
 
-    // Procesar archivos que tengan "Transcribir" en sus acciones
+    // Procesar TODOS los archivos con acciones (la transcripción se hace siempre internamente)
     for (const file of filesToProcess) {
-      console.log('[Process] Checking file:', file.name, 'Actions:', file.actions, 'Has Transcribir?', file.actions.includes('Transcribir'));
-
-      if (file.actions.includes('Transcribir')) {
+      console.log('[Process] Processing file:', file.name, 'Actions:', file.actions);
         try {
           console.log('[Process] 🚀 Processing file:', file.name, 'blobUrl:', file.blobUrl);
 
@@ -484,7 +482,8 @@ export default function Dashboard() {
               audioUrl: file.blobUrl,
               filename: file.name,
               language: language,
-              actions: file.actions // ✨ NEW: Send selected actions to API
+              actions: file.actions, // ✨ Send selected actions to API
+              summaryType: summaryType // ✨ Send summary type (short/detailed)
             })
           });
 
@@ -531,9 +530,6 @@ export default function Dashboard() {
             f.id === file.id ? { ...f, status: 'error' } : f
           ));
         }
-      } else {
-        console.log('[Process] ⏭️ Skipping file (no Transcribir action):', file.name);
-      }
     }
 
     console.log('[Process] 🏁 Finished! Processed', processedCount, 'files');

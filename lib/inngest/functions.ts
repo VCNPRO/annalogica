@@ -167,23 +167,29 @@ export const transcribeFile = inngest.createFunction(
       await TranscriptionJobDB.updateStatus(jobId, 'transcribed');
     });
 
-    // Conditionally trigger summarization ONLY if requested
+    // Conditionally trigger summarization/tagging ONLY if requested
     const actions: string[] = job.metadata?.actions || [];
-    if (actions.includes('Resumir') || actions.includes('Etiquetas')) {
+    const needsSummaryOrTags = actions.includes('Resumir') || actions.includes('Etiquetas');
+
+    if (needsSummaryOrTags) {
       await step.run('trigger-summarization', async () => {
-        console.log('[Inngest] ✅ Resumir/Etiquetas requested - triggering summarization');
+        console.log('[Inngest] ✅ Resumir and/or Etiquetas requested - triggering processing');
+        console.log('[Inngest] Actions requested:', actions);
         await inngest.send({
           name: 'task/summarize',
-          data: { jobId }
+          data: {
+            jobId,
+            actions // Pass actions to control what gets generated
+          }
         });
-        console.log(`[Inngest] Triggered summarization for job ${jobId}`);
+        console.log(`[Inngest] Triggered summarization/tagging for job ${jobId}`);
       });
     } else {
-      console.log('[Inngest] ⏭️ Resumir/Etiquetas NOT requested - skipping summarization');
-      // Mark as completed immediately since no summary is needed
+      console.log('[Inngest] ⏭️ Resumir/Etiquetas NOT requested - skipping');
+      // Mark as completed immediately since no summary/tags needed
       await step.run('mark-completed-no-summary', async () => {
         await TranscriptionJobDB.updateStatus(jobId, 'completed');
-        console.log(`[Inngest] Job ${jobId} marked as completed (no summary requested)`);
+        console.log(`[Inngest] Job ${jobId} marked as completed (no summary/tags requested)`);
       });
     }
 
@@ -204,7 +210,7 @@ export const summarizeFile = inngest.createFunction(
   },
   { event: 'task/summarize' },
   async ({ event, step }) => {
-    const { jobId } = event.data;
+    const { jobId, actions: requestedActions } = event.data;
     const job = await TranscriptionJobDB.findById(jobId);
 
     if (!job || !job.txt_url) {
@@ -218,35 +224,59 @@ export const summarizeFile = inngest.createFunction(
         return { error: 'No AssemblyAI transcript ID available' };
     }
 
+    // Determine what needs to be generated based on actions
+    const actions = requestedActions || metadata?.actions || [];
+    const generateSummary = actions.includes('Resumir');
+    const generateTags = actions.includes('Etiquetas');
+    const summaryType = metadata?.summaryType || 'detailed'; // 'short' or 'detailed'
+
+    console.log('[Inngest] Summarization task:', { generateSummary, generateTags, summaryType });
+
     const { summary, tags } = await step.run('generate-summary-and-tags', async () => {
         // Use LeMUR with the transcript ID directly
-        const result = await generateSummaryWithLeMUR(job.assemblyai_id!, job.language || 'es');
+        const result = await generateSummaryWithLeMUR(
+          job.assemblyai_id!,
+          job.language || 'es',
+          generateSummary,
+          generateTags,
+          summaryType
+        );
 
-        if (!result.summary) {
+        // Validate that we got what was requested
+        if (generateSummary && !result.summary) {
           throw new Error('LeMUR returned empty summary');
         }
 
         return result;
     });
 
-    if (!summary) {
-        console.warn(`[Inngest] Summary generation returned empty for job ${jobId}. Marking as failed.`);
-        await step.run('update-status-failed', async () => {
-          await TranscriptionJobDB.updateStatus(jobId, 'failed', 'Summary generation failed');
-        });
-        return { status: 'failed', reason: 'Empty summary generated' };
+    // Only save and update if we actually generated something
+    let summaryUrl: string | undefined = undefined;
+
+    if (generateSummary && summary) {
+      summaryUrl = await step.run('save-summary', async () => {
+          return await saveSummary(summary, filename);
+      });
     }
 
-    const summaryUrl = await step.run('save-summary', async () => {
-        return await saveSummary(summary, filename);
-    });
-
     await step.run('update-db-with-summary', async () => {
-        const newMetadata = { ...metadata, tags };
-        await TranscriptionJobDB.updateResults(jobId, {
-            summaryUrl,
-            metadata: newMetadata,
-        });
+        // Build metadata with tags if generated
+        const newMetadata = { ...metadata };
+        if (generateTags && tags && tags.length > 0) {
+          newMetadata.tags = tags;
+        }
+
+        // Build update object conditionally
+        const updateData: any = {
+          metadata: newMetadata,
+        };
+
+        // Only add summaryUrl if summary was generated
+        if (summaryUrl) {
+          updateData.summaryUrl = summaryUrl;
+        }
+
+        await TranscriptionJobDB.updateResults(jobId, updateData);
 
         // Estimate tokens for LeMUR usage tracking
         const tokensInput = Math.ceil((job.txt_url?.length || 0) / 4); // Approximate

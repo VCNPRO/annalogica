@@ -76,7 +76,7 @@ export async function POST(request: Request) {
 
     // Parse and validate request body
     const body = await request.json();
-    const { audioUrl, filename, language, actions = [] } = body;
+    const { audioUrl, filename, language, actions = [], summaryType = 'detailed' } = body;
 
     // Validate required fields
     validateRequired(body, ['audioUrl', 'filename', 'language']);
@@ -94,10 +94,16 @@ export async function POST(request: Request) {
       throw new ValidationError('Actions debe ser un array');
     }
 
-    logger.info('Process API: Received actions', {
+    // Validate summaryType
+    if (summaryType !== 'short' && summaryType !== 'detailed') {
+      throw new ValidationError('summaryType debe ser "short" o "detailed"');
+    }
+
+    logger.info('Process API: Received request params', {
       userId: user.userId,
       filename,
-      actions
+      actions,
+      summaryType
     });
 
     // Create job in database
@@ -108,14 +114,15 @@ export async function POST(request: Request) {
       language
     );
 
-    // Store actions in metadata
-    if (actions.length > 0) {
+    // Store actions and summaryType in metadata
+    if (actions.length > 0 || summaryType) {
       await TranscriptionJobDB.updateResults(job.id, {
-        metadata: { actions }
+        metadata: { actions, summaryType }
       });
-      logger.info('Process API: Actions stored in metadata', {
+      logger.info('Process API: Metadata stored', {
         jobId: job.id,
-        actions
+        actions,
+        summaryType
       });
     }
 

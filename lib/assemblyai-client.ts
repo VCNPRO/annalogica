@@ -241,28 +241,77 @@ export interface SummaryResult {
 }
 
 /**
- * Generate summary and tags using AssemblyAI LeMUR
+ * Generate summary and/or tags using AssemblyAI LeMUR
  */
-export async function generateSummaryWithLeMUR(transcriptId: string, language: string = 'es'): Promise<SummaryResult> {
+export async function generateSummaryWithLeMUR(
+  transcriptId: string,
+  language: string = 'es',
+  generateSummary: boolean = true,
+  generateTags: boolean = true,
+  summaryType: 'short' | 'detailed' = 'detailed'
+): Promise<SummaryResult> {
   const client = getAssemblyAIClient();
 
   try {
-    console.log('[LeMUR] Generating summary for transcript:', transcriptId);
+    console.log('[LeMUR] Generating content for transcript:', transcriptId, {
+      generateSummary,
+      generateTags,
+      summaryType
+    });
 
-    // Detect language prompt based on transcript language
-    const prompts: Record<string, string> = {
-      'es': 'Resume el siguiente texto en español en 3-4 párrafos. Después del resumen, añade una sección llamada "Tags:" seguida de una lista de 5-7 tags/categorías principales separadas por comas.',
-      'en': 'Summarize the following text in English in 3-4 paragraphs. After the summary, add a section called "Tags:" followed by a list of 5-7 main tags/categories separated by commas.',
-      'ca': 'Resumeix el següent text en català en 3-4 paràgrafs. Després del resum, afegeix una secció anomenada "Etiquetes:" seguida d\'una llista de 5-7 etiquetes/categories principals separades per comes.',
-      'eu': 'Laburtu ondorengo testua euskaraz 3-4 paragrafoan. Laburpenaren ondoren, gehitu "Etiketak:" izeneko atal bat, komaz bereizitako 5-7 etiketa/kategoria nagusien zerrenda batekin.',
-      'gl': 'Resume o seguinte texto en galego en 3-4 parágrafos. Despois do resumo, engade unha sección chamada "Etiquetas:" seguida dunha lista de 5-7 etiquetas/categorías principais separadas por comas.',
-      'pt': 'Resume o seguinte texto em português em 3-4 parágrafos. Após o resumo, adicione uma seção chamada "Tags:" seguida de uma lista de 5-7 tags/categorias principais separadas por vírgulas.',
-      'fr': 'Résumez le texte suivant en français en 3-4 paragraphes. Après le résumé, ajoutez une section appelée "Tags :" suivie d\'une liste de 5-7 tags/catégories principales séparés par des virgules.',
-      'de': 'Fassen Sie den folgenden Text auf Deutsch in 3-4 Absätzen zusammen. Fügen Sie nach der Zusammenfassung einen Abschnitt mit dem Titel "Tags:" hinzu, gefolgt von einer Liste von 5-7 Haupttags/-kategorien, die durch Kommas getrennt sind.',
-      'it': 'Riassumi il seguente testo in italiano in 3-4 paragrafi. Dopo il riassunto, aggiungi una sezione chiamata "Tag:" seguita da un elenco di 5-7 tag/categorie principali separati da virgole.',
+    // Build prompt based on what's requested
+    let prompt = '';
+
+    // Summary prompts by language and type
+    const summaryPromptsShort: Record<string, string> = {
+      'es': 'Resume el siguiente texto en español en 1-2 párrafos breves (máximo 150 palabras). Sé conciso y directo.',
+      'en': 'Summarize the following text in English in 1-2 brief paragraphs (maximum 150 words). Be concise and direct.',
+      'ca': 'Resumeix el següent text en català en 1-2 paràgrafs breus (màxim 150 paraules). Sigues concís i directe.',
+      'eu': 'Laburtu ondorengo testua euskaraz 1-2 paragrafo laburren (gehienez 150 hitz). Izan zehatza eta zuzena.',
+      'gl': 'Resume o seguinte texto en galego en 1-2 parágrafos breves (máximo 150 palabras). Sé conciso e directo.',
+      'pt': 'Resume o seguinte texto em português em 1-2 parágrafos breves (máximo 150 palavras). Seja conciso e direto.',
+      'fr': 'Résumez le texte suivant en français en 1-2 paragraphes brefs (maximum 150 mots). Soyez concis et direct.',
+      'de': 'Fassen Sie den folgenden Text auf Deutsch in 1-2 kurzen Absätzen zusammen (maximal 150 Wörter). Seien Sie prägnant und direkt.',
+      'it': 'Riassumi il seguente testo in italiano in 1-2 paragrafi brevi (massimo 150 parole). Sii conciso e diretto.',
     };
 
-    const prompt = prompts[language] || prompts['es'];
+    const summaryPromptsDetailed: Record<string, string> = {
+      'es': 'Resume el siguiente texto en español en 3-4 párrafos detallados. Incluye los puntos clave y contexto relevante.',
+      'en': 'Summarize the following text in English in 3-4 detailed paragraphs. Include key points and relevant context.',
+      'ca': 'Resumeix el següent text en català en 3-4 paràgrafs detallats. Inclou els punts clau i context rellevant.',
+      'eu': 'Laburtu ondorengo testua euskaraz 3-4 paragrafo xehakatutan. Sartu puntu nagusiak eta testuinguru garrantzitsua.',
+      'gl': 'Resume o seguinte texto en galego en 3-4 parágrafos detallados. Inclúe os puntos clave e contexto relevante.',
+      'pt': 'Resume o seguinte texto em português em 3-4 parágrafos detalhados. Inclua os pontos-chave e contexto relevante.',
+      'fr': 'Résumez le texte suivant en français en 3-4 paragraphes détaillés. Incluez les points clés et le contexte pertinent.',
+      'de': 'Fassen Sie den folgenden Text auf Deutsch in 3-4 detaillierten Absätzen zusammen. Fügen Sie wichtige Punkte und relevanten Kontext hinzu.',
+      'it': 'Riassumi il seguente testo in italiano in 3-4 paragrafi dettagliati. Includi i punti chiave e il contesto rilevante.',
+    };
+
+    const tagsPrompts: Record<string, string> = {
+      'es': 'Genera una lista de 5-7 tags/categorías principales que describan el contenido, separadas por comas.',
+      'en': 'Generate a list of 5-7 main tags/categories that describe the content, separated by commas.',
+      'ca': 'Genera una llista de 5-7 etiquetes/categories principals que descriguin el contingut, separades per comes.',
+      'eu': 'Sortu edukia deskribatzen duten 5-7 etiketa/kategoria nagusien zerrenda bat, komaz bereizita.',
+      'gl': 'Xera unha lista de 5-7 etiquetas/categorías principais que describan o contido, separadas por comas.',
+      'pt': 'Gere uma lista de 5-7 tags/categorias principais que descrevam o conteúdo, separadas por vírgulas.',
+      'fr': 'Générez une liste de 5-7 tags/catégories principaux décrivant le contenu, séparés par des virgules.',
+      'de': 'Generieren Sie eine Liste von 5-7 Haupttags/-kategorien, die den Inhalt beschreiben, getrennt durch Kommas.',
+      'it': 'Genera un elenco di 5-7 tag/categorie principali che descrivono il contenuto, separati da virgole.',
+    };
+
+    // Build prompt based on what's requested
+    if (generateSummary && generateTags) {
+      const summaryPromptSet = summaryType === 'short' ? summaryPromptsShort : summaryPromptsDetailed;
+      prompt = `${summaryPromptSet[language] || summaryPromptSet['es']} Después, añade una sección llamada "Tags:" seguida de ${tagsPrompts[language] || tagsPrompts['es']}`;
+    } else if (generateSummary) {
+      const summaryPromptSet = summaryType === 'short' ? summaryPromptsShort : summaryPromptsDetailed;
+      prompt = summaryPromptSet[language] || summaryPromptSet['es'];
+    } else if (generateTags) {
+      prompt = tagsPrompts[language] || tagsPrompts['es'];
+    } else {
+      console.warn('[LeMUR] Neither summary nor tags requested - returning empty result');
+      return { summary: '', tags: [] };
+    }
 
     const result = await client.lemur.task({
       transcript_ids: [transcriptId],
@@ -272,20 +321,35 @@ export async function generateSummaryWithLeMUR(transcriptId: string, language: s
 
     const fullText = result.response;
 
-    // Parse summary and tags
-    let summary = fullText;
+    // Parse based on what was requested
+    let summary = '';
     let tags: string[] = [];
 
-    const tagsMarker = /\n(Tags|Etiquetas|Etiketak|Categorías):/i;
-    const match = fullText.match(tagsMarker);
+    if (generateSummary && generateTags) {
+      // Both requested - parse for tags marker
+      const tagsMarker = /\n(Tags|Etiquetas|Etiketak|Categorías):/i;
+      const match = fullText.match(tagsMarker);
 
-    if (match && match.index) {
-      summary = fullText.slice(0, match.index).trim();
-      const tagsString = fullText.slice(match.index + match[0].length).trim();
-      tags = tagsString.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+      if (match && match.index) {
+        summary = fullText.slice(0, match.index).trim();
+        const tagsString = fullText.slice(match.index + match[0].length).trim();
+        tags = tagsString.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+      } else {
+        // Fallback if tags marker not found
+        summary = fullText.trim();
+      }
+    } else if (generateSummary) {
+      // Only summary requested
+      summary = fullText.trim();
+    } else if (generateTags) {
+      // Only tags requested - parse comma-separated list
+      tags = fullText.split(',').map((tag: string) => tag.trim()).filter(Boolean);
     }
 
-    console.log('[LeMUR] Summary generated successfully');
+    console.log('[LeMUR] Generation completed:', {
+      summaryLength: summary.length,
+      tagsCount: tags.length
+    });
     return { summary, tags };
 
   } catch (error: any) {
