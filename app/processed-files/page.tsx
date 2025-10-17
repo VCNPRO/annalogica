@@ -37,6 +37,7 @@ export default function ProcessedFilesPage() {
   const [darkMode, setDarkMode] = useState(true); // Assuming dark mode state is managed here
   const [processedJobs, setProcessedJobs] = useState<ProcessedJob[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
 
   // Load user from localStorage and check auth
   useEffect(() => {
@@ -88,6 +89,26 @@ export default function ProcessedFilesPage() {
     }
   }, [user]);
 
+  const toggleJobSelection = (jobId: string) => {
+    setSelectedJobs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleAllJobs = () => {
+    if (selectedJobs.size === processedJobs.length) {
+      setSelectedJobs(new Set());
+    } else {
+      setSelectedJobs(new Set(processedJobs.map(j => j.id)));
+    }
+  };
+
   const handleDeleteJob = async (jobId: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar este archivo procesado y todos sus resultados?')) {
       return;
@@ -109,6 +130,43 @@ export default function ProcessedFilesPage() {
     } catch (err: any) {
       console.error('Error deleting job:', err);
       showNotification(`Error al eliminar: ${err.message}`, 'error');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedJobs.size === 0) {
+      showNotification('No hay archivos seleccionados', 'error');
+      return;
+    }
+
+    if (!confirm(`¿Estás seguro de que quieres eliminar ${selectedJobs.size} archivo(s) seleccionado(s)?`)) {
+      return;
+    }
+
+    const deletePromises = Array.from(selectedJobs).map(async (jobId) => {
+      try {
+        const res = await fetch(`/api/processed-files/${jobId}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        if (!res.ok) throw new Error('Error al eliminar');
+        return { jobId, success: true };
+      } catch {
+        return { jobId, success: false };
+      }
+    });
+
+    const results = await Promise.all(deletePromises);
+    const successful = results.filter(r => r.success);
+    const failed = results.filter(r => !r.success);
+
+    setProcessedJobs(prev => prev.filter(job => !successful.some(r => r.jobId === job.id)));
+    setSelectedJobs(new Set());
+
+    if (failed.length === 0) {
+      showNotification(`${successful.length} archivo(s) eliminado(s) correctamente`, 'success');
+    } else {
+      showNotification(`${successful.length} eliminado(s), ${failed.length} fallaron`, 'error');
     }
   };
 
@@ -345,11 +403,34 @@ export default function ProcessedFilesPage() {
               <p className="text-zinc-400">No hay archivos procesados aún.</p>
             </div>
           ) : (
+            <>
+              {selectedJobs.size > 0 && (
+                <div className="mb-4 flex items-center justify-between bg-zinc-900 rounded-lg border border-zinc-800 p-4">
+                  <span className="text-white">
+                    {selectedJobs.size} archivo(s) seleccionado(s)
+                  </span>
+                  <button
+                    onClick={handleDeleteSelected}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar Seleccionados
+                  </button>
+                </div>
+              )}
             <div className="bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-zinc-700">
                   <thead className="bg-zinc-900">
                     <tr>
+                      <th scope="col" className="px-6 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={selectedJobs.size === processedJobs.length && processedJobs.length > 0}
+                          onChange={toggleAllJobs}
+                          className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer"
+                        />
+                      </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
                         Archivo Original
                       </th>
@@ -370,6 +451,14 @@ export default function ProcessedFilesPage() {
                   <tbody className="divide-y divide-zinc-800">
                     {processedJobs.map((job) => (
                       <tr key={job.id} className="bg-zinc-900 hover:bg-zinc-800">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedJobs.has(job.id)}
+                            onChange={() => toggleJobSelection(job.id)}
+                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer"
+                          />
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
                           {job.filename}
                         </td>
@@ -478,6 +567,7 @@ export default function ProcessedFilesPage() {
                 </table>
               </div>
             </div>
+            </>
           )}
         </div>
       </div>
