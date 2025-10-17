@@ -97,6 +97,7 @@ export default function ProcessedFilesPage() {
       } else {
         newSet.add(jobId);
       }
+      console.log('Selected jobs:', Array.from(newSet)); // Debug log
       return newSet;
     });
   };
@@ -134,6 +135,7 @@ export default function ProcessedFilesPage() {
   };
 
   const handleDeleteSelected = async () => {
+    console.log('handleDeleteSelected called, selectedJobs.size:', selectedJobs.size); // Debug log
     if (selectedJobs.size === 0) {
       showNotification('No hay archivos seleccionados', 'error');
       return;
