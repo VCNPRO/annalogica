@@ -1231,12 +1231,12 @@ export default function Dashboard() {
             </div>
 
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(60vh - 200px)' }}>
-              {uploadedFiles.length === 0 ? (
+              {uploadedFiles.filter(f => f.status !== 'completed').length === 0 ? (
                 <div className="px-4 py-8 text-center">
                   <p className={`text-xs ${textSecondary}`}>No hay archivos cargados aún.</p>
                 </div>
               ) : (
-                uploadedFiles.map((file) => (
+                uploadedFiles.filter(f => f.status !== 'completed').map((file) => (
                   <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
                     <div className="flex items-center gap-4 mb-2">
                       <input
