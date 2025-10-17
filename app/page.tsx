@@ -1180,8 +1180,6 @@ export default function Dashboard() {
                 <button
                   onClick={async () => {
                     const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id));
-                    console.log('Delete button clicked! selectedUploadedFileIds:', Array.from(selectedUploadedFileIds)); // Debug
-                    console.log('Selected files:', selectedFiles.map(f => ({ name: f.name, status: f.status, jobId: f.jobId }))); // Debug
 
                     if (selectedFiles.length === 0) {
                       showNotification('Selecciona archivos para eliminar', 'info');
@@ -1197,18 +1195,12 @@ export default function Dashboard() {
                     const nonCompletedFiles = selectedFiles.filter(f => f.status !== 'completed');
 
                     // Delete completed files from database
-                    let deletedCount = 0;
                     for (const file of completedFiles) {
                       try {
-                        const res = await fetch(`/api/processed-files/${file.jobId}`, {
+                        await fetch(`/api/processed-files/${file.jobId}`, {
                           method: 'DELETE',
                           credentials: 'include'
                         });
-                        if (res.ok) {
-                          deletedCount++;
-                        } else {
-                          console.error(`Failed to delete ${file.name}`);
-                        }
                       } catch (err) {
                         console.error(`Error deleting ${file.name}:`, err);
                       }
