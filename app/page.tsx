@@ -1180,8 +1180,10 @@ export default function Dashboard() {
                 <button
                   onClick={() => {
                     const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id) && f.status !== 'completed');
+                    console.log('Delete button clicked! selectedUploadedFileIds:', Array.from(selectedUploadedFileIds)); // Debug
+                    console.log('Selected files (non-completed):', selectedFiles.map(f => f.name)); // Debug
                     if (selectedFiles.length === 0) {
-                      showNotification('Selecciona archivos para eliminar', 'info');
+                      showNotification('Selecciona archivos para eliminar (solo archivos NO completados)', 'info');
                       return;
                     }
                     if (confirm(`¿Eliminar ${selectedFiles.length} archivo(s)?`)) {
@@ -1191,7 +1193,7 @@ export default function Dashboard() {
                     }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
-                  title="Eliminar archivos seleccionados"
+                  title="Eliminar archivos seleccionados (solo NO completados)"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Eliminar
