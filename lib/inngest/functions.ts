@@ -292,3 +292,197 @@ export const summarizeFile = inngest.createFunction(
     return { status: 'completed' };
   }
 );
+
+/**
+ * [Task] Summarize Document
+ * Triggered for text documents (PDF, TXT, DOCX).
+ * Generates summary and/or tags directly from text without AssemblyAI.
+ */
+export const summarizeDocument = inngest.createFunction(
+  {
+    id: 'task-summarize-document',
+    name: 'Task: Summarize Document',
+    retries: 1,
+  },
+  { event: 'task/summarize-document' },
+  async ({ event, step }) => {
+    const { jobId, actions, text, language, summaryType } = event.data;
+    const job = await TranscriptionJobDB.findById(jobId);
+
+    if (!job) {
+      console.error(`[Inngest] Job ${jobId} not found for document summarization.`);
+      return { error: 'Job not found' };
+    }
+
+    const { user_id: userId, filename, metadata } = job;
+
+    const generateSummary = actions.includes('Resumir');
+    const generateTags = actions.includes('Etiquetas');
+
+    console.log('[Inngest] Document summarization task:', {
+      jobId,
+      generateSummary,
+      generateTags,
+      summaryType,
+      textLength: text.length
+    });
+
+    const { summary, tags } = await step.run('generate-summary-and-tags-direct', async () => {
+      // Use Claude directly via AssemblyAI LeMUR-style API or direct Anthropic API
+      // For now, we'll use a helper function that processes text directly
+      return await generateSummaryFromText(text, language, generateSummary, generateTags, summaryType);
+    });
+
+    // Save results
+    let summaryUrl: string | undefined = undefined;
+
+    if (generateSummary && summary) {
+      summaryUrl = await step.run('save-summary', async () => {
+        return await saveSummary(summary, filename);
+      });
+    }
+
+    await step.run('update-db-with-results', async () => {
+      const newMetadata = { ...metadata };
+      if (generateTags && tags && tags.length > 0) {
+        newMetadata.tags = tags;
+      }
+
+      const updateData: any = {
+        metadata: newMetadata,
+      };
+
+      if (summaryUrl) {
+        updateData.summaryUrl = summaryUrl;
+      }
+
+      await TranscriptionJobDB.updateResults(jobId, updateData);
+
+      // Log usage
+      const tokensInput = Math.ceil(text.length / 4);
+      const tokensOutput = Math.ceil((summary?.length || 0) / 4);
+      await logSummary(userId, tokensInput, tokensOutput);
+    });
+
+    await step.run('update-status-completed', async () => {
+      await TranscriptionJobDB.updateStatus(jobId, 'completed');
+    });
+
+    console.log(`[Inngest] Document summarization task for job ${jobId} completed.`);
+    return { status: 'completed' };
+  }
+);
+
+/**
+ * Helper function to generate summary/tags from raw text
+ * Uses Claude via Anthropic API directly
+ */
+async function generateSummaryFromText(
+  text: string,
+  language: string = 'es',
+  generateSummary: boolean = true,
+  generateTags: boolean = true,
+  summaryType: 'short' | 'detailed' = 'detailed'
+): Promise<{ summary: string; tags: string[] }> {
+  // For documents, we'll use Anthropic's API directly instead of AssemblyAI
+  // This requires ANTHROPIC_API_KEY environment variable
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.warn('[Document] ANTHROPIC_API_KEY not set, falling back to empty results');
+    return { summary: '', tags: [] };
+  }
+
+  try {
+    // Build prompt based on what's requested
+    let prompt = '';
+
+    const summaryPromptsShort: Record<string, string> = {
+      'es': 'Resume el siguiente texto en español en 1-2 párrafos breves (máximo 150 palabras). Sé conciso y directo.',
+      'en': 'Summarize the following text in English in 1-2 brief paragraphs (maximum 150 words). Be concise and direct.',
+    };
+
+    const summaryPromptsDetailed: Record<string, string> = {
+      'es': 'Resume el siguiente texto en español en 3-4 párrafos detallados. Incluye los puntos clave y contexto relevante.',
+      'en': 'Summarize the following text in English in 3-4 detailed paragraphs. Include key points and relevant context.',
+    };
+
+    const tagsPrompts: Record<string, string> = {
+      'es': 'Genera una lista de 5-7 tags/categorías principales que describan el contenido, separadas por comas.',
+      'en': 'Generate a list of 5-7 main tags/categories that describe the content, separated by commas.',
+    };
+
+    if (generateSummary && generateTags) {
+      const summaryPromptSet = summaryType === 'short' ? summaryPromptsShort : summaryPromptsDetailed;
+      prompt = `${summaryPromptSet[language] || summaryPromptSet['es']} Después, añade una sección llamada "Tags:" seguida de ${tagsPrompts[language] || tagsPrompts['es']}`;
+    } else if (generateSummary) {
+      const summaryPromptSet = summaryType === 'short' ? summaryPromptsShort : summaryPromptsDetailed;
+      prompt = summaryPromptSet[language] || summaryPromptSet['es'];
+    } else if (generateTags) {
+      prompt = tagsPrompts[language] || tagsPrompts['es'];
+    } else {
+      return { summary: '', tags: [] };
+    }
+
+    // Call Anthropic API
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 2048,
+        messages: [
+          {
+            role: 'user',
+            content: `${prompt}\n\nTexto:\n${text.substring(0, 100000)}` // Limit to ~100k chars
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('[Document] Claude API error:', errorData);
+      throw new Error('Error calling Claude API');
+    }
+
+    const data = await response.json();
+    const fullText = data.content[0].text;
+
+    // Parse results
+    let summary = '';
+    let tags: string[] = [];
+
+    if (generateSummary && generateTags) {
+      const tagsMarker = /\n(Tags|Etiquetas):/i;
+      const match = fullText.match(tagsMarker);
+
+      if (match && match.index) {
+        summary = fullText.slice(0, match.index).trim();
+        const tagsString = fullText.slice(match.index + match[0].length).trim();
+        tags = tagsString.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+      } else {
+        summary = fullText.trim();
+      }
+    } else if (generateSummary) {
+      summary = fullText.trim();
+    } else if (generateTags) {
+      tags = fullText.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+    }
+
+    console.log('[Document] Claude processing completed:', {
+      summaryLength: summary.length,
+      tagsCount: tags.length
+    });
+
+    return { summary, tags };
+
+  } catch (error: any) {
+    console.error('[Document] Error generating summary from text:', error);
+    return { summary: '', tags: [] };
+  }
+}

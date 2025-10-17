@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { RefreshCw, Trash2, Sun, Moon, HelpCircle, LogOut } from 'lucide-react';
+import { RefreshCw, Trash2, Sun, Moon, BookOpen, LogOut } from 'lucide-react';
 import jsPDF from 'jspdf';
 
 // AssemblyAI + Inngest - Arquitectura asíncrona con polling
@@ -886,7 +886,7 @@ export default function Dashboard() {
           className={`flex items-center gap-2 ${bgSecondary} px-3 py-2 rounded-lg shadow-sm ${border} border`}
           title="Guía de usuario"
         >
-          <HelpCircle className={`h-4 w-4 ${textSecondary}`} />
+          <BookOpen className={`h-4 w-4 ${textSecondary}`} />
         </button>
         <button
           onClick={() => setDarkMode(!darkMode)}
