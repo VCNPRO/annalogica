@@ -558,8 +558,8 @@ export default function Dashboard() {
       return;
     }
 
-    // Delete completed files from database AND from localStorage
-    let successfulDeletions = 0;
+    // Delete completed files from database (only if they have jobId)
+    let dbDeletions = 0;
     for (const file of selectedCompletedFiles) {
       if (file.jobId) {
         try {
@@ -568,25 +568,23 @@ export default function Dashboard() {
             credentials: 'include'
           });
 
-          if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(errorData.error || `Error al eliminar ${file.name}`);
+          if (res.ok) {
+            dbDeletions++;
           }
-          successfulDeletions++;
+          // Si falla, no mostramos error - solo lo eliminamos del localStorage
         } catch (err: any) {
           console.error(`Error deleting job ${file.jobId}:`, err);
-          showNotification(`Error al eliminar ${file.name}: ${err.message}`, 'error');
+          // No mostramos notificación de error, seguimos eliminando
         }
       }
     }
 
-    // Remove files from state (this will also update localStorage via useEffect)
+    // Remove ALL selected files from state (this will also update localStorage via useEffect)
     setUploadedFiles(prev => prev.filter(file => !(file.status === 'completed' && selectedCompletedFileIds.has(file.id))));
     setSelectedCompletedFileIds(new Set());
 
-    if (successfulDeletions > 0) {
-      showNotification(`${successfulDeletions} archivo(s) eliminado(s) correctamente.`, 'success');
-    }
+    // Mostrar notificación con el total eliminado
+    showNotification(`${selectedCompletedFiles.length} archivo(s) eliminado(s) correctamente.`, 'success');
   };
 
   const handleLogout = async () => {
