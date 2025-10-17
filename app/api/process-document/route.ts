@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
       if (fileType === 'application/pdf') {
         // Extract text from PDF using dynamic import
         console.log('[Document] Extracting text from PDF:', fileName);
-        const pdfParse = (await import('pdf-parse')).default;
-        const pdfData = await pdfParse(buffer);
+        const { PDFParse } = await import('pdf-parse');
+        const pdfData = await PDFParse(buffer);
         extractedText = pdfData.text;
         console.log('[Document] PDF text extracted, length:', extractedText.length);
 
