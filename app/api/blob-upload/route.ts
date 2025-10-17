@@ -6,6 +6,7 @@ import { TranscriptionJobDB } from '@/lib/db';
 // File size limits (in bytes)
 const MAX_FILE_SIZE_AUDIO = 500 * 1024 * 1024; // 500 MB
 const MAX_FILE_SIZE_VIDEO = 2 * 1024 * 1024 * 1024; // 2 GB
+const MAX_FILE_SIZE_DOCUMENT = 50 * 1024 * 1024; // 50 MB
 
 // Allowed MIME types
 const ALLOWED_AUDIO_TYPES = [
@@ -26,6 +27,12 @@ const ALLOWED_VIDEO_TYPES = [
   'video/webm',
   'video/quicktime',
   'video/x-msvideo',
+];
+
+const ALLOWED_DOCUMENT_TYPES = [
+  'text/plain',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
 ];
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -62,20 +69,33 @@ export async function POST(request: NextRequest): Promise<Response> {
         // Validate file type
         const isAudioAllowed = ALLOWED_AUDIO_TYPES.includes(fileType);
         const isVideoAllowed = ALLOWED_VIDEO_TYPES.includes(fileType);
+        const isDocumentAllowed = ALLOWED_DOCUMENT_TYPES.includes(fileType);
 
-        if (!isAudioAllowed && !isVideoAllowed) {
+        if (!isAudioAllowed && !isVideoAllowed && !isDocumentAllowed) {
           throw new Error(
-            'Tipo de archivo no permitido. Solo se aceptan archivos de audio (MP3, WAV, OGG, M4A) o video (MP4, WEBM, MOV).'
+            'Tipo de archivo no permitido. Solo se aceptan archivos de audio (MP3, WAV, OGG, M4A), video (MP4, WEBM, MOV) o documentos (TXT, PDF, DOCX).'
           );
         }
 
         // Validate file size
-        const maxSize = isAudioAllowed ? MAX_FILE_SIZE_AUDIO : MAX_FILE_SIZE_VIDEO;
+        let maxSize: number;
+        let fileTypeLabel: string;
+
+        if (isAudioAllowed) {
+          maxSize = MAX_FILE_SIZE_AUDIO;
+          fileTypeLabel = 'audio';
+        } else if (isVideoAllowed) {
+          maxSize = MAX_FILE_SIZE_VIDEO;
+          fileTypeLabel = 'video';
+        } else {
+          maxSize = MAX_FILE_SIZE_DOCUMENT;
+          fileTypeLabel = 'documento';
+        }
+
         if (fileSize > maxSize) {
           const maxSizeMB = maxSize / 1024 / 1024;
-          const fileType = isAudioAllowed ? 'audio' : 'video';
           throw new Error(
-            `El archivo ${fileType} es demasiado grande. Tamaño máximo: ${maxSizeMB} MB`
+            `El archivo ${fileTypeLabel} es demasiado grande. Tamaño máximo: ${maxSizeMB} MB`
           );
         }
 
@@ -83,9 +103,9 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         // Add userId to clientPayload for onUploadCompleted
         return {
-          allowedContentTypes: [...ALLOWED_AUDIO_TYPES, ...ALLOWED_VIDEO_TYPES],
+          allowedContentTypes: [...ALLOWED_AUDIO_TYPES, ...ALLOWED_VIDEO_TYPES, ...ALLOWED_DOCUMENT_TYPES],
           addRandomSuffix: true,
-          maximumSizeInBytes: MAX_FILE_SIZE_VIDEO,
+          maximumSizeInBytes: MAX_FILE_SIZE_VIDEO, // Use largest size as max
           clientPayload: JSON.stringify({ ...payload, userId: auth.userId }), // Pass userId to clientPayload
         };
       },
