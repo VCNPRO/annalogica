@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Trash2, Download } from 'lucide-react';
+import { Trash2, Download, ArrowLeft, Settings, Info, Languages } from 'lucide-react';
 import jsPDF from 'jspdf'; // Assuming jsPDF is used for PDF generation
 import { useNotification } from '@/hooks/useNotification';
 import { Toast } from '@/components/Toast';
@@ -38,6 +38,8 @@ export default function ProcessedFilesPage() {
   const [processedJobs, setProcessedJobs] = useState<ProcessedJob[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
+  const [translatingJob, setTranslatingJob] = useState<string | null>(null);
+  const [targetLanguage, setTargetLanguage] = useState('en');
 
   // Load user from localStorage and check auth
   useEffect(() => {
@@ -246,6 +248,49 @@ export default function ProcessedFilesPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleTranslate = async (jobId: string) => {
+    if (!targetLanguage) {
+      showNotification('Selecciona un idioma de destino', 'error');
+      return;
+    }
+
+    setTranslatingJob(jobId);
+    try {
+      const res = await fetch(`/api/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          jobId,
+          targetLanguage
+        })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Error al traducir');
+      }
+
+      const data = await res.json();
+      showNotification(`Traducción a ${targetLanguage} completada. Descargando...`, 'success');
+
+      // Download translated file
+      if (data.translatedText) {
+        const job = processedJobs.find(j => j.id === jobId);
+        const filename = job?.filename.replace(/\.[^/.]+$/, '') || 'traduccion';
+        const txtBlob = new Blob([data.translatedText], { type: 'text/plain' });
+        triggerDownload(txtBlob, `${filename}-traduccion-${targetLanguage}.txt`);
+      }
+    } catch (err: any) {
+      console.error('Error translating:', err);
+      showNotification(`Error al traducir: ${err.message}`, 'error');
+    } finally {
+      setTranslatingJob(null);
+    }
+  };
+
   const handleDownload = async (job: ProcessedJob, type: 'txt' | 'srt' | 'vtt' | 'summary' | 'speakers' | 'tags', format: 'txt' | 'pdf' | 'original') => {
     let url: string | undefined;
     let filename: string = job.filename.replace(/\.[^/.]+$/, '');
@@ -366,31 +411,86 @@ export default function ProcessedFilesPage() {
             )}
           </div>
 
-          <nav className="flex flex-col space-y-2">
-            <Link href="/" className="flex items-center gap-2 p-3 rounded-lg hover:bg-zinc-800 text-white">
-              <span className="text-orange-500">📁</span>
-              <span>Cargar y Procesar</span>
+          <nav className="flex flex-col space-y-2 mb-6">
+            <Link href="/" className="flex items-center gap-2 p-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium transition-colors">
+              <ArrowLeft className="h-4 w-4" />
+              <span>Volver al Dashboard</span>
             </Link>
             <Link href="/processed-files" className="flex items-center gap-2 p-3 rounded-lg bg-black text-white font-medium">
               <span className="text-green-500">✅</span>
               <span>Archivos Procesados</span>
             </Link>
-            {/* Add other navigation links as needed */}
+            <Link href="/settings" className="flex items-center gap-2 p-3 rounded-lg hover:bg-zinc-800 text-white transition-colors">
+              <Settings className="h-4 w-4 text-zinc-400" />
+              <span>Ajustes</span>
+            </Link>
           </nav>
 
-          <div className="mt-auto pt-6 text-center">
-            <p className="text-xs text-zinc-500">
-              annalogica by videoconversion digital lab, S.L.
+          {/* File retention policy info */}
+          <div className="bg-zinc-800 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-2 mb-2">
+              <Info className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+              <h3 className="text-sm font-medium text-white">Política de Retención</h3>
+            </div>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Los archivos procesados se conservan durante <span className="text-white font-medium">30 días</span>.
+              Los archivos originales de audio/video se eliminan automáticamente tras el procesamiento.
             </p>
-            <p className="text-xs text-zinc-500">
-              From Barcelona with love
-            </p>
+          </div>
+
+          <div className="mt-auto">
+            <Link
+              href="/"
+              className="flex items-center justify-center gap-2 p-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium transition-colors mb-4"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Volver al Dashboard</span>
+            </Link>
+            <div className="pt-4 border-t border-zinc-800 text-center">
+              <p className="text-xs text-zinc-500">
+                annalogica by videoconversion digital lab, S.L.
+              </p>
+              <p className="text-xs text-zinc-500">
+                From Barcelona with love
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Main Content */}
         <div className="flex-1 p-6 overflow-y-auto">
-          <h2 className="text-xl font-bold mb-6 text-white">Archivos Procesados</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-white">Archivos Procesados</h2>
+
+            {/* Translation language selector */}
+            <div className="flex items-center gap-3">
+              <label htmlFor="target-language" className="text-sm text-zinc-400">
+                Idioma para traducir:
+              </label>
+              <select
+                id="target-language"
+                className="p-2 bg-zinc-800 rounded-lg border border-zinc-700 text-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                value={targetLanguage}
+                onChange={(e) => setTargetLanguage(e.target.value)}
+                style={{ minWidth: '150px' }}
+              >
+                <option value="en">English</option>
+                <option value="es">Español</option>
+                <option value="ca">Català</option>
+                <option value="eu">Euskera</option>
+                <option value="gl">Gallego</option>
+                <option value="pt">Português</option>
+                <option value="fr">Français</option>
+                <option value="de">Deutsch</option>
+                <option value="it">Italiano</option>
+                <option value="zh">中文 (Chinese)</option>
+                <option value="ja">日本語 (Japanese)</option>
+                <option value="ko">한국어 (Korean)</option>
+                <option value="ar">العربية (Arabic)</option>
+                <option value="ru">Русский (Russian)</option>
+              </select>
+            </div>
+          </div>
 
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded p-3">
@@ -549,6 +649,26 @@ export default function ProcessedFilesPage() {
                                   <Download className="h-3 w-3 mr-1" /> Tags PDF
                                 </button>
                               </>
+                            )}
+                            {/* Translation button */}
+                            {job.txt_url && (
+                              <button
+                                onClick={() => handleTranslate(job.id)}
+                                disabled={translatingJob === job.id}
+                                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                                title="Traducir transcripción al idioma seleccionado"
+                              >
+                                {translatingJob === job.id ? (
+                                  <>
+                                    <div className="animate-spin h-3 w-3 mr-1 border-2 border-white border-t-transparent rounded-full"></div>
+                                    Traduciendo...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Languages className="h-3 w-3 mr-1" /> Traducir
+                                  </>
+                                )}
+                              </button>
                             )}
                           </div>
                         </td>
