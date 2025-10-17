@@ -1178,22 +1178,51 @@ export default function Dashboard() {
                   Reiniciar
                 </button>
                 <button
-                  onClick={() => {
-                    const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id) && f.status !== 'completed');
+                  onClick={async () => {
+                    const selectedFiles = uploadedFiles.filter(f => selectedUploadedFileIds.has(f.id));
                     console.log('Delete button clicked! selectedUploadedFileIds:', Array.from(selectedUploadedFileIds)); // Debug
-                    console.log('Selected files (non-completed):', selectedFiles.map(f => f.name)); // Debug
+                    console.log('Selected files:', selectedFiles.map(f => ({ name: f.name, status: f.status, jobId: f.jobId }))); // Debug
+
                     if (selectedFiles.length === 0) {
-                      showNotification('Selecciona archivos para eliminar (solo archivos NO completados)', 'info');
+                      showNotification('Selecciona archivos para eliminar', 'info');
                       return;
                     }
-                    if (confirm(`¿Eliminar ${selectedFiles.length} archivo(s)?`)) {
-                      setUploadedFiles(prev => prev.filter(f => !(selectedUploadedFileIds.has(f.id) && f.status !== 'completed')));
-                      setSelectedUploadedFileIds(new Set());
-                      showNotification('Archivos eliminados', 'success');
+
+                    if (!confirm(`¿Eliminar ${selectedFiles.length} archivo(s) seleccionado(s)?`)) {
+                      return;
                     }
+
+                    // Separate completed from non-completed files
+                    const completedFiles = selectedFiles.filter(f => f.status === 'completed' && f.jobId);
+                    const nonCompletedFiles = selectedFiles.filter(f => f.status !== 'completed');
+
+                    // Delete completed files from database
+                    let deletedCount = 0;
+                    for (const file of completedFiles) {
+                      try {
+                        const res = await fetch(`/api/processed-files/${file.jobId}`, {
+                          method: 'DELETE',
+                          credentials: 'include'
+                        });
+                        if (res.ok) {
+                          deletedCount++;
+                        } else {
+                          console.error(`Failed to delete ${file.name}`);
+                        }
+                      } catch (err) {
+                        console.error(`Error deleting ${file.name}:`, err);
+                      }
+                    }
+
+                    // Remove all selected files from state
+                    setUploadedFiles(prev => prev.filter(f => !selectedUploadedFileIds.has(f.id)));
+                    setSelectedUploadedFileIds(new Set());
+
+                    const total = completedFiles.length + nonCompletedFiles.length;
+                    showNotification(`${total} archivo(s) eliminado(s) correctamente`, 'success');
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
-                  title="Eliminar archivos seleccionados (solo NO completados)"
+                  title="Eliminar archivos seleccionados"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Eliminar
