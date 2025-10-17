@@ -558,10 +558,7 @@ export default function Dashboard() {
       return;
     }
 
-    if (!confirm(`¿Estás seguro de que quieres eliminar ${selectedCompletedFiles.length} archivo(s) procesado(s) seleccionado(s) y todos sus resultados?`)) {
-      return;
-    }
-
+    // Delete completed files from database AND from localStorage
     let successfulDeletions = 0;
     for (const file of selectedCompletedFiles) {
       if (file.jobId) {
@@ -578,14 +575,16 @@ export default function Dashboard() {
           successfulDeletions++;
         } catch (err: any) {
           console.error(`Error deleting job ${file.jobId}:`, err);
-          setError(`Error al eliminar ${file.name}: ${err.message}`);
+          showNotification(`Error al eliminar ${file.name}: ${err.message}`, 'error');
         }
       }
     }
 
+    // Remove files from state (this will also update localStorage via useEffect)
+    setUploadedFiles(prev => prev.filter(file => !(file.status === 'completed' && selectedCompletedFileIds.has(file.id))));
+    setSelectedCompletedFileIds(new Set());
+
     if (successfulDeletions > 0) {
-      setUploadedFiles(prev => prev.filter(file => !(file.status === 'completed' && selectedCompletedFileIds.has(file.id))));
-      setSelectedCompletedFileIds(new Set());
       showNotification(`${successfulDeletions} archivo(s) eliminado(s) correctamente.`, 'success');
     }
   };
