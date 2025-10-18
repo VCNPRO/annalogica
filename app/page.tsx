@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, BookOpen, LogOut } from 'lucide-react';
 import jsPDF from 'jspdf';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+}
 
 // AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
@@ -495,9 +501,53 @@ export default function Dashboard() {
           }
           const blob = await blobResponse.blob();
 
-          // Crear FormData para enviar el archivo
+          // Crear FormData
           const formData = new FormData();
-          formData.append('file', blob, file.name);
+
+          // SECURITY: Check if it's a PDF - process client-side for privacy
+          const isPDF = file.name.toLowerCase().endsWith('.pdf') || blob.type === 'application/pdf';
+
+          if (isPDF) {
+            console.log('[Process] 🔒 PDF detected - processing in browser for privacy');
+
+            try {
+              // Extract text from PDF in the browser
+              const arrayBuffer = await blob.arrayBuffer();
+              const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+              const numPages = pdf.numPages;
+              const textParts: string[] = [];
+
+              console.log(`[Process] PDF has ${numPages} pages - extracting text...`);
+
+              for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items
+                  .map((item: any) => item.str)
+                  .join(' ');
+                textParts.push(pageText);
+              }
+
+              const extractedText = textParts.join('\n\n');
+
+              if (!extractedText || extractedText.trim().length === 0) {
+                throw new Error('No se pudo extraer texto del PDF. Puede estar vacío o ser una imagen escaneada.');
+              }
+
+              console.log(`[Process] ✅ Text extracted from PDF (${extractedText.length} characters) - sending to server`);
+
+              // Send ONLY the extracted text (not the PDF file)
+              formData.append('text', extractedText);
+              formData.append('fileName', file.name);
+            } catch (pdfError: any) {
+              console.error('[Process] Error extracting PDF text:', pdfError);
+              throw new Error(`Error al procesar PDF: ${pdfError.message}`);
+            }
+          } else {
+            // Not a PDF - send file directly (TXT, DOCX)
+            formData.append('file', blob, file.name);
+          }
+
           formData.append('actions', JSON.stringify(file.actions));
           formData.append('summaryType', summaryType);
           formData.append('language', language);
