@@ -58,14 +58,13 @@ export async function POST(request: NextRequest) {
       const buffer = Buffer.from(arrayBuffer);
 
       if (fileType === 'application/pdf') {
-        // Extract text from PDF using pdfjs-dist
+        // Extract text from PDF using pdfjs-dist (CommonJS version for Node.js)
         console.log('[Document] Extracting text from PDF:', fileName);
-        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
 
         const loadingTask = pdfjsLib.getDocument({
           data: new Uint8Array(buffer),
           useSystemFonts: true,
-          standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/',
         });
 
         const pdfDocument = await loadingTask.promise;
