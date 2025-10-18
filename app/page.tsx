@@ -508,8 +508,8 @@ export default function Dashboard() {
               // Dynamic import of PDF.js (client-side only)
               const pdfjsLib = await import('pdfjs-dist');
 
-              // Configure worker
-              pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+              // Configure worker - use unpkg CDN as fallback
+              pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
 
               // Extract text from PDF in the browser
               const arrayBuffer = await blob.arrayBuffer();
