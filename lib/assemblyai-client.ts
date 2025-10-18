@@ -755,3 +755,111 @@ export async function saveSpeakersReport(
 
   return speakersBlob.url;
 }
+
+/**
+ * Generate summary and/or tags from raw text using AssemblyAI LeMUR
+ * For documents (PDF, TXT, DOCX) that don't have AssemblyAI transcripts
+ */
+export async function generateSummaryFromTextWithLeMUR(
+  text: string,
+  language: string = 'es',
+  generateSummary: boolean = true,
+  generateTags: boolean = true,
+  summaryType: 'short' | 'detailed' = 'detailed'
+): Promise<SummaryResult> {
+  const client = getAssemblyAIClient();
+
+  try {
+    console.log('[LeMUR Document] Generating content from text:', {
+      textLength: text.length,
+      generateSummary,
+      generateTags,
+      summaryType,
+      language
+    });
+
+    // Build prompt based on what's requested (same logic as transcript-based summarization)
+    let prompt = '';
+
+    const summaryPromptsShort: Record<string, string> = {
+      'es': 'Resume el siguiente texto en español en 1-2 párrafos breves (máximo 150 palabras). Sé conciso y directo.',
+      'en': 'Summarize the following text in English in 1-2 brief paragraphs (maximum 150 words). Be concise and direct.',
+      'ca': 'Resumeix el següent text en català en 1-2 paràgrafs breus (màxim 150 paraules). Sigues concís i directe.',
+      'eu': 'Laburtu ondorengo testua euskaraz 1-2 paragrafo laburren (gehienez 150 hitz). Izan zehatza eta zuzena.',
+      'gl': 'Resume o seguinte texto en galego en 1-2 parágrafos breves (máximo 150 palabras). Sé conciso e directo.',
+      'pt': 'Resume o seguinte texto em português em 1-2 parágrafos breves (máximo 150 palavras). Seja conciso e direto.',
+    };
+
+    const summaryPromptsDetailed: Record<string, string> = {
+      'es': 'Resume el siguiente texto en español en 3-4 párrafos detallados. Incluye los puntos clave y contexto relevante.',
+      'en': 'Summarize the following text in English in 3-4 detailed paragraphs. Include key points and relevant context.',
+      'ca': 'Resumeix el següent text en català en 3-4 paràgrafs detallats. Inclou els punts clau i context rellevant.',
+      'eu': 'Laburtu ondorengo testua euskaraz 3-4 paragrafo xehakatutan. Sartu puntu nagusiak eta testuinguru garrantzitsua.',
+      'gl': 'Resume o seguinte texto en galego en 3-4 parágrafos detallados. Inclúe os puntos clave e contexto relevante.',
+      'pt': 'Resume o seguinte texto em português em 3-4 parágrafos detalhados. Inclua os pontos-chave e contexto relevante.',
+    };
+
+    const tagsPrompts: Record<string, string> = {
+      'es': 'Genera una lista de 5-7 tags/categorías principales que describan el contenido, separadas por comas.',
+      'en': 'Generate a list of 5-7 main tags/categories that describe the content, separated by commas.',
+      'ca': 'Genera una llista de 5-7 etiquetes/categories principals que descriguin el contingut, separades per comes.',
+      'eu': 'Sortu edukia deskribatzen duten 5-7 etiketa/kategoria nagusien zerrenda bat, komaz bereizita.',
+      'gl': 'Xera unha lista de 5-7 etiquetas/categorías principais que describan o contido, separadas por comas.',
+      'pt': 'Gere uma lista de 5-7 tags/categorias principais que descrevam o conteúdo, separadas por vírgulas.',
+    };
+
+    if (generateSummary && generateTags) {
+      const summaryPromptSet = summaryType === 'short' ? summaryPromptsShort : summaryPromptsDetailed;
+      prompt = `${summaryPromptSet[language] || summaryPromptSet['es']} Después, añade una sección llamada "Tags:" seguida de ${tagsPrompts[language] || tagsPrompts['es']}`;
+    } else if (generateSummary) {
+      const summaryPromptSet = summaryType === 'short' ? summaryPromptsShort : summaryPromptsDetailed;
+      prompt = summaryPromptSet[language] || summaryPromptSet['es'];
+    } else if (generateTags) {
+      prompt = tagsPrompts[language] || tagsPrompts['es'];
+    } else {
+      console.warn('[LeMUR Document] Neither summary nor tags requested - returning empty result');
+      return { summary: '', tags: [] };
+    }
+
+    // Use LeMUR with custom text input (no transcript_ids needed for documents)
+    const result = await client.lemur.task({
+      input_text: text.substring(0, 100000), // Limit to ~100k characters for safety
+      prompt: prompt,
+      final_model: 'anthropic/claude-3-5-haiku-20241022',
+    });
+
+    const fullText = result.response;
+
+    // Parse results (same logic as transcript-based summarization)
+    let summary = '';
+    let tags: string[] = [];
+
+    if (generateSummary && generateTags) {
+      const tagsMarker = /\n(Tags|Etiquetas|Etiketak|Categorías):/i;
+      const match = fullText.match(tagsMarker);
+
+      if (match && match.index) {
+        summary = fullText.slice(0, match.index).trim();
+        const tagsString = fullText.slice(match.index + match[0].length).trim();
+        tags = tagsString.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+      } else {
+        summary = fullText.trim();
+      }
+    } else if (generateSummary) {
+      summary = fullText.trim();
+    } else if (generateTags) {
+      tags = fullText.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+    }
+
+    console.log('[LeMUR Document] Generation completed:', {
+      summaryLength: summary.length,
+      tagsCount: tags.length
+    });
+
+    return { summary, tags };
+
+  } catch (error: any) {
+    console.error('[LeMUR Document] Error generating summary from text:', error);
+    throw new Error(`Failed to generate summary: ${error.message}`);
+  }
+}
