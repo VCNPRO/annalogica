@@ -1,13 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      // Ignorar canvas en servidor (no disponible en serverless)
-      config.resolve.alias.canvas = false;
-    }
-    return config;
-  },
   async headers() {
     return [
       {

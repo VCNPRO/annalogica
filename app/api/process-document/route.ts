@@ -36,57 +36,44 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+
+    // Support both file upload AND pre-extracted text (for PDF client-side processing)
+    const file = formData.get('file') as File | null;
+    const preExtractedText = formData.get('text') as string | null;
+    const fileName = formData.get('fileName') as string || 'documento.txt';
     const actions = JSON.parse(formData.get('actions') as string || '[]');
     const summaryType = formData.get('summaryType') as 'short' | 'detailed' || 'detailed';
     const language = formData.get('language') as string || 'es';
 
-    if (!file) {
+    // Require either file or pre-extracted text
+    if (!file && !preExtractedText) {
       return NextResponse.json(
-        { error: 'No se proporcionó ningún archivo' },
+        { error: 'No se proporcionó ningún archivo ni texto extraído' },
         { status: 400 }
       );
     }
 
-    // Extract text based on file type
-    let extractedText = '';
-    const fileType = file.type;
-    const fileName = file.name;
+    // Use pre-extracted text if provided (client-side PDF processing)
+    let extractedText = preExtractedText || '';
+    let fileType = 'text/plain';
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      // Only process file if no pre-extracted text provided
+      if (!preExtractedText && file) {
+        fileType = file.type;
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
 
-      if (fileType === 'application/pdf') {
-        // Extract text from PDF using pdfjs-dist without workers (serverless compatible)
-        console.log('[Document] Extracting text from PDF:', fileName);
-        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
-
-        // Disable worker to avoid worker file not found in serverless
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-
-        const loadingTask = pdfjsLib.getDocument({
-          data: new Uint8Array(buffer),
-          useSystemFonts: true,
-          disableWorker: true,
-          isEvalSupported: false,
-        });
-
-        const pdfDocument = await loadingTask.promise;
-        const numPages = pdfDocument.numPages;
-        const textParts: string[] = [];
-
-        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-          const page = await pdfDocument.getPage(pageNum);
-          const textContent = await page.getTextContent();
-          const pageText = textContent.items
-            .map((item: any) => item.str)
-            .join(' ');
-          textParts.push(pageText);
-        }
-
-        extractedText = textParts.join('\n\n');
-        console.log('[Document] PDF text extracted, length:', extractedText.length);
+        if (fileType === 'application/pdf') {
+          // SECURITY: PDFs should be processed on the CLIENT side for privacy
+          // This is critical for enterprise/institutional clients with confidential documents
+          return NextResponse.json(
+            {
+              error: 'Los archivos PDF deben procesarse en el navegador por seguridad. El texto extraído debe enviarse desde el cliente.',
+              code: 'PDF_CLIENT_SIDE_ONLY'
+            },
+            { status: 400 }
+          );
 
       } else if (fileType === 'text/plain') {
         // Extract text from TXT
@@ -104,13 +91,15 @@ export async function POST(request: NextRequest) {
         extractedText = result.value;
         console.log('[Document] DOCX text extracted, length:', extractedText.length);
 
-      } else {
-        return NextResponse.json(
-          { error: `Tipo de archivo no soportado: ${fileType}. Solo se permiten PDF, TXT y DOCX.` },
-          { status: 400 }
-        );
+        } else {
+          return NextResponse.json(
+            { error: `Tipo de archivo no soportado: ${fileType}. Solo se permiten PDF (procesado en cliente), TXT y DOCX.` },
+            { status: 400 }
+          );
+        }
       }
 
+      // Validate extracted text
       if (!extractedText || extractedText.trim().length === 0) {
         return NextResponse.json(
           { error: 'No se pudo extraer texto del documento. El archivo puede estar vacío o dañado.' },
