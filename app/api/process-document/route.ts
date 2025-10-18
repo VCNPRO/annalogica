@@ -58,13 +58,18 @@ export async function POST(request: NextRequest) {
       const buffer = Buffer.from(arrayBuffer);
 
       if (fileType === 'application/pdf') {
-        // Extract text from PDF using pdfjs-dist (CommonJS version for Node.js)
+        // Extract text from PDF using pdfjs-dist without workers (serverless compatible)
         console.log('[Document] Extracting text from PDF:', fileName);
         const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.js');
+
+        // Disable worker to avoid worker file not found in serverless
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
         const loadingTask = pdfjsLib.getDocument({
           data: new Uint8Array(buffer),
           useSystemFonts: true,
+          disableWorker: true,
+          isEvalSupported: false,
         });
 
         const pdfDocument = await loadingTask.promise;
