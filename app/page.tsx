@@ -508,8 +508,9 @@ export default function Dashboard() {
               // Dynamic import of PDF.js (client-side only)
               const pdfjsLib = await import('pdfjs-dist');
 
-              // Configure worker - use unpkg CDN as fallback
-              pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.js`;
+              // Use self-hosted worker for reliability and performance
+              // No external CDN dependencies - professional approach
+              pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
               // Extract text from PDF in the browser
               const arrayBuffer = await blob.arrayBuffer();
