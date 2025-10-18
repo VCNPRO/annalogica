@@ -58,11 +58,30 @@ export async function POST(request: NextRequest) {
       const buffer = Buffer.from(arrayBuffer);
 
       if (fileType === 'application/pdf') {
-        // Extract text from PDF using dynamic import (v1 API)
+        // Extract text from PDF using pdfjs-dist
         console.log('[Document] Extracting text from PDF:', fileName);
-        const pdfParse = (await import('pdf-parse')).default;
-        const pdfData = await pdfParse(buffer);
-        extractedText = pdfData.text;
+        const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+        const loadingTask = pdfjsLib.getDocument({
+          data: new Uint8Array(buffer),
+          useSystemFonts: true,
+          standardFontDataUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/',
+        });
+
+        const pdfDocument = await loadingTask.promise;
+        const numPages = pdfDocument.numPages;
+        const textParts: string[] = [];
+
+        for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+          const page = await pdfDocument.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items
+            .map((item: any) => item.str)
+            .join(' ');
+          textParts.push(pageText);
+        }
+
+        extractedText = textParts.join('\n\n');
         console.log('[Document] PDF text extracted, length:', extractedText.length);
 
       } else if (fileType === 'text/plain') {
