@@ -5,12 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, BookOpen, LogOut } from 'lucide-react';
 import jsPDF from 'jspdf';
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Configure PDF.js worker
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-}
 
 // AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
@@ -511,6 +505,12 @@ export default function Dashboard() {
             console.log('[Process] 🔒 PDF detected - processing in browser for privacy');
 
             try {
+              // Dynamic import of PDF.js (client-side only)
+              const pdfjsLib = await import('pdfjs-dist');
+
+              // Configure worker
+              pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
               // Extract text from PDF in the browser
               const arrayBuffer = await blob.arrayBuffer();
               const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
