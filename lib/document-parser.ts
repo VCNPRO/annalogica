@@ -53,13 +53,13 @@ async function parsePDF(buffer: Buffer): Promise<ParseResult> {
 
       if (result.text && result.text.trim().length > 0) {
         const processingTime = Date.now() - startTime;
-        console.log(`[DocumentParser] ✅ pdf-parse succeeded: ${result.text.length} chars, ${result.numPages} pages in ${processingTime}ms`);
+        console.log(`[DocumentParser] ✅ pdf-parse succeeded: ${result.text.length} chars, ${result.total} pages in ${processingTime}ms`);
 
         return {
           text: result.text,
           metadata: {
             method: 'pdf-parse',
-            pages: result.numPages,
+            pages: result.total,
             processingTime,
             fileSize: buffer.length,
             warnings: warnings.length > 0 ? warnings : undefined
