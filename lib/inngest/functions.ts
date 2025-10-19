@@ -1,5 +1,5 @@
 // DÓNDE: lib/inngest/functions.ts
-// Versión final con identificación de oradores y subtítulos reincorporados usando el nuevo stack.
+// VERSIÓN FINAL: Todas las funciones de IA han sido migradas a Deepgram y OpenAI.
 
 import { inngest } from './client';
 import { TranscriptionJobDB } from '@/lib/db';
@@ -51,7 +51,7 @@ const generateVtt = (utterances: Utterance[]) => {
 
 
 /**
- * [Task] Transcribe File (MIGRADO A DEEPGRAM + FUNCIONALIDAD CRÍTICA)
+ * [Task] Transcribe File (MIGRADO A DEEPGRAM)
  */
 export const transcribeFile = inngest.createFunction(
   {
@@ -99,7 +99,7 @@ export const transcribeFile = inngest.createFunction(
                 return JSON.parse(completion.choices[0].message.content || '{}');
             } catch (e) {
                 console.error("Fallo al identificar oradores con OpenAI, se usarán valores por defecto.", e);
-                return {}; // Devuelve un objeto vacío en caso de error
+                return {};
             }
         });
     }
@@ -169,8 +169,6 @@ export const summarizeFile = inngest.createFunction(
   },
   { event: 'task/summarize' },
   async ({ event, step }) => {
-    // (Esta función no necesita cambios, ya que depende del texto transcrito)
-    // El resto de tu código de summarizeFile se mantiene igual
     const { jobId, actions: requestedActions } = event.data;
     const job = await TranscriptionJobDB.findById(jobId);
 
@@ -187,53 +185,28 @@ export const summarizeFile = inngest.createFunction(
     const { summary, tags } = await step.run('generate-summary-with-openai', async () => {
       const textResponse = await fetch(job.txt_url!);
       const transcriptText = await textResponse.text();
-
-      const prompt = `
-        Analiza la siguiente transcripción.
-        ${generateSummary ? `Genera un resumen de tipo "${summaryType}".` : ''}
-        ${generateTags ? 'Genera una lista de 5 a 10 etiquetas clave (tags) relevantes.' : ''}
-        Responde en formato JSON con las claves "summary" y "tags". Si no se pide un resumen, la clave "summary" debe ser un string vacío. Si no se piden etiquetas, "tags" debe ser un array vacío.
-        El texto es:
-        ---
-        ${transcriptText}
-      `;
-
+      const prompt = `Analiza el siguiente texto. ${generateSummary ? `Genera un resumen de tipo "${summaryType}".` : ''} ${generateTags ? 'Genera una lista de 5 a 10 etiquetas clave (tags) relevantes.' : ''} Responde en formato JSON con las claves "summary" y "tags".`;
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
+        messages: [{ role: "user", content: prompt }, {role: "system", content: `El texto es:\n---\n${transcriptText}`}],
         response_format: { type: "json_object" },
       });
-
       const result = JSON.parse(completion.choices[0].message.content || '{}');
-      return {
-          summary: result.summary || '',
-          tags: result.tags || [],
-      };
+      return { summary: result.summary || '', tags: result.tags || [] };
     });
 
     let summaryUrl: string | undefined = undefined;
     if (generateSummary && summary) {
-      summaryUrl = await step.run('save-summary', async () => {
-        return await saveTextToFile(summary, filename, 'summary.txt');
-      });
+      summaryUrl = await step.run('save-summary', async () => await saveTextToFile(summary, filename, 'summary.txt'));
     }
 
     await step.run('update-db-with-summary', async () => {
-      const newMetadata = { ...metadata };
-      if (generateTags && tags && tags.length > 0) {
-        newMetadata.tags = tags;
-      }
-      const updateData: any = { metadata: newMetadata };
-      if (summaryUrl) {
-        updateData.summaryUrl = summaryUrl;
-      }
+      const newMetadata = { ...metadata, tags: (generateTags && tags && tags.length > 0) ? tags : undefined };
+      const updateData: any = { metadata: newMetadata, summaryUrl };
       await TranscriptionJobDB.updateResults(jobId, updateData);
-      
       const textResponse = await fetch(job.txt_url!);
       const transcriptText = await textResponse.text();
-      const tokensInput = Math.ceil(transcriptText.length / 4);
-      const tokensOutput = Math.ceil(summary.length / 4);
-      await logSummary(userId, tokensInput, tokensOutput);
+      await logSummary(userId, Math.ceil(transcriptText.length / 4), Math.ceil(summary.length / 4));
     });
 
     await step.run('update-status-completed', async () => {
@@ -245,13 +218,13 @@ export const summarizeFile = inngest.createFunction(
 );
 
 
-// --- FUNCIONES DE DOCUMENTOS (INTACTAS) ---
-// Estas funciones se mantienen sin cambios.
-
+/**
+ * [Task] Process Document (MIGRADO A OPENAI)
+ */
 export const processDocument = inngest.createFunction(
   {
-    id: 'task-process-document',
-    name: 'Task: Process Document',
+    id: 'task-process-document-openai',
+    name: 'Task: Process Document (OpenAI)',
     retries: 2,
     concurrency: { limit: 5 }
   },
@@ -259,113 +232,111 @@ export const processDocument = inngest.createFunction(
   async ({ event, step }) => {
     const { jobId, documentUrl, filename, actions, language, summaryType } = event.data;
     const job = await TranscriptionJobDB.findById(jobId);
-    if (!job) {
-      console.error(`[Inngest] Job ${jobId} not found.`);
-      return { error: 'Job not found' };
-    }
+    if (!job) { return { error: 'Job not found' }; }
     const { user_id: userId, metadata } = job;
+
     const { extractedText, parseMetadata } = await step.run('extract-text', async () => {
       const { parseDocumentFromURL } = await import('@/lib/document-parser');
-      const parseResult = await parseDocumentFromURL(documentUrl, filename);
-      return { extractedText: parseResult.text, parseMetadata: parseResult.metadata };
+      return await parseDocumentFromURL(documentUrl, filename);
     });
-    const txtUrl = await step.run('save-extracted-text', async () => {
-        const blob = await put(`${Date.now()}-${filename}-extracted.txt`, extractedText, { access: 'public', contentType: 'text/plain; charset=utf-8', token: process.env.BLOB_READ_WRITE_TOKEN!, addRandomSuffix: true });
-        return blob.url;
-    });
+
+    const txtUrl = await step.run('save-extracted-text', async () => await saveTextToFile(extractedText, filename, 'extracted.txt'));
+
     await step.run('update-job-with-text', async () => {
       await TranscriptionJobDB.updateResults(jobId, {
         txtUrl,
-        metadata: { ...metadata, parseMethod: parseMetadata.method, parseTime: parseMetadata.processingTime, pages: parseMetadata.pages, originalFileSize: parseMetadata.fileSize, warnings: parseMetadata.warnings, actions, summaryType, isDocument: true }
+        metadata: { ...metadata, ...parseMetadata, actions, summaryType, isDocument: true }
       });
       await TranscriptionJobDB.updateStatus(jobId, 'transcribed');
     });
+
     const generateSummary = actions.includes('Resumir');
     const generateTags = actions.includes('Etiquetas');
-    let summaryUrl: string | undefined = undefined;
-    let tags: string[] | undefined = undefined;
+    let summaryUrl: string | undefined, tags: string[] | undefined;
+
     if (generateSummary || generateTags) {
-      const result = await step.run('generate-summary-and-tags', async () => {
-        const { generateSummaryFromTextWithLeMUR, saveSummary } = await import('@/lib/assemblyai-client');
-        const { summary, tags: generatedTags } = await generateSummaryFromTextWithLeMUR(extractedText, language, generateSummary, generateTags, summaryType);
-        let summaryBlobUrl: string | undefined = undefined;
-        if (generateSummary && summary) {
-          summaryBlobUrl = await saveSummary(summary, filename);
-        }
-        return { summaryUrl: summaryBlobUrl, tags: generatedTags };
+      const result = await step.run('generate-doc-summary-openai', async () => {
+        const prompt = `Analiza el siguiente texto de un documento. ${generateSummary ? `Genera un resumen de tipo "${summaryType}".` : ''} ${generateTags ? 'Genera una lista de 5 a 10 etiquetas clave (tags) relevantes.' : ''} Responde en formato JSON con las claves "summary" y "tags".`;
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }, {role: "system", content: `El texto es:\n---\n${extractedText}`}],
+            response_format: { type: "json_object" },
+        });
+        const aiResult = JSON.parse(completion.choices[0].message.content || '{}');
+        const summary = aiResult.summary || '';
+        const blobUrl = (generateSummary && summary) ? await saveTextToFile(summary, filename, 'summary.txt') : undefined;
+        return { summaryUrl: blobUrl, tags: aiResult.tags || [] };
       });
       summaryUrl = result.summaryUrl;
       tags = result.tags;
     }
+
     await step.run('update-job-final', async () => {
-      const updatedMetadata = { ...metadata };
-      if (tags && tags.length > 0) { updatedMetadata.tags = tags; }
-      const updateData: any = { metadata: updatedMetadata };
-      if (summaryUrl) { updateData.summaryUrl = summaryUrl; }
+      const updateData: any = { metadata: { ...metadata, tags }, summaryUrl };
       await TranscriptionJobDB.updateResults(jobId, updateData);
       if (generateSummary || generateTags) {
-        const tokensInput = Math.ceil(extractedText.length / 4);
-        const tokensOutput = generateSummary ? Math.ceil((summaryUrl?.length || 0) / 4) : 0;
-        await logSummary(userId, tokensInput, tokensOutput);
+        await logSummary(userId, Math.ceil(extractedText.length / 4), Math.ceil((summaryUrl?.length || 0) / 4));
       }
     });
+
     await step.run('mark-completed', async () => {
       await TranscriptionJobDB.updateStatus(jobId, 'completed');
     });
+    
     await step.run('cleanup-original-file', async () => {
-      try {
-        await del(documentUrl, { token: process.env.BLOB_READ_WRITE_TOKEN! });
-      } catch (error: any) {
-        console.warn(`[Inngest] ⚠️ Failed to delete original document (non-critical):`, error.message);
-      }
+        try { await del(documentUrl, { token: process.env.BLOB_READ_WRITE_TOKEN! }); } catch (e: any) { console.warn(`Fallo al borrar doc (no-crítico):`, e.message); }
     });
+
     return { status: 'completed', jobId };
   }
 );
 
+
+/**
+ * [Task] Summarize Document (LEGACY - AHORA USA OPENAI)
+ */
 export const summarizeDocument = inngest.createFunction(
   {
-    id: 'task-summarize-document',
-    name: 'Task: Summarize Document (Legacy)',
+    id: 'task-summarize-document-openai',
+    name: 'Task: Summarize Document (Legacy, OpenAI)',
     retries: 3,
-    rateLimit: { key: 'event.data.jobId', limit: 1, period: '30s' }
   },
   { event: 'task/summarize-document' },
   async ({ event, step }) => {
     const { jobId, actions, text, language, summaryType } = event.data;
     const job = await TranscriptionJobDB.findById(jobId);
-    if (!job) {
-      return { error: 'Job not found' };
-    }
+    if (!job) { return { error: 'Job not found' }; }
     const { user_id: userId, filename, metadata } = job;
+
     const generateSummary = actions.includes('Resumir');
     const generateTags = actions.includes('Etiquetas');
-    const { generateSummaryFromTextWithLeMUR } = await import('@/lib/assemblyai-client');
-    const { summary, tags } = await step.run('generate-summary-and-tags-direct', async () => {
-      return await generateSummaryFromTextWithLeMUR(text, language, generateSummary, generateTags, summaryType);
+
+    const { summary, tags } = await step.run('generate-legacy-doc-summary-openai', async () => {
+        const prompt = `Analiza el siguiente texto de un documento. ${generateSummary ? `Genera un resumen de tipo "${summaryType}".` : ''} ${generateTags ? 'Genera una lista de 5 a 10 etiquetas clave (tags) relevantes.' : ''} Responde en formato JSON con las claves "summary" y "tags".`;
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }, {role: "system", content: `El texto es:\n---\n${text}`}],
+            response_format: { type: "json_object" },
+        });
+        const result = JSON.parse(completion.choices[0].message.content || '{}');
+        return { summary: result.summary || '', tags: result.tags || [] };
     });
+    
     let summaryUrl: string | undefined = undefined;
     if (generateSummary && summary) {
-        const { saveSummary } = await import('@/lib/assemblyai-client');
-        summaryUrl = await step.run('save-summary', async () => await saveSummary(summary, filename));
+        summaryUrl = await step.run('save-summary', async () => await saveTextToFile(summary, filename, 'summary.txt'));
     }
+
     await step.run('update-db-with-results', async () => {
-      const newMetadata = { ...metadata };
-      if (generateTags && tags && tags.length > 0) {
-        newMetadata.tags = tags;
-      }
-      const updateData: any = { metadata: newMetadata };
-      if (summaryUrl) {
-        updateData.summaryUrl = summaryUrl;
-      }
+      const updateData: any = { metadata: { ...metadata, tags }, summaryUrl };
       await TranscriptionJobDB.updateResults(jobId, updateData);
-      const tokensInput = Math.ceil(text.length / 4);
-      const tokensOutput = Math.ceil((summary?.length || 0) / 4);
-      await logSummary(userId, tokensInput, tokensOutput);
+      await logSummary(userId, Math.ceil(text.length / 4), Math.ceil((summary?.length || 0) / 4));
     });
+
     await step.run('update-status-completed', async () => {
       await TranscriptionJobDB.updateStatus(jobId, 'completed');
     });
+
     return { status: 'completed' };
   }
 );
