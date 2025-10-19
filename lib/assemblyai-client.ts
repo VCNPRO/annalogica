@@ -354,7 +354,19 @@ export async function generateSummaryWithLeMUR(
 
   } catch (error: any) {
     console.error('[LeMUR] Summary generation failed:', error.message);
-    return { summary: '', tags: [] }; // Don't fail the entire job
+
+    // Check if it's a rate limit error (429) - throw to trigger retry with backoff
+    if (error.message?.includes('Too Many Requests') ||
+        error.message?.includes('429') ||
+        error.status === 429 ||
+        error.statusCode === 429) {
+      console.warn('[LeMUR] Rate limit hit (429) - throwing error for retry with backoff');
+      throw new Error(`Failed to generate summary: Too Many Requests`);
+    }
+
+    // For other errors, don't fail the entire job
+    console.warn('[LeMUR] Non-rate-limit error - continuing with empty results');
+    return { summary: '', tags: [] };
   }
 }
 

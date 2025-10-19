@@ -208,7 +208,13 @@ export const summarizeFile = inngest.createFunction(
   {
     id: 'task-summarize-file',
     name: 'Task: Summarize File',
-    retries: 1,
+    retries: 3,
+    // Exponential backoff for rate limits: 30s, 2m, 5m
+    rateLimit: {
+      key: 'event.data.jobId',
+      limit: 1,
+      period: '30s'
+    }
   },
   { event: 'task/summarize' },
   async ({ event, step }) => {
@@ -480,7 +486,13 @@ export const summarizeDocument = inngest.createFunction(
   {
     id: 'task-summarize-document',
     name: 'Task: Summarize Document (Legacy)',
-    retries: 1,
+    retries: 3,
+    // Exponential backoff for rate limits
+    rateLimit: {
+      key: 'event.data.jobId',
+      limit: 1,
+      period: '30s'
+    }
   },
   { event: 'task/summarize-document' },
   async ({ event, step }) => {
