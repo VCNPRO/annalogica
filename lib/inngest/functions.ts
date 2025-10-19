@@ -14,6 +14,7 @@ import {
   type TranscriptionOptions
 } from '@/lib/assemblyai-client';
 import { logTranscription, logSummary } from '@/lib/usage-tracking';
+import { put } from '@vercel/blob';
 
 /**
  * [Task] Transcribe File
