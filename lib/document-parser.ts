@@ -39,8 +39,9 @@ async function parsePDF(buffer: Buffer): Promise<ParseResult> {
   try {
     console.log('[DocumentParser] PDF: Extracting text with unpdf (serverless-optimized)...');
 
-    // unpdf works with Buffer or Uint8Array
-    const result = await extractText(buffer, {
+    // Convert Buffer to Uint8Array as required by unpdf
+    const uint8Array = new Uint8Array(buffer);
+    const result = await extractText(uint8Array, {
       // Options for better text extraction
       mergePages: true
     });
