@@ -44,27 +44,34 @@ async function parsePDF(buffer: Buffer): Promise<ParseResult> {
   try {
     console.log('[DocumentParser] PDF: Attempting pdf-parse (primary method)...');
 
-    // Dynamic import - pdf-parse exports PDFParse as named export
+    // Dynamic import - pdf-parse exports PDFParse class
     const { PDFParse } = await import('pdf-parse');
-    const data = await PDFParse(buffer);
+    const parser = new PDFParse({ data: buffer });
 
-    if (data.text && data.text.trim().length > 0) {
-      const processingTime = Date.now() - startTime;
-      console.log(`[DocumentParser] ✅ pdf-parse succeeded: ${data.text.length} chars, ${data.numpages} pages in ${processingTime}ms`);
+    try {
+      const result = await parser.getText();
 
-      return {
-        text: data.text,
-        metadata: {
-          method: 'pdf-parse',
-          pages: data.numpages,
-          processingTime,
-          fileSize: buffer.length,
-          warnings: warnings.length > 0 ? warnings : undefined
-        }
-      };
+      if (result.text && result.text.trim().length > 0) {
+        const processingTime = Date.now() - startTime;
+        console.log(`[DocumentParser] ✅ pdf-parse succeeded: ${result.text.length} chars, ${result.numPages} pages in ${processingTime}ms`);
+
+        return {
+          text: result.text,
+          metadata: {
+            method: 'pdf-parse',
+            pages: result.numPages,
+            processingTime,
+            fileSize: buffer.length,
+            warnings: warnings.length > 0 ? warnings : undefined
+          }
+        };
+      }
+
+      warnings.push('pdf-parse succeeded but extracted empty text');
+    } finally {
+      // Always destroy parser to free resources
+      await parser.destroy();
     }
-
-    warnings.push('pdf-parse succeeded but extracted empty text');
   } catch (error: any) {
     console.warn('[DocumentParser] pdf-parse failed:', error.message);
     warnings.push(`pdf-parse failed: ${error.message}`);
