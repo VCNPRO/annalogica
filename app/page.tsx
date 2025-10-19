@@ -182,6 +182,9 @@ export default function Dashboard() {
           let processingStartTime = file.processingStartTime;
           let estimatedTimeRemaining = file.estimatedTimeRemaining;
 
+          // Check if this is a document (PDF, DOCX, TXT)
+          const isDocument = file.fileType === 'text' || job.metadata?.isDocument;
+
           if (job.status === 'processing' || job.status === 'transcribed') {
             newStatus = 'processing';
 
@@ -190,30 +193,40 @@ export default function Dashboard() {
               processingStartTime = Date.now();
             }
 
-            // Estimate progress based on audio duration
             const createdAt = new Date(job.created_at).getTime();
             const now = Date.now();
             const elapsed = (now - createdAt) / 1000; // seconds
 
-            // Use actual audio duration for better time estimation
-            const audioDuration = job.audio_duration_seconds || 60; // fallback to 60s
+            if (isDocument) {
+              // Document processing: Simpler progress model
+              // Documents typically process faster than audio
+              const estimatedDocTime = 30; // ~30 seconds for document processing
 
-            // Time estimation: Whisper processes roughly 0.2-0.3x real-time
-            // (i.e., 10 minutes of audio takes ~2-3 minutes to process)
-            const estimatedTotalTime = audioDuration * 0.25; // 0.25x real-time multiplier
-
-            // Better progress calculation: transcribed means almost done
-            if (job.status === 'transcribed') {
-              processingProgress = 98; // Almost complete, waiting for summary
-              estimatedTimeRemaining = 5; // ~5 seconds remaining for summary
+              if (job.status === 'transcribed') {
+                // Document text extracted, generating summary/tags
+                processingProgress = 95;
+                estimatedTimeRemaining = 5;
+              } else {
+                // Extract + parse phase
+                const baseProgress = Math.floor((elapsed / estimatedDocTime) * 100);
+                processingProgress = Math.min(90, baseProgress);
+                const remainingProgress = 100 - processingProgress;
+                estimatedTimeRemaining = Math.ceil((remainingProgress / 100) * estimatedDocTime);
+              }
             } else {
-              // Progressive increase based on audio duration, but cap at 90
-              const baseProgress = Math.floor((elapsed / estimatedTotalTime) * 100);
-              processingProgress = Math.min(98, baseProgress);
+              // Audio/Video processing: Use audio duration
+              const audioDuration = job.audio_duration_seconds || 60;
+              const estimatedTotalTime = audioDuration * 0.25;
 
-              // Calculate remaining time
-              const remainingProgress = 100 - processingProgress;
-              estimatedTimeRemaining = Math.ceil((remainingProgress / 100) * estimatedTotalTime);
+              if (job.status === 'transcribed') {
+                processingProgress = 98;
+                estimatedTimeRemaining = 5;
+              } else {
+                const baseProgress = Math.floor((elapsed / estimatedTotalTime) * 100);
+                processingProgress = Math.min(98, baseProgress);
+                const remainingProgress = 100 - processingProgress;
+                estimatedTimeRemaining = Math.ceil((remainingProgress / 100) * estimatedTotalTime);
+              }
             }
           } else if (job.status === 'completed' || job.status === 'summarized') {
             newStatus = 'completed';
