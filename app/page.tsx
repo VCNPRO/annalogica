@@ -249,11 +249,19 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [uploadedFiles]);
 
-  const getFileType = (mimeType: string): 'audio' | 'video' | 'text' => {
+  const getFileType = (mimeType: string, filename: string): 'audio' | 'video' | 'text' => {
+    // Check MIME type first
     if (mimeType.startsWith('audio/')) return 'audio';
     if (mimeType.startsWith('video/')) return 'video';
     if (mimeType.startsWith('text/') || mimeType === 'application/pdf' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'text';
-    return 'text'; // Default to text if unknown, or handle as error
+
+    // Fallback: check file extension (some browsers don't report MIME type correctly for PDFs)
+    const ext = filename.toLowerCase().split('.').pop();
+    if (ext === 'pdf' || ext === 'txt' || ext === 'docx') return 'text';
+    if (['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'].includes(ext || '')) return 'audio';
+    if (['mp4', 'avi', 'mov', 'mkv', 'webm'].includes(ext || '')) return 'video';
+
+    return 'text'; // Default to text if unknown
   };
 
   // Helper function to format file size
@@ -296,13 +304,16 @@ export default function Dashboard() {
       // Create all file entries first
       const filesToUpload = Array.from(files).map((file, i) => {
         const fileId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`;
+        const detectedType = getFileType(file.type, file.name);
+        console.log(`[Upload] File: ${file.name}, MIME: ${file.type}, Detected type: ${detectedType}`);
+
         const newFile: UploadedFile = {
           id: fileId,
           name: file.name,
           uploadProgress: 0,
           status: 'uploading',
           date: new Date().toISOString(),
-          fileType: getFileType(file.type),
+          fileType: detectedType,
           actions: [],
           fileSize: file.size // Capture file size in bytes
         };
@@ -474,6 +485,7 @@ export default function Dashboard() {
 
         // Determinar si es documento o audio/video
         const isDocument = file.fileType === 'text';
+        console.log('[Process] Is document?', isDocument, 'fileType:', file.fileType);
 
         if (isDocument) {
           // Procesar como documento (PDF, TXT, DOCX) - SERVER-SIDE PROCESSING
