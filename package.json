@@ -11,6 +11,7 @@
     "postinstall": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'public/pdf.worker.min.mjs')\""
   },
   "dependencies": {
+    "@deepgram/sdk": "^3.3.4",
     "@stripe/stripe-js": "^8.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
@@ -20,7 +21,6 @@
     "@upstash/redis": "^1.35.5",
     "@vercel/blob": "^2.0.0",
     "@vercel/postgres": "^0.10.0",
-    "assemblyai": "^4.16.1",
     "bcryptjs": "^3.0.2",
     "cookie": "^1.0.2",
     "inngest": "^3.44.2",
@@ -29,6 +29,7 @@
     "lucide-react": "^0.544.0",
     "mammoth": "^1.11.0",
     "next": "15.5.4",
+    "openai": "^4.51.0",
     "opossum": "^9.0.0",
     "pdfjs-dist": "^5.4.296",
     "pdfkit": "^0.17.2",
