@@ -253,9 +253,29 @@ export async function parseDocumentFromURL(
     return await parseDocument(buffer, filename);
 
   } catch (error: any) {
-    const errorMessage = error?.message || error?.toString() || 'Unknown error';
+    // Extract error message properly
+    let errorMessage = 'Unknown error';
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else if (typeof error === 'string') {
+      errorMessage = error;
+    } else if (error?.message) {
+      errorMessage = error.message;
+    } else if (error?.cause) {
+      errorMessage = String(error.cause);
+    } else {
+      try {
+        errorMessage = JSON.stringify(error);
+      } catch {
+        errorMessage = String(error);
+      }
+    }
+
     console.error('[DocumentParser] ❌ Failed to fetch document:', errorMessage);
-    console.error('[DocumentParser] Full error:', error);
+    console.error('[DocumentParser] Full error object:', error);
+    console.error('[DocumentParser] Error type:', typeof error);
+    console.error('[DocumentParser] Error keys:', error ? Object.keys(error) : 'none');
 
     throw {
       error: `Error descargando documento: ${errorMessage}`,
