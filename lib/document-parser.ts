@@ -9,9 +9,11 @@
  * - Detailed logging
  */
 
-import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import { createWorker } from 'tesseract.js';
+
+// pdf-parse uses CommonJS, needs dynamic import
+// We'll import it dynamically in the function
 
 export interface ParseResult {
   text: string;
@@ -41,6 +43,9 @@ async function parsePDF(buffer: Buffer): Promise<ParseResult> {
   // ATTEMPT 1: pdf-parse (fastest, most robust for standard PDFs)
   try {
     console.log('[DocumentParser] PDF: Attempting pdf-parse (primary method)...');
+
+    // Dynamic import for CommonJS module
+    const pdfParse = (await import('pdf-parse')).default;
     const data = await pdfParse(buffer);
 
     if (data.text && data.text.trim().length > 0) {
