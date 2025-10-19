@@ -44,9 +44,9 @@ async function parsePDF(buffer: Buffer): Promise<ParseResult> {
   try {
     console.log('[DocumentParser] PDF: Attempting pdf-parse (primary method)...');
 
-    // Dynamic import for CommonJS module
-    const pdfParse = (await import('pdf-parse')).default;
-    const data = await pdfParse(buffer);
+    // Dynamic import - pdf-parse exports PDFParse as named export
+    const { PDFParse } = await import('pdf-parse');
+    const data = await PDFParse(buffer);
 
     if (data.text && data.text.trim().length > 0) {
       const processingTime = Date.now() - startTime;
