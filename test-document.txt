@@ -1,0 +1,1 @@
+Reunión de equipo del proyecto Annalogica. Hablamos sobre la implementación de procesamiento de PDFs en el cliente para mantener la privacidad. Se decidió usar AssemblyAI LeMUR para todo el procesamiento de resúmenes y etiquetas. El equipo está satisfecho con la arquitectura profesional implementada.

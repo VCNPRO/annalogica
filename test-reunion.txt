@@ -1,0 +1,21 @@
+Reunión de Planificación del Proyecto Annalogica
+Fecha: 18 de octubre de 2025
+Participantes: Equipo de desarrollo
+
+TEMA 1: Procesamiento de Documentos
+Se implementó exitosamente el procesamiento de PDFs en el lado del cliente para garantizar máxima privacidad. Los documentos PDF nunca se envían al servidor, solo el texto extraído. Esto cumple con GDPR, HIPAA y normativas de privacidad institucional.
+
+TEMA 2: Arquitectura Técnica
+La arquitectura utiliza AssemblyAI LeMUR para todo el procesamiento (audio, video y documentos), manteniendo consistencia en toda la plataforma. Se eliminó la dependencia de Anthropic API directa, simplificando el sistema.
+
+TEMA 3: Auto-hosted Workers
+Se implementó un worker de PDF.js auto-hospedado en lugar de usar CDNs externos. Esto mejora la confiabilidad, rendimiento y seguridad. El worker se actualiza automáticamente con cada npm install.
+
+TEMA 4: Próximos Pasos
+- Implementar OCR para PDFs escaneados (Tesseract.js)
+- Mejorar manejo de errores con mensajes más descriptivos
+- Añadir soporte para PDFs protegidos con contraseña
+- Implementar métricas de rendimiento
+
+CONCLUSIÓN:
+El sistema está funcionando de manera profesional y enterprise-grade. La arquitectura es sólida, escalable y mantiene los más altos estándares de privacidad y seguridad.

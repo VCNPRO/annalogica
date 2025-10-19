@@ -95,19 +95,51 @@ export async function POST(request: NextRequest) {
     console.log(`[ProcessDocument] Job created: ${job.id}`);
 
     // Trigger Inngest worker for document processing
-    await inngest.send({
-      name: 'task/process-document',
-      data: {
+    try {
+      console.log('[ProcessDocument] About to send Inngest event:', {
+        name: 'task/process-document',
         jobId: job.id,
         documentUrl: blobUrl,
-        filename: fileName,
-        actions,
-        language,
-        summaryType
-      }
-    });
+        filename: fileName
+      });
 
-    console.log(`[ProcessDocument] Inngest worker triggered for job ${job.id}`);
+      const eventResult = await inngest.send({
+        name: 'task/process-document',
+        data: {
+          jobId: job.id,
+          documentUrl: blobUrl,
+          filename: fileName,
+          actions,
+          language,
+          summaryType
+        }
+      });
+
+      console.log('[ProcessDocument] ✅ Inngest event sent successfully:', eventResult);
+      console.log(`[ProcessDocument] Inngest worker triggered for job ${job.id}`);
+    } catch (inngestError: any) {
+      console.error('[ProcessDocument] ❌ FAILED to send Inngest event:', {
+        error: inngestError.message,
+        stack: inngestError.stack,
+        jobId: job.id,
+        eventName: 'task/process-document'
+      });
+
+      // Mark job as failed since we couldn't trigger processing
+      await TranscriptionJobDB.updateStatus(job.id, 'failed');
+      await TranscriptionJobDB.updateResults(job.id, {
+        metadata: {
+          actions,
+          summaryType,
+          isDocument: true,
+          fileType: ext,
+          error: `Error al enviar evento a Inngest: ${inngestError.message}`,
+          errorTimestamp: new Date().toISOString()
+        }
+      });
+
+      throw inngestError; // Re-throw to return 500 error to client
+    }
 
     // Increment usage
     await incrementUsage(auth.userId);
