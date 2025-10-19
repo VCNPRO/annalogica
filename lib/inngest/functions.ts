@@ -309,7 +309,8 @@ export const processDocument = inngest.createFunction(
   {
     id: 'task-process-document',
     name: 'Task: Process Document',
-    retries: 2, // More retries for robust processing
+    retries: 2,
+    concurrency: { limit: 5 } // Process max 5 documents simultaneously (same as audio)
   },
   { event: 'task/process-document' },
   async ({ event, step }) => {
@@ -455,16 +456,15 @@ export const processDocument = inngest.createFunction(
       console.log(`[Inngest] ✅ Document processing completed for job ${jobId}`);
     });
 
-    // STEP 7: Clean up original document file (after 5 minutes - allow time for retries)
-    await step.sleep('wait-before-cleanup', '5m');
-
+    // STEP 7: Clean up original document file immediately (text already extracted)
     await step.run('cleanup-original-file', async () => {
       try {
         const { del } = await import('@vercel/blob');
         await del(documentUrl, { token: process.env.BLOB_READ_WRITE_TOKEN! });
-        console.log(`[Inngest] Original document file deleted: ${documentUrl}`);
+        console.log(`[Inngest] ✅ Original document file deleted: ${documentUrl}`);
       } catch (error: any) {
-        console.warn(`[Inngest] Failed to delete original document (non-critical):`, error.message);
+        console.warn(`[Inngest] ⚠️ Failed to delete original document (non-critical):`, error.message);
+        // Non-critical - cleanup will happen in daily cron job
       }
     });
 
