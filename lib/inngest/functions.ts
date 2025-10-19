@@ -443,7 +443,6 @@ export const processDocument = inngest.createFunction(
 
       // Log usage for cost tracking
       if (generateSummary || generateTags) {
-        const { logSummary } = await import('@/lib/db');
         const tokensInput = Math.ceil(extractedText.length / 4);
         const tokensOutput = generateSummary ? Math.ceil((summaryUrl?.length || 0) / 4) : 0;
         await logSummary(userId, tokensInput, tokensOutput);
