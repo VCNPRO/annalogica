@@ -23,6 +23,7 @@
     "@vercel/postgres": "^0.10.0",
     "assemblyai": "^4.16.1",
     "bcryptjs": "^3.0.2",
+    "canvas": "^3.2.0",
     "cookie": "^1.0.2",
     "inngest": "^3.44.2",
     "jsonwebtoken": "^9.0.2",
