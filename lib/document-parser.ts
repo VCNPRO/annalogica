@@ -231,27 +231,39 @@ export async function parseDocumentFromURL(
   console.log(`[DocumentParser] Fetching document from URL: ${url}`);
 
   try {
-    const response = await fetch(url);
+    // Fetch with proper error handling
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Annalogica Document Parser'
+      }
+    });
 
     if (!response.ok) {
+      const errorText = await response.text().catch(() => 'No error details');
+      console.error(`[DocumentParser] HTTP Error ${response.status}:`, errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    console.log(`[DocumentParser] Downloaded ${buffer.length} bytes`);
+    console.log(`[DocumentParser] ✅ Downloaded ${buffer.length} bytes`);
 
     return await parseDocument(buffer, filename);
 
   } catch (error: any) {
-    console.error('[DocumentParser] Failed to fetch document:', error);
+    const errorMessage = error?.message || error?.toString() || 'Unknown error';
+    console.error('[DocumentParser] ❌ Failed to fetch document:', errorMessage);
+    console.error('[DocumentParser] Full error:', error);
+
     throw {
-      error: `Error descargando documento: ${error.message}`,
+      error: `Error descargando documento: ${errorMessage}`,
       attemptedMethods: ['fetch'],
       suggestions: [
         'Verifica que la URL sea válida y accesible',
-        'El archivo puede haber sido eliminado de Vercel Blob'
+        'El archivo puede haber sido eliminado de Vercel Blob',
+        'Puede haber un problema de conectividad de red'
       ]
     } as ParseError;
   }
