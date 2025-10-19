@@ -3,12 +3,19 @@ import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client';
 import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guard';
-import { put } from '@vercel/blob';
-import mammoth from 'mammoth';
 
 /**
  * POST /api/process-document
- * Process text documents (PDF, TXT, DOCX) for summarization, tags, etc.
+ *
+ * Professional server-side document processing (PDF, DOCX, TXT)
+ *
+ * Architecture:
+ * 1. Client uploads document to Vercel Blob
+ * 2. Client sends blob URL + metadata to this endpoint
+ * 3. Endpoint creates job and triggers Inngest worker
+ * 4. Inngest worker downloads, parses, and processes document
+ *
+ * This matches the audio/video architecture for consistency.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -35,164 +42,85 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
+    const body = await request.json();
 
-    // Support both file upload AND pre-extracted text (for PDF client-side processing)
-    const file = formData.get('file') as File | null;
-    const preExtractedText = formData.get('text') as string | null;
-    const fileName = formData.get('fileName') as string || 'documento.txt';
-    const actions = JSON.parse(formData.get('actions') as string || '[]');
-    const summaryType = formData.get('summaryType') as 'short' | 'detailed' || 'detailed';
-    const language = formData.get('language') as string || 'es';
+    const {
+      blobUrl,
+      fileName,
+      actions = [],
+      summaryType = 'detailed',
+      language = 'es'
+    } = body;
 
-    // Require either file or pre-extracted text
-    if (!file && !preExtractedText) {
+    // Validate required fields
+    if (!blobUrl || !fileName) {
       return NextResponse.json(
-        { error: 'No se proporcionó ningún archivo ni texto extraído' },
+        { error: 'Faltan campos requeridos: blobUrl, fileName' },
         { status: 400 }
       );
     }
 
-    // Use pre-extracted text if provided (client-side PDF processing)
-    let extractedText = preExtractedText || '';
-    let fileType = 'text/plain';
-
-    try {
-      // Only process file if no pre-extracted text provided
-      if (!preExtractedText && file) {
-        fileType = file.type;
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        if (fileType === 'application/pdf') {
-          // SECURITY: PDFs should be processed on the CLIENT side for privacy
-          // This is critical for enterprise/institutional clients with confidential documents
-          return NextResponse.json(
-            {
-              error: 'Los archivos PDF deben procesarse en el navegador por seguridad. El texto extraído debe enviarse desde el cliente.',
-              code: 'PDF_CLIENT_SIDE_ONLY'
-            },
-            { status: 400 }
-          );
-
-      } else if (fileType === 'text/plain') {
-        // Extract text from TXT
-        console.log('[Document] Reading plain text file:', fileName);
-        extractedText = buffer.toString('utf-8');
-        console.log('[Document] TXT text extracted, length:', extractedText.length);
-
-      } else if (
-        fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-        fileName.endsWith('.docx')
-      ) {
-        // Extract text from DOCX
-        console.log('[Document] Extracting text from DOCX:', fileName);
-        const result = await mammoth.extractRawText({ buffer });
-        extractedText = result.value;
-        console.log('[Document] DOCX text extracted, length:', extractedText.length);
-
-        } else {
-          return NextResponse.json(
-            { error: `Tipo de archivo no soportado: ${fileType}. Solo se permiten PDF (procesado en cliente), TXT y DOCX.` },
-            { status: 400 }
-          );
-        }
-      }
-
-      // Validate extracted text
-      if (!extractedText || extractedText.trim().length === 0) {
-        return NextResponse.json(
-          { error: 'No se pudo extraer texto del documento. El archivo puede estar vacío o dañado.' },
-          { status: 400 }
-        );
-      }
-
-      // Save extracted text to Vercel Blob
-      const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
-      if (!blobToken) {
-        throw new Error('BLOB_READ_WRITE_TOKEN not configured');
-      }
-
-      const baseName = fileName.replace(/\.[^/.]+$/, '');
-      const timestamp = Date.now();
-      const txtBlob = await put(`${timestamp}-${baseName}-extracted.txt`, extractedText, {
-        access: 'public',
-        contentType: 'text/plain; charset=utf-8',
-        token: blobToken,
-        addRandomSuffix: true
-      });
-
-      console.log('[Document] Text saved to Vercel Blob:', txtBlob.url);
-
-      // Create a job in the database
-      // Use a special "document" type to differentiate from audio/video
-      const job = await TranscriptionJobDB.create(
-        auth.userId,
-        fileName,
-        txtBlob.url, // Store the text blob URL as the "audio_url"
-        language
-      );
-
-      // Update job metadata and mark as already "transcribed" since we have the text
-      await TranscriptionJobDB.updateResults(job.id, {
-        txtUrl: txtBlob.url,
-        metadata: {
-          actions,
-          summaryType,
-          isDocument: true, // Flag to indicate this is a document, not audio/video
-          originalFileType: fileType,
-          textLength: extractedText.length
-        }
-      });
-
-      await TranscriptionJobDB.updateStatus(job.id, 'transcribed');
-
-      console.log('[Document] Job created and marked as transcribed:', job.id);
-
-      // If actions include summary or tags, trigger the summarization task
-      const needsSummaryOrTags = actions.includes('Resumir') || actions.includes('Etiquetas');
-
-      if (needsSummaryOrTags) {
-        console.log('[Document] Triggering summarization for document:', job.id);
-
-        // For documents, we need to create a mock AssemblyAI transcript ID
-        // Or we can directly process with Claude without using AssemblyAI
-        // Let's send to the document summarization endpoint
-        await inngest.send({
-          name: 'task/summarize-document',
-          data: {
-            jobId: job.id,
-            actions,
-            text: extractedText, // Pass text directly
-            language,
-            summaryType
-          }
-        });
-      } else {
-        // No summary/tags needed, mark as completed
-        await TranscriptionJobDB.updateStatus(job.id, 'completed');
-      }
-
-      // Increment usage
-      await incrementUsage(auth.userId);
-
-      return NextResponse.json({
-        success: true,
-        jobId: job.id,
-        message: 'Documento procesado correctamente',
-        status: needsSummaryOrTags ? 'processing' : 'completed'
-      });
-
-    } catch (extractionError: any) {
-      console.error('[Document] Error extracting text:', extractionError);
+    // Validate file type from extension
+    const ext = fileName.toLowerCase().split('.').pop();
+    if (!['pdf', 'docx', 'txt'].includes(ext || '')) {
       return NextResponse.json(
-        { error: `Error al procesar el documento: ${extractionError.message}` },
-        { status: 500 }
+        { error: `Tipo de archivo no soportado: .${ext}. Solo se permiten PDF, DOCX, TXT.` },
+        { status: 400 }
       );
     }
 
+    console.log(`[ProcessDocument] Creating job for ${fileName} (${ext})`);
+
+    // Create job in database
+    const job = await TranscriptionJobDB.create(
+      auth.userId,
+      fileName,
+      blobUrl, // Store document URL in audio_url field
+      language
+    );
+
+    // Update job metadata
+    await TranscriptionJobDB.updateResults(job.id, {
+      metadata: {
+        actions,
+        summaryType,
+        isDocument: true,
+        fileType: ext
+      }
+    });
+
+    // Mark as pending (processing will start in Inngest worker)
+    await TranscriptionJobDB.updateStatus(job.id, 'pending');
+
+    console.log(`[ProcessDocument] Job created: ${job.id}`);
+
+    // Trigger Inngest worker for document processing
+    await inngest.send({
+      name: 'task/process-document',
+      data: {
+        jobId: job.id,
+        documentUrl: blobUrl,
+        filename: fileName,
+        actions,
+        language,
+        summaryType
+      }
+    });
+
+    console.log(`[ProcessDocument] Inngest worker triggered for job ${job.id}`);
+
+    // Increment usage
+    await incrementUsage(auth.userId);
+
+    return NextResponse.json({
+      success: true,
+      jobId: job.id,
+      message: 'Documento en cola de procesamiento',
+      status: 'processing'
+    });
+
   } catch (error: any) {
-    console.error('[Document] Error processing document:', error);
+    console.error('[ProcessDocument] Error:', error);
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

@@ -476,8 +476,8 @@ export default function Dashboard() {
         const isDocument = file.fileType === 'text';
 
         if (isDocument) {
-          // Procesar como documento (PDF, TXT, DOCX)
-          console.log('[Process] 📄 Processing as DOCUMENT');
+          // Procesar como documento (PDF, TXT, DOCX) - SERVER-SIDE PROCESSING
+          console.log('[Process] 📄 Processing as DOCUMENT (server-side with multi-layer fallback)');
 
           // Validar que las acciones sean apropiadas para documentos
           const invalidActions = file.actions.filter(a =>
@@ -488,75 +488,21 @@ export default function Dashboard() {
             throw new Error(`Las acciones ${invalidActions.join(', ')} no están disponibles para documentos de texto. Solo puedes usar Resumen y Etiquetas.`);
           }
 
-          // Descargar el archivo desde Vercel Blob
-          const blobResponse = await fetch(file.blobUrl!);
-          if (!blobResponse.ok) {
-            throw new Error('No se pudo descargar el archivo');
-          }
-          const blob = await blobResponse.blob();
-
-          // Crear FormData
-          const formData = new FormData();
-
-          // SECURITY: Check if it's a PDF - process client-side for privacy
-          const isPDF = file.name.toLowerCase().endsWith('.pdf') || blob.type === 'application/pdf';
-
-          if (isPDF) {
-            console.log('[Process] 🔒 PDF detected - processing in browser for privacy');
-
-            try {
-              // Dynamic import of PDF.js (client-side only)
-              const pdfjsLib = await import('pdfjs-dist');
-
-              // Use self-hosted worker for reliability and performance
-              // No external CDN dependencies - professional approach
-              pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
-
-              // Extract text from PDF in the browser
-              const arrayBuffer = await blob.arrayBuffer();
-              const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-              const numPages = pdf.numPages;
-              const textParts: string[] = [];
-
-              console.log(`[Process] PDF has ${numPages} pages - extracting text...`);
-
-              for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-                const page = await pdf.getPage(pageNum);
-                const textContent = await page.getTextContent();
-                const pageText = textContent.items
-                  .map((item: any) => item.str)
-                  .join(' ');
-                textParts.push(pageText);
-              }
-
-              const extractedText = textParts.join('\n\n');
-
-              if (!extractedText || extractedText.trim().length === 0) {
-                throw new Error('No se pudo extraer texto del PDF. Puede estar vacío o ser una imagen escaneada.');
-              }
-
-              console.log(`[Process] ✅ Text extracted from PDF (${extractedText.length} characters) - sending to server`);
-
-              // Send ONLY the extracted text (not the PDF file)
-              formData.append('text', extractedText);
-              formData.append('fileName', file.name);
-            } catch (pdfError: any) {
-              console.error('[Process] Error extracting PDF text:', pdfError);
-              throw new Error(`Error al procesar PDF: ${pdfError.message}`);
-            }
-          } else {
-            // Not a PDF - send file directly (TXT, DOCX)
-            formData.append('file', blob, file.name);
-          }
-
-          formData.append('actions', JSON.stringify(file.actions));
-          formData.append('summaryType', summaryType);
-          formData.append('language', language);
-
+          // Send document URL to server for processing (same as audio/video)
+          // Server will download, parse with multi-layer fallback, and process
           const processRes = await fetch('/api/process-document', {
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
             credentials: 'include',
-            body: formData
+            body: JSON.stringify({
+              blobUrl: file.blobUrl,
+              fileName: file.name,
+              actions: file.actions,
+              summaryType: summaryType,
+              language: language
+            })
           });
 
           console.log('[Process] Document API Response status:', processRes.status);

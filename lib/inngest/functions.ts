@@ -295,14 +295,191 @@ export const summarizeFile = inngest.createFunction(
 );
 
 /**
- * [Task] Summarize Document
+ * [Task] Process Document (Professional Server-Side)
  * Triggered for text documents (PDF, TXT, DOCX).
- * Generates summary and/or tags directly from text without AssemblyAI.
+ * Complete workflow:
+ * 1. Download from Vercel Blob
+ * 2. Extract text with multi-layer fallback (pdf-parse → pdfjs → OCR)
+ * 3. Save extracted text
+ * 4. Generate summary/tags (if requested)
+ * 5. Clean up original file
+ */
+export const processDocument = inngest.createFunction(
+  {
+    id: 'task-process-document',
+    name: 'Task: Process Document',
+    retries: 2, // More retries for robust processing
+  },
+  { event: 'task/process-document' },
+  async ({ event, step }) => {
+    const { jobId, documentUrl, filename, actions, language, summaryType } = event.data;
+
+    console.log(`[Inngest] Starting document processing for job ${jobId}`);
+
+    const job = await TranscriptionJobDB.findById(jobId);
+
+    if (!job) {
+      console.error(`[Inngest] Job ${jobId} not found.`);
+      return { error: 'Job not found' };
+    }
+
+    const { user_id: userId, metadata } = job;
+
+    // STEP 1: Extract text from document
+    const { extractedText, parseMetadata } = await step.run('extract-text', async () => {
+      console.log(`[Inngest] Downloading document from: ${documentUrl}`);
+
+      const { parseDocumentFromURL } = await import('@/lib/document-parser');
+      const parseResult = await parseDocumentFromURL(documentUrl, filename);
+
+      console.log(`[Inngest] ✅ Text extracted using ${parseResult.metadata.method}:`, {
+        length: parseResult.text.length,
+        processingTime: parseResult.metadata.processingTime,
+        pages: parseResult.metadata.pages,
+        warnings: parseResult.metadata.warnings
+      });
+
+      return {
+        extractedText: parseResult.text,
+        parseMetadata: parseResult.metadata
+      };
+    });
+
+    // STEP 2: Save extracted text to Vercel Blob
+    const txtUrl = await step.run('save-extracted-text', async () => {
+      const timestamp = Date.now();
+      const baseName = filename.replace(/\.[^/.]+$/, '');
+      const blob = await put(
+        `${timestamp}-${baseName}-extracted.txt`,
+        extractedText,
+        {
+          access: 'public',
+          contentType: 'text/plain; charset=utf-8',
+          token: process.env.BLOB_READ_WRITE_TOKEN!,
+          addRandomSuffix: true
+        }
+      );
+
+      console.log(`[Inngest] Extracted text saved to: ${blob.url}`);
+      return blob.url;
+    });
+
+    // STEP 3: Update job with extracted text URL and metadata
+    await step.run('update-job-with-text', async () => {
+      await TranscriptionJobDB.updateResults(jobId, {
+        txtUrl,
+        metadata: {
+          ...metadata,
+          parseMethod: parseMetadata.method,
+          parseTime: parseMetadata.processingTime,
+          pages: parseMetadata.pages,
+          originalFileSize: parseMetadata.fileSize,
+          warnings: parseMetadata.warnings,
+          actions,
+          summaryType,
+          isDocument: true
+        }
+      });
+
+      await TranscriptionJobDB.updateStatus(jobId, 'transcribed');
+    });
+
+    // STEP 4: Generate summary and tags (if requested)
+    const generateSummary = actions.includes('Resumir');
+    const generateTags = actions.includes('Etiquetas');
+
+    let summaryUrl: string | undefined = undefined;
+    let tags: string[] | undefined = undefined;
+
+    if (generateSummary || generateTags) {
+      const result = await step.run('generate-summary-and-tags', async () => {
+        console.log(`[Inngest] Generating summary/tags for document ${jobId}...`);
+
+        const { generateSummaryFromTextWithLeMUR, saveSummary } = await import('@/lib/assemblyai-client');
+
+        const { summary, tags: generatedTags } = await generateSummaryFromTextWithLeMUR(
+          extractedText,
+          language,
+          generateSummary,
+          generateTags,
+          summaryType
+        );
+
+        let summaryBlobUrl: string | undefined = undefined;
+
+        if (generateSummary && summary) {
+          summaryBlobUrl = await saveSummary(summary, filename);
+          console.log(`[Inngest] Summary saved to: ${summaryBlobUrl}`);
+        }
+
+        return {
+          summaryUrl: summaryBlobUrl,
+          tags: generatedTags
+        };
+      });
+
+      summaryUrl = result.summaryUrl;
+      tags = result.tags;
+    }
+
+    // STEP 5: Update job with final results
+    await step.run('update-job-final', async () => {
+      const updatedMetadata = { ...metadata };
+
+      if (tags && tags.length > 0) {
+        updatedMetadata.tags = tags;
+      }
+
+      const updateData: any = {
+        metadata: updatedMetadata
+      };
+
+      if (summaryUrl) {
+        updateData.summaryUrl = summaryUrl;
+      }
+
+      await TranscriptionJobDB.updateResults(jobId, updateData);
+
+      // Log usage for cost tracking
+      if (generateSummary || generateTags) {
+        const { logSummary } = await import('@/lib/db');
+        const tokensInput = Math.ceil(extractedText.length / 4);
+        const tokensOutput = generateSummary ? Math.ceil((summaryUrl?.length || 0) / 4) : 0;
+        await logSummary(userId, tokensInput, tokensOutput);
+      }
+    });
+
+    // STEP 6: Mark as completed
+    await step.run('mark-completed', async () => {
+      await TranscriptionJobDB.updateStatus(jobId, 'completed');
+      console.log(`[Inngest] ✅ Document processing completed for job ${jobId}`);
+    });
+
+    // STEP 7: Clean up original document file (after 5 minutes - allow time for retries)
+    await step.sleep('wait-before-cleanup', '5m');
+
+    await step.run('cleanup-original-file', async () => {
+      try {
+        const { del } = await import('@vercel/blob');
+        await del(documentUrl, { token: process.env.BLOB_READ_WRITE_TOKEN! });
+        console.log(`[Inngest] Original document file deleted: ${documentUrl}`);
+      } catch (error: any) {
+        console.warn(`[Inngest] Failed to delete original document (non-critical):`, error.message);
+      }
+    });
+
+    return { status: 'completed', jobId };
+  }
+);
+
+/**
+ * [Task] Summarize Document (DEPRECATED - use processDocument instead)
+ * Kept for backward compatibility with old jobs
  */
 export const summarizeDocument = inngest.createFunction(
   {
     id: 'task-summarize-document',
-    name: 'Task: Summarize Document',
+    name: 'Task: Summarize Document (Legacy)',
     retries: 1,
   },
   { event: 'task/summarize-document' },
@@ -320,7 +497,7 @@ export const summarizeDocument = inngest.createFunction(
     const generateSummary = actions.includes('Resumir');
     const generateTags = actions.includes('Etiquetas');
 
-    console.log('[Inngest] Document summarization task:', {
+    console.log('[Inngest] Document summarization task (LEGACY):', {
       jobId,
       generateSummary,
       generateTags,
@@ -329,12 +506,9 @@ export const summarizeDocument = inngest.createFunction(
     });
 
     const { summary, tags } = await step.run('generate-summary-and-tags-direct', async () => {
-      // Use AssemblyAI LeMUR with custom text input (same as audio/video processing)
-      // This maintains consistency across the entire platform
       return await generateSummaryFromTextWithLeMUR(text, language, generateSummary, generateTags, summaryType);
     });
 
-    // Save results
     let summaryUrl: string | undefined = undefined;
 
     if (generateSummary && summary) {
@@ -359,7 +533,6 @@ export const summarizeDocument = inngest.createFunction(
 
       await TranscriptionJobDB.updateResults(jobId, updateData);
 
-      // Log usage
       const tokensInput = Math.ceil(text.length / 4);
       const tokensOutput = Math.ceil((summary?.length || 0) / 4);
       await logSummary(userId, tokensInput, tokensOutput);
@@ -369,7 +542,7 @@ export const summarizeDocument = inngest.createFunction(
       await TranscriptionJobDB.updateStatus(jobId, 'completed');
     });
 
-    console.log(`[Inngest] Document summarization task for job ${jobId} completed.`);
+    console.log(`[Inngest] Document summarization task (LEGACY) for job ${jobId} completed.`);
     return { status: 'completed' };
   }
 );

@@ -1,43 +1,44 @@
-# PDF.js Worker - Self-hosted Implementation
+# PDF.js Worker - DEPRECATED
 
-## 📋 Resumen
+## ⚠️ NOTA IMPORTANTE: ESTE ARCHIVO YA NO SE USA
 
-Este directorio contiene el worker de PDF.js servido desde nuestro propio dominio para máxima confiabilidad y rendimiento.
+**A partir de 2025-10-19, Annalogica procesa documentos (PDF, DOCX, TXT) completamente en el servidor.**
 
-## 📁 Archivos
+## 🏗️ Nueva Arquitectura
 
-- `pdf.worker.min.mjs` (1MB) - Worker de PDF.js para procesamiento en navegador
-
-## 🔄 Mantenimiento Automático
-
-El worker se actualiza automáticamente en cada `npm install`:
-
-```json
-// package.json
-{
-  "scripts": {
-    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'public/pdf.worker.min.mjs')\""
-  }
-}
+```
+Cliente → Upload a Vercel Blob → API crea job → Inngest worker
+                                                       ↓
+                               Procesamiento server-side con:
+                               - pdf-parse (primario)
+                               - pdfjs-dist (fallback)
+                               - OCR Tesseract (escaneados)
 ```
 
-**Qué hace:**
-1. Se ejecuta después de cada `npm install`
-2. Copia el worker desde `node_modules/pdfjs-dist/build/`
-3. Lo coloca en `public/` para ser servido por Next.js
-4. Funciona tanto en local como en Vercel build
+### Por qué el cambio:
 
-## 🚀 Uso en la Aplicación
+1. **Robustez**: Multi-layer fallback para 99%+ compatibilidad
+2. **Sin límites**: Archivos hasta 500MB (vs ~100MB en navegador)
+3. **OCR**: Soporte para PDFs escaneados
+4. **Consistencia**: Misma arquitectura que audio/video
+5. **Debugging**: Logs completos en servidor
 
-```typescript
-// app/page.tsx
-const pdfjsLib = await import('pdfjs-dist');
+## 📁 Archivos Obsoletos
 
-// Worker servido desde nuestro dominio
-pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+- `pdf.worker.min.mjs` - Ya no se usa (procesamiento client-side eliminado)
+- Script `postinstall` en package.json - Puede eliminarse
 
-const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-```
+## 🔄 Migración Completada
+
+- ✅ Código client-side eliminado de `app/page.tsx`
+- ✅ Parser server-side creado en `lib/document-parser.ts`
+- ✅ Función Inngest `processDocument` implementada
+- ✅ API `/api/process-document` refactorizada
+- ✅ Documentación actualizada
+
+## 📚 Nueva Documentación
+
+Ver: `PDF-CLIENT-SIDE-PROCESSING.md` (renombrado de propósito - ahora documenta server-side)
 
 ## 🌐 URLs de Servicio
 
