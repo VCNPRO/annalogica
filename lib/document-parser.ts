@@ -3,24 +3,21 @@
  *
  * Supports: PDF, DOCX, TXT
  * Features:
- * - Multi-layer fallback strategy for PDFs
- * - OCR for scanned PDFs
+ * - Serverless-optimized PDF parsing (unpdf - no native dependencies)
+ * - DOCX processing with mammoth
+ * - UTF-8/Latin1 text file support
  * - Professional error handling
  * - Detailed logging
  */
 
 import mammoth from 'mammoth';
-import { createWorker } from 'tesseract.js';
-
-// pdf-parse uses CommonJS, needs dynamic import
-// We'll import it dynamically in the function
+import { extractText } from 'unpdf';
 
 export interface ParseResult {
   text: string;
   metadata: {
-    method: 'pdf-parse' | 'pdfjs-dist' | 'tesseract-ocr' | 'mammoth' | 'plain-text';
+    method: 'unpdf' | 'mammoth' | 'plain-text';
     pages?: number;
-    confidence?: number; // For OCR
     processingTime: number;
     fileSize: number;
     warnings?: string[];
@@ -34,127 +31,51 @@ export interface ParseError {
 }
 
 /**
- * Parse PDF with multi-layer fallback strategy
+ * Parse PDF using unpdf (serverless-optimized, no native dependencies)
  */
 async function parsePDF(buffer: Buffer): Promise<ParseResult> {
   const startTime = Date.now();
-  const warnings: string[] = [];
 
-  // ATTEMPT 1: pdf-parse (fastest, most robust for standard PDFs)
   try {
-    console.log('[DocumentParser] PDF: Attempting pdf-parse (primary method)...');
+    console.log('[DocumentParser] PDF: Extracting text with unpdf (serverless-optimized)...');
 
-    // Dynamic import - pdf-parse exports PDFParse class
-    const { PDFParse } = await import('pdf-parse');
-    const parser = new PDFParse({ data: buffer });
-
-    try {
-      const result = await parser.getText();
-
-      if (result.text && result.text.trim().length > 0) {
-        const processingTime = Date.now() - startTime;
-        console.log(`[DocumentParser] ✅ pdf-parse succeeded: ${result.text.length} chars, ${result.total} pages in ${processingTime}ms`);
-
-        return {
-          text: result.text,
-          metadata: {
-            method: 'pdf-parse',
-            pages: result.total,
-            processingTime,
-            fileSize: buffer.length,
-            warnings: warnings.length > 0 ? warnings : undefined
-          }
-        };
-      }
-
-      warnings.push('pdf-parse succeeded but extracted empty text');
-    } finally {
-      // Always destroy parser to free resources
-      await parser.destroy();
-    }
-  } catch (error: any) {
-    console.warn('[DocumentParser] pdf-parse failed:', error.message);
-    warnings.push(`pdf-parse failed: ${error.message}`);
-  }
-
-  // ATTEMPT 2: pdfjs-dist (better compatibility for complex/corrupted PDFs)
-  try {
-    console.log('[DocumentParser] PDF: Attempting pdfjs-dist (fallback method)...');
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-
-    // Load PDF
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(buffer),
-      verbosity: 0, // Suppress warnings
+    // unpdf works with Buffer or Uint8Array
+    const result = await extractText(buffer, {
+      // Options for better text extraction
+      mergePages: true
     });
 
-    const pdf = await loadingTask.promise;
-    const numPages = pdf.numPages;
-    const textParts: string[] = [];
-
-    // Extract text from each page
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      textParts.push(pageText);
+    if (!result.text || result.text.trim().length === 0) {
+      throw new Error('El PDF está vacío o no contiene texto extraíble');
     }
 
-    const extractedText = textParts.join('\n\n');
+    const processingTime = Date.now() - startTime;
+    console.log(`[DocumentParser] ✅ unpdf succeeded: ${result.text.length} chars, ${result.totalPages} pages in ${processingTime}ms`);
 
-    if (extractedText && extractedText.trim().length > 0) {
-      const processingTime = Date.now() - startTime;
-      console.log(`[DocumentParser] ✅ pdfjs-dist succeeded: ${extractedText.length} chars, ${numPages} pages in ${processingTime}ms`);
-
-      return {
-        text: extractedText,
-        metadata: {
-          method: 'pdfjs-dist',
-          pages: numPages,
-          processingTime,
-          fileSize: buffer.length,
-          warnings: warnings.length > 0 ? warnings : undefined
-        }
-      };
-    }
-
-    warnings.push('pdfjs-dist succeeded but extracted empty text');
-  } catch (error: any) {
-    console.warn('[DocumentParser] pdfjs-dist failed:', error.message);
-    warnings.push(`pdfjs-dist failed: ${error.message}`);
-  }
-
-  // ATTEMPT 3: OCR with Tesseract (for scanned PDFs / images)
-  try {
-    console.log('[DocumentParser] PDF: Attempting Tesseract OCR (last resort for scanned PDFs)...');
-    console.log('[DocumentParser] ⚠️ OCR is slow - this may take 30-120 seconds...');
-
-    // Convert PDF to images and OCR (simplified approach)
-    // For production: use pdf2pic or similar to convert to images first
-    // For now, we'll skip OCR to avoid complexity and timeout issues
-
-    warnings.push('OCR skipped - install pdf2pic for scanned PDF support');
-    throw new Error('OCR not fully implemented yet - requires pdf-to-image conversion');
+    return {
+      text: result.text,
+      metadata: {
+        method: 'unpdf',
+        pages: result.totalPages,
+        processingTime,
+        fileSize: buffer.length
+      }
+    };
 
   } catch (error: any) {
-    console.warn('[DocumentParser] Tesseract OCR failed or skipped:', error.message);
-    warnings.push(`OCR failed/skipped: ${error.message}`);
+    console.error('[DocumentParser] unpdf failed:', error);
+    throw {
+      error: `Error al procesar PDF: ${error.message}`,
+      attemptedMethods: ['unpdf'],
+      suggestions: [
+        'El PDF puede estar protegido con contraseña',
+        'El PDF puede estar completamente escaneado (imagen sin capa de texto)',
+        'El PDF puede estar corrupto o dañado',
+        'Intenta convertir el PDF a TXT o DOCX usando Adobe Acrobat o Google Drive',
+        'Usa herramientas online: https://www.ilovepdf.com/pdf_to_text'
+      ]
+    } as ParseError;
   }
-
-  // ALL ATTEMPTS FAILED
-  throw {
-    error: 'No se pudo extraer texto del PDF después de múltiples intentos',
-    attemptedMethods: ['pdf-parse', 'pdfjs-dist', 'tesseract-ocr'],
-    suggestions: [
-      'El PDF puede estar protegido con contraseña',
-      'El PDF puede estar completamente escaneado (imagen) - requiere OCR avanzado',
-      'El PDF puede estar corrupto o dañado',
-      'Intenta convertir el PDF a TXT o DOCX usando Adobe Acrobat o Google Drive',
-      'Usa herramientas online: https://www.ilovepdf.com/pdf_to_text'
-    ]
-  } as ParseError;
 }
 
 /**
