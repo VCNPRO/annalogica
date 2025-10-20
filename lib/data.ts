@@ -10,9 +10,9 @@ import Stripe from 'stripe';
 // --- ¡NUEVO! INICIALIZAMOS STRIPE CON TU API KEY ---
 // Asegúrate de que tu STRIPE_SECRET_KEY está en las variables de entorno de Vercel
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // --- LÍNEA CORREGIDA ---
-  // Usamos la última versión oficial de la API de Stripe
-  apiVersion: '2024-06-20',
+  // --- LÍNEA CORREGIDA (LA DEFINITIVA) ---
+  // Usamos la versión exacta que nos pide el error de compilación
+  apiVersion: '2025-09-30.clover',
 });
 
 
