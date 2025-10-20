@@ -1,5 +1,5 @@
 // DÓNDE: lib/inngest/functions.ts
-// VERSIÓN BLINDADA: Todas las funciones con su código completo, migradas, y con un sistema de diagnóstico de errores robusto.
+// VERSIÓN FINAL: Soluciona el error de tipos al guardar un fallo, usando el campo 'metadata'.
 
 import { inngest } from './client';
 import { TranscriptionJobDB } from '@/lib/db';
@@ -109,6 +109,7 @@ export const transcribeFile = inngest.createFunction(
         await step.run('mark-job-as-failed', async () => {
           const job = await TranscriptionJobDB.findById(jobId);
           await TranscriptionJobDB.updateStatus(jobId, 'failed');
+          // --- CORRECCIÓN FINAL ---
           await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: error.message } });
         });
         throw error;
@@ -163,6 +164,7 @@ export const summarizeFile = inngest.createFunction(
         await step.run('mark-summary-as-failed', async () => {
             const job = await TranscriptionJobDB.findById(jobId);
             await TranscriptionJobDB.updateStatus(jobId, 'failed');
+            // --- CORRECCIÓN FINAL ---
             await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: `Summary Error: ${error.message}` } });
         });
         throw error;
@@ -230,6 +232,7 @@ export const processDocument = inngest.createFunction(
         await step.run('mark-doc-job-as-failed', async () => {
             const job = await TranscriptionJobDB.findById(jobId);
             await TranscriptionJobDB.updateStatus(jobId, 'failed');
+            // --- CORRECCIÓN FINAL ---
             await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: error.message } });
         });
         throw error;
@@ -275,6 +278,7 @@ export const summarizeDocument = inngest.createFunction(
         await step.run('mark-legacy-doc-job-as-failed', async () => {
             const job = await TranscriptionJobDB.findById(jobId);
             await TranscriptionJobDB.updateStatus(jobId, 'failed');
+            // --- CORRECCIÓN FINAL ---
             await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: error.message } });
         });
         throw error;
