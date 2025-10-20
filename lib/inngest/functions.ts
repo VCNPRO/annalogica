@@ -1,5 +1,5 @@
 // DÓNDE: lib/inngest/functions.ts
-// VERSIÓN 100% COMPLETA: Todas las funciones con su código completo, migradas y con diagnóstico.
+// VERSIÓN CON DIAGNÓSTICO CORREGIDO: Soluciona el error de tipos al guardar un fallo.
 
 import { inngest } from './client';
 import { TranscriptionJobDB } from '@/lib/db';
@@ -107,7 +107,9 @@ export const transcribeFile = inngest.createFunction(
     } catch (error: any) {
         console.error(`[CRITICAL] Job ${jobId} failed in transcribeFile:`, error);
         await step.run('mark-job-as-failed', async () => {
-          await TranscriptionJobDB.updateResults(jobId, { status: 'FAILED', error_message: error.message });
+          // --- CORRECCIÓN ---
+          await TranscriptionJobDB.updateStatus(jobId, 'FAILED');
+          await TranscriptionJobDB.updateResults(jobId, { error_message: error.message });
         });
         throw error;
     }
@@ -159,7 +161,9 @@ export const summarizeFile = inngest.createFunction(
       } catch (error: any) {
         console.error(`[CRITICAL] Job ${jobId} failed in summarizeFile:`, error);
         await step.run('mark-summary-as-failed', async () => {
-            await TranscriptionJobDB.updateResults(jobId, { status: 'FAILED', error_message: `Summary Error: ${error.message}` });
+            // --- CORRECCIÓN ---
+            await TranscriptionJobDB.updateStatus(jobId, 'FAILED');
+            await TranscriptionJobDB.updateResults(jobId, { error_message: `Summary Error: ${error.message}` });
         });
         throw error;
       }
@@ -224,7 +228,9 @@ export const processDocument = inngest.createFunction(
     } catch (error: any) {
         console.error(`[CRITICAL] Job ${jobId} failed in processDocument:`, error);
         await step.run('mark-doc-job-as-failed', async () => {
-            await TranscriptionJobDB.updateResults(jobId, { status: 'FAILED', error_message: error.message });
+            // --- CORRECCIÓN ---
+            await TranscriptionJobDB.updateStatus(jobId, 'FAILED');
+            await TranscriptionJobDB.updateResults(jobId, { error_message: error.message });
         });
         throw error;
     }
@@ -267,7 +273,9 @@ export const summarizeDocument = inngest.createFunction(
     } catch (error: any) {
         console.error(`[CRITICAL] Job ${jobId} failed in summarizeDocument (Legacy):`, error);
         await step.run('mark-legacy-doc-job-as-failed', async () => {
-            await TranscriptionJobDB.updateResults(jobId, { status: 'FAILED', error_message: error.message });
+            // --- CORRECCIÓN ---
+            await TranscriptionJobDB.updateStatus(jobId, 'FAILED');
+            await TranscriptionJobDB.updateResults(jobId, { error_message: error.message });
         });
         throw error;
     }
