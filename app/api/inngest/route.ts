@@ -1,20 +1,27 @@
+// DÓNDE: app/api/inngest/route.ts
+// VERSIÓN CORREGIDA: Sincronizado con las funciones que están realmente activas.
+
 import { serve } from 'inngest/next';
 import { inngest } from '@/lib/inngest/client';
+
+// --- LÍNEAS CORREGIDAS ---
+// Importamos solo las funciones que están activas en functions.ts
 import {
   transcribeFile,
-  summarizeFile,
-  processDocument,
-  summarizeDocument
+  summarizeFile
+  // processDocument,   <-- Desactivado temporalmente
+  // summarizeDocument  <-- Desactivado temporalmente
 } from '@/lib/inngest/functions';
 
-// Inngest webhook endpoint - handles background job processing
+// El endpoint que gestiona los trabajos en segundo plano
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
-    transcribeFile,     // Transcription task (audio/video)
-    summarizeFile,      // Summarization task (audio/video)
-    processDocument,    // Document processing (PDF, DOCX, TXT) - NEW PROFESSIONAL APPROACH
-    summarizeDocument,  // Legacy document summarization (backward compatibility)
+    transcribeFile,
+    summarizeFile,
+    // processDocument,   <-- Desactivado temporalmente
+    // summarizeDocument  <-- Desactivado temporalmente
   ],
   signingKey: process.env.INNGEST_SIGNING_KEY,
 });
+
