@@ -7,11 +7,9 @@ import { unstable_noStore as noStore } from 'next/cache';
 export async function getUserIsAdmin(userId: string) {
   noStore();
   try {
-    // ACTUALIZADO: Seleccionamos la columna 'role'
     const data = await sql`
       SELECT role FROM users WHERE id = ${userId};
     `;
-    // ACTUALIZADO: Comprobamos si el rol es 'admin'
     return data.rows[0]?.role === 'admin';
   } catch (error) {
     console.error('Error en la base de datos al verificar el rol de admin:', error);
@@ -19,23 +17,52 @@ export async function getUserIsAdmin(userId: string) {
   }
 }
 
+// --- ¡FUNCIÓN ACTUALIZADA CON DATOS REALES! ---
 export async function getAdminDashboardData() {
-    noStore();
+    noStore(); // Asegura que los datos sean siempre frescos
     try {
-        // En el futuro, aquí harás consultas SQL complejas
-        // Por ahora, devolvemos datos de ejemplo para que la UI funcione
-        const data = {
-            kpis: { activeUsers: '1,245', revenue: '4,820.75', apiCosts: '372.50', grossMargin: '92.27' },
-            users: [
-              { id: '1', email: 'juan.perez@betatester.com', plan: 'Pro', registeredAt: '15/10/2025', usage: { totalFiles: 25, breakdown: 'A:15, P:8, D:2' } },
-              { id: '2', email: 'nuevo.usuario@gmail.com', plan: 'Free', registeredAt: '19/10/2025', usage: { totalFiles: 5, breakdown: 'A:3, P:2' } },
-            ]
+        // Ejecutamos ambas consultas a la base de datos en paralelo para más eficiencia
+        const [usersData, kpiData] = await Promise.all([
+            sql`SELECT id, email, subscription_plan, created_at, monthly_usage, monthly_quota FROM users ORDER BY created_at DESC;`,
+            sql`SELECT 
+                    COUNT(*) as total_users,
+                    SUM(total_cost_usd::numeric) as total_costs
+                 FROM users;`
+        ]);
+
+        // Mapeamos los datos de los usuarios al formato que espera el frontend
+        const formattedUsers = usersData.rows.map(user => ({
+            id: user.id,
+            email: user.email,
+            plan: user.subscription_plan || 'Free',
+            registeredAt: new Date(user.created_at).toLocaleDateString('es-ES'),
+            usage: {
+                totalFiles: user.monthly_usage,
+                breakdown: `Uso: ${user.monthly_usage}/${user.monthly_quota}` // Desglose simple por ahora
+            }
+        }));
+
+        // Calculamos los KPIs
+        // NOTA: Los ingresos (revenue) deberían venir de Stripe. Por ahora, es un valor de ejemplo.
+        const totalCosts = parseFloat(kpiData.rows[0].total_costs) || 0;
+        const totalRevenue = 4820.75; // Valor de ejemplo, a reemplazar con datos de Stripe
+        const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCosts) / totalRevenue) * 100 : 0;
+
+        const formattedKpis = {
+            activeUsers: kpiData.rows[0].total_users || '0',
+            revenue: totalRevenue.toLocaleString('es-ES', { minimumFractionDigits: 2 }),
+            apiCosts: totalCosts.toLocaleString('es-ES', { minimumFractionDigits: 2 }),
+            grossMargin: grossMargin.toFixed(2)
         };
-        return data;
+
+        return {
+            kpis: formattedKpis,
+            users: formattedUsers
+        };
+
     } catch (error) {
         console.error('Error de base de datos al obtener los datos del dashboard:', error);
         throw new Error('No se pudieron obtener los datos del panel de control.');
     }
 }
-
 
