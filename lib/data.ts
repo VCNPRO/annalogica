@@ -1,8 +1,18 @@
 // DÓNDE: lib/data.ts
-// MISIÓN: Centralizar las consultas a la base de datos.
+// MISIÓN: Centralizar las consultas a la base de datos y ahora también a Stripe.
 
 import { sql } from '@vercel/postgres';
 import { unstable_noStore as noStore } from 'next/cache';
+
+// --- ¡NUEVO! IMPORTAMOS LA LIBRERÍA DE STRIPE ---
+import Stripe from 'stripe';
+
+// --- ¡NUEVO! INICIALIZAMOS STRIPE CON TU API KEY ---
+// Asegúrate de que tu STRIPE_SECRET_KEY está en las variables de entorno de Vercel
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-04-05', // Usa una versión de API explícita
+});
+
 
 export async function getUserIsAdmin(userId: string) {
   noStore();
@@ -17,20 +27,28 @@ export async function getUserIsAdmin(userId: string) {
   }
 }
 
-// --- ¡FUNCIÓN ACTUALIZADA CON DATOS REALES! ---
+
 export async function getAdminDashboardData() {
-    noStore(); // Asegura que los datos sean siempre frescos
+    noStore();
     try {
-        // Ejecutamos ambas consultas a la base de datos en paralelo para más eficiencia
-        const [usersData, kpiData] = await Promise.all([
+        // --- CONSULTA ACTUALIZADA ---
+        // Ahora ejecutamos 3 consultas en paralelo: usuarios, costes y los ingresos de Stripe
+        const [usersData, kpiData, balanceTransactions] = await Promise.all([
             sql`SELECT id, email, subscription_plan, created_at, monthly_usage, monthly_quota FROM users ORDER BY created_at DESC;`,
             sql`SELECT 
                     COUNT(*) as total_users,
                     SUM(total_cost_usd::numeric) as total_costs
-                 FROM users;`
+                 FROM users;`,
+            // --- ¡NUEVO! OBTENEMOS LAS TRANSACCIONES DE STRIPE DEL ÚLTIMO MES ---
+            stripe.balanceTransactions.list({
+                limit: 100, // Obtiene las últimas 100 transacciones
+                created: {
+                    // Filtra por el último mes
+                    gte: Math.floor((new Date().getTime() - 30 * 24 * 60 * 60 * 1000) / 1000),
+                }
+            }),
         ]);
 
-        // Mapeamos los datos de los usuarios al formato que espera el frontend
         const formattedUsers = usersData.rows.map(user => ({
             id: user.id,
             email: user.email,
@@ -38,14 +56,17 @@ export async function getAdminDashboardData() {
             registeredAt: new Date(user.created_at).toLocaleDateString('es-ES'),
             usage: {
                 totalFiles: user.monthly_usage,
-                breakdown: `Uso: ${user.monthly_usage}/${user.monthly_quota}` // Desglose simple por ahora
+                breakdown: `Uso: ${user.monthly_usage}/${user.monthly_quota}`
             }
         }));
 
-        // Calculamos los KPIs
-        // NOTA: Los ingresos (revenue) deberían venir de Stripe. Por ahora, es un valor de ejemplo.
+        // --- ¡NUEVO! CALCULAMOS LOS INGRESOS REALES DE STRIPE ---
+        // Sumamos solo las transacciones que son pagos (charges) o pagos de suscripciones (payment)
+        const totalRevenue = balanceTransactions.data
+            .filter(tx => tx.type === 'charge' || tx.type === 'payment')
+            .reduce((sum, tx) => sum + tx.amount, 0) / 100; // Dividimos por 100 para convertir de céntimos a euros
+
         const totalCosts = parseFloat(kpiData.rows[0].total_costs) || 0;
-        const totalRevenue = 4820.75; // Valor de ejemplo, a reemplazar con datos de Stripe
         const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCosts) / totalRevenue) * 100 : 0;
 
         const formattedKpis = {
@@ -61,7 +82,7 @@ export async function getAdminDashboardData() {
         };
 
     } catch (error) {
-        console.error('Error de base de datos al obtener los datos del dashboard:', error);
+        console.error('Error al obtener los datos del dashboard:', error);
         throw new Error('No se pudieron obtener los datos del panel de control.');
     }
 }
