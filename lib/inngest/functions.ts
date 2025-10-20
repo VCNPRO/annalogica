@@ -1,5 +1,5 @@
 // DÓNDE: lib/inngest/functions.ts
-// VERSIÓN COMPLETA: Todas las funciones (audio y documentos) están migradas y activas.
+// VERSIÓN COMPLETA Y CORREGIDA: Soluciona el error en la función processDocument.
 
 import { inngest } from './client';
 import { TranscriptionJobDB } from '@/lib/db';
