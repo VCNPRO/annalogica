@@ -1,5 +1,5 @@
 // DÓNDE: lib/inngest/functions.ts
-// VERSIÓN FINAL: Soluciona el error de tipos al guardar un fallo, usando el campo 'metadata'.
+// VERSIÓN CON LÍMITES CORREGIDOS: Se ajusta la concurrencia al límite del plan de Inngest (5).
 
 import { inngest } from './client';
 import { TranscriptionJobDB } from '@/lib/db';
@@ -35,7 +35,8 @@ const generateVtt = (utterances: any[]) => {
 
 // --- FUNCIONES DE AUDIO CON DIAGNÓSTICO ---
 export const transcribeFile = inngest.createFunction(
-  { id: 'task-transcribe-file-deepgram-v3', name: 'Task: Transcribe File (Deepgram)', retries: 2, concurrency: { limit: 10 } },
+  // --- LÍNEA CORREGIDA ---
+  { id: 'task-transcribe-file-deepgram-v3', name: 'Task: Transcribe File (Deepgram)', retries: 2, concurrency: { limit: 5 } },
   { event: 'task/transcribe' },
   async ({ event, step }) => {
     const { jobId } = event.data;
@@ -109,7 +110,6 @@ export const transcribeFile = inngest.createFunction(
         await step.run('mark-job-as-failed', async () => {
           const job = await TranscriptionJobDB.findById(jobId);
           await TranscriptionJobDB.updateStatus(jobId, 'failed');
-          // --- CORRECCIÓN FINAL ---
           await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: error.message } });
         });
         throw error;
@@ -118,7 +118,8 @@ export const transcribeFile = inngest.createFunction(
 );
 
 export const summarizeFile = inngest.createFunction(
-  { id: 'task-summarize-file-openai-v2', name: 'Task: Summarize File (OpenAI)', retries: 3, concurrency: { limit: 10 } },
+  // --- LÍNEA CORREGIDA ---
+  { id: 'task-summarize-file-openai-v2', name: 'Task: Summarize File (OpenAI)', retries: 3, concurrency: { limit: 5 } },
   { event: 'task/summarize' },
   async ({ event, step }) => {
       const { jobId } = event.data;
@@ -164,7 +165,6 @@ export const summarizeFile = inngest.createFunction(
         await step.run('mark-summary-as-failed', async () => {
             const job = await TranscriptionJobDB.findById(jobId);
             await TranscriptionJobDB.updateStatus(jobId, 'failed');
-            // --- CORRECCIÓN FINAL ---
             await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: `Summary Error: ${error.message}` } });
         });
         throw error;
@@ -232,7 +232,6 @@ export const processDocument = inngest.createFunction(
         await step.run('mark-doc-job-as-failed', async () => {
             const job = await TranscriptionJobDB.findById(jobId);
             await TranscriptionJobDB.updateStatus(jobId, 'failed');
-            // --- CORRECCIÓN FINAL ---
             await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: error.message } });
         });
         throw error;
@@ -278,7 +277,6 @@ export const summarizeDocument = inngest.createFunction(
         await step.run('mark-legacy-doc-job-as-failed', async () => {
             const job = await TranscriptionJobDB.findById(jobId);
             await TranscriptionJobDB.updateStatus(jobId, 'failed');
-            // --- CORRECCIÓN FINAL ---
             await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: error.message } });
         });
         throw error;
