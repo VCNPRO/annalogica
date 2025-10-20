@@ -1,5 +1,5 @@
 // DÓNDE: lib/inngest/functions.ts
-// VERSIÓN FINAL: Soluciona el error de tipos al guardar un fallo, usando el campo 'metadata'.
+// VERSIÓN BLINDADA: Todas las funciones con su código completo, migradas, y con un sistema de diagnóstico de errores robusto.
 
 import { inngest } from './client';
 import { TranscriptionJobDB } from '@/lib/db';
