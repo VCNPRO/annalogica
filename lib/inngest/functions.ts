@@ -164,7 +164,9 @@ export const processDocument = inngest.createFunction(
     
     await step.run('update-status-doc-processing', async () => await TranscriptionJobDB.updateStatus(jobId, 'processing'));
     
-    const { extractedText, parseMetadata } = await step.run('extract-text-from-doc', async () => {
+    // --- LÍNEA CORREGIDA ---
+    // Cambiamos la desestructuración para que coincida con lo que devuelve la función.
+    const { text: extractedText, metadata: parseMetadata } = await step.run('extract-text-from-doc', async () => {
       const { parseDocumentFromURL } = await import('@/lib/document-parser');
       return await parseDocumentFromURL(documentUrl, filename);
     });
