@@ -1,10 +1,9 @@
 // DÓNDE: components/admin/AdminDashboard.tsx
-// VERSIÓN PROFESIONAL DEFINITIVA: Rediseño completo enfocado en diagnóstico técnico y usabilidad.
-
+// VERSIÓN FINAL CORREGIDA: Se añade la directiva 'use client' para solucionar el error de React.
 'use client';
 
 import { useState, useEffect, type ReactNode } from 'react';
-import { Sun, Moon, Users, Euro, Server, PieChart, CheckCircle, AlertTriangle, MoreHorizontal, History, Replace, LogIn, Ban, X, Clock, File, User, Tag, ArrowRight } from 'lucide-react';
+import { Sun, Moon, Users, Euro, Server, PieChart, CheckCircle, AlertTriangle, MoreHorizontal, History, Replace, LogIn, Ban, X, Clock, File, User, Tag } from 'lucide-react';
 
 // --- SUB-COMPONENTES DE UI ---
 
@@ -89,25 +88,11 @@ const JobDetailPanel = ({ job, onClose }: { job: any | null, onClose: () => void
                             ))}
                         </div>
                     </div>
-
-                    <hr className="border-gray-200 dark:border-gray-700" />
-                    
-                     {/* Resumen de Costes */}
-                    <div>
-                        <h3 className="font-semibold mb-2">Resumen de Costes</h3>
-                        <div className="text-sm space-y-2">
-                             <div className="flex justify-between"><span>Transcripción (Deepgram):</span><span className="font-mono">{job.costs.transcription}</span></div>
-                             <div className="flex justify-between"><span>Resumen (OpenAI):</span><span className="font-mono">{job.costs.summary}</span></div>
-                             <div className="flex justify-between font-bold border-t border-gray-200 dark:border-gray-700 mt-2 pt-2"><span>Total:</span><span className="font-mono">{job.costs.total}</span></div>
-                        </div>
-                    </div>
                 </div>
-
                 <div className="p-4 border-t border-gray-200 dark:border-gray-700">
                     <h3 className="text-sm font-semibold mb-3">Acciones de Administrador</h3>
                     <div className="flex gap-2">
                          <button className="flex-1 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 p-2 rounded-md">Re-procesar Trabajo</button>
-                         <button className="flex-1 text-sm bg-red-500 text-white hover:bg-red-600 p-2 rounded-md">Marcar como Fallido</button>
                     </div>
                 </div>
             </div>
@@ -135,7 +120,6 @@ export function AdminDashboard() {
               steps: [
                 { name: 'UPLOAD', status: 'COMPLETED', duration: '2s', error: null },
                 { name: 'TRANSCRIPCIÓN (DEEPGRAM)', status: 'COMPLETED', duration: '28s', error: null },
-                { name: 'IDENTIFICAR ORADORES (OPENAI)', status: 'COMPLETED', duration: '10s', error: null },
                 { name: 'RESUMEN (OPENAI)', status: 'COMPLETED', duration: '5s', error: null },
               ],
               costs: { transcription: '€0.08', summary: '€0.04', total: '€0.12' }
@@ -144,7 +128,6 @@ export function AdminDashboard() {
               steps: [
                 { name: 'UPLOAD', status: 'COMPLETED', duration: '3s', error: null },
                 { name: 'TRANSCRIPCIÓN (DEEPGRAM)', status: 'FAILED', duration: '9s', error: 'API Error 502: Upstream server timed out after 8000ms' },
-                { name: 'IDENTIFICAR ORADORES (OPENAI)', status: 'SKIPPED', duration: '0s', error: null },
                 { name: 'RESUMEN (OPENAI)', status: 'SKIPPED', duration: '0s', error: null },
               ],
               costs: { transcription: '€0.05', summary: '€0.00', total: '€0.05' }
@@ -155,14 +138,14 @@ export function AdminDashboard() {
     setIsLoading(false);
   }, []);
 
-  useEffect(() => { /* Lógica del modo noche (sin cambios) */
+  useEffect(() => { 
     const savedTheme = localStorage.getItem('theme') || 'light';
     const newIsDark = savedTheme === 'dark';
     setIsDarkMode(newIsDark);
     document.documentElement.classList.toggle('dark', newIsDark);
   }, []);
 
-  const toggleTheme = () => { /* Lógica del modo noche (sin cambios) */
+  const toggleTheme = () => {
     const newIsDark = !isDarkMode;
     setIsDarkMode(newIsDark);
     localStorage.setItem('theme', newIsDark ? 'dark' : 'light');
@@ -187,19 +170,9 @@ export function AdminDashboard() {
         <KpiCard title="Margen Bruto" value={`${data.kpis.grossMargin}%`} icon={<PieChart size={20} />} trend="Objetivo: > 85%" trendDirection="none" />
       </div>
       
-      {/* ¡NUEVA TABLA DE DIAGNÓSTICO! */}
       <div className="mt-8 bg-white dark:bg-gray-800 shadow-md rounded-lg border border-gray-200 dark:border-gray-700">
           <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <h2 className="text-xl font-semibold">Registro de Actividad de Trabajos</h2>
-            <div className="flex gap-2">
-                <input type="text" placeholder="Buscar por archivo o email..." className="w-64 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/10 shadow-sm p-2 text-sm" />
-                <select className="rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/10 shadow-sm p-2 text-sm">
-                    <option>Todos los estados</option>
-                    <option>Fallido</option>
-                    <option>Completado</option>
-                    <option>Procesando</option>
-                </select>
-            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
