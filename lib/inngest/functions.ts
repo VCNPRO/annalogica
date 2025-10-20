@@ -1,5 +1,5 @@
 // DÓNDE: lib/inngest/functions.ts
-// VERSIÓN CON CORRECCIÓN DE MAYÚSCULAS: Soluciona el error de tipos al guardar un fallo.
+// VERSIÓN FINAL: Soluciona el error de tipos al guardar un fallo, usando el campo 'metadata'.
 
 import { inngest } from './client';
 import { TranscriptionJobDB } from '@/lib/db';
@@ -15,7 +15,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 const saveTextToFile = async (text: string, baseFilename: string, extension: string) => {
     const timestamp = Date.now();
     const filename = `${timestamp}-${baseFilename.replace(/\.[^/.]+$/, '')}-annalogica.${extension}`;
-    const blob = await put(filename, text, { access: 'public', contentType: 'text/plain; charset=utf--8', token: process.env.BLOB_READ_WRITE_TOKEN!, addRandomSuffix: true });
+    const blob = await put(filename, text, { access: 'public', contentType: 'text/plain; charset=utf-8', token: process.env.BLOB_READ_WRITE_TOKEN!, addRandomSuffix: true });
     return blob.url;
 };
 const formatTimestamp = (seconds: number) => {
@@ -107,9 +107,9 @@ export const transcribeFile = inngest.createFunction(
     } catch (error: any) {
         console.error(`[CRITICAL] Job ${jobId} failed in transcribeFile:`, error);
         await step.run('mark-job-as-failed', async () => {
-          // --- CORRECCIÓN ---
+          const job = await TranscriptionJobDB.findById(jobId);
           await TranscriptionJobDB.updateStatus(jobId, 'failed');
-          await TranscriptionJobDB.updateResults(jobId, { error_message: error.message });
+          await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: error.message } });
         });
         throw error;
     }
@@ -161,9 +161,9 @@ export const summarizeFile = inngest.createFunction(
       } catch (error: any) {
         console.error(`[CRITICAL] Job ${jobId} failed in summarizeFile:`, error);
         await step.run('mark-summary-as-failed', async () => {
-            // --- CORRECCIÓN ---
+            const job = await TranscriptionJobDB.findById(jobId);
             await TranscriptionJobDB.updateStatus(jobId, 'failed');
-            await TranscriptionJobDB.updateResults(jobId, { error_message: `Summary Error: ${error.message}` });
+            await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: `Summary Error: ${error.message}` } });
         });
         throw error;
       }
@@ -228,9 +228,9 @@ export const processDocument = inngest.createFunction(
     } catch (error: any) {
         console.error(`[CRITICAL] Job ${jobId} failed in processDocument:`, error);
         await step.run('mark-doc-job-as-failed', async () => {
-            // --- CORRECCIÓN ---
+            const job = await TranscriptionJobDB.findById(jobId);
             await TranscriptionJobDB.updateStatus(jobId, 'failed');
-            await TranscriptionJobDB.updateResults(jobId, { error_message: error.message });
+            await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: error.message } });
         });
         throw error;
     }
@@ -273,9 +273,9 @@ export const summarizeDocument = inngest.createFunction(
     } catch (error: any) {
         console.error(`[CRITICAL] Job ${jobId} failed in summarizeDocument (Legacy):`, error);
         await step.run('mark-legacy-doc-job-as-failed', async () => {
-            // --- CORRECCIÓN ---
+            const job = await TranscriptionJobDB.findById(jobId);
             await TranscriptionJobDB.updateStatus(jobId, 'failed');
-            await TranscriptionJobDB.updateResults(jobId, { error_message: error.message });
+            await TranscriptionJobDB.updateResults(jobId, { metadata: { ...job?.metadata, error: error.message } });
         });
         throw error;
     }
