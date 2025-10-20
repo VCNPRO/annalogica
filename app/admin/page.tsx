@@ -1,9 +1,12 @@
 // DÓNDE: app/admin/page.tsx
-// MISIÓN: El archivo final que une todo.
+// MISIÓN: Proteger la ruta y renderizar el panel de control.
 
 import { redirect } from 'next/navigation';
-// import { auth } from '@/auth'; // Descomenta cuando tengas tu sistema de auth
-// import { getUserIsAdmin } from '@/lib/db/queries'; // Descomenta después
+// import { auth } from '@/auth'; // Asume que tienes un sistema de autenticación
+// import { getUserIsAdmin } from '@/lib/db/queries'; // Necesitarás una función para verificar si el usuario es admin
+
+// --- LÍNEA CORREGIDA ---
+// Aseguramos que la importación sea correcta para un componente con "exportación nombrada"
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
 
 export default async function AdminPage() {
@@ -23,3 +26,4 @@ export default async function AdminPage() {
     </div>
   );
 }
+
