@@ -1,105 +1,129 @@
 // DÓNDE: components/admin/AdminDashboard.tsx
-// VERSIÓN PROFESIONAL: Soluciona errores de UI y añade un panel de diagnóstico técnico.
+// VERSIÓN PROFESIONAL DEFINITIVA: Rediseño completo enfocado en diagnóstico técnico y usabilidad.
+
 'use client';
 
 import { useState, useEffect, type ReactNode } from 'react';
-import { Sun, Moon, Users, Euro, Server, PieChart, CheckCircle, AlertTriangle, MoreHorizontal, History, Replace, LogIn, Ban } from 'lucide-react';
+import { Sun, Moon, Users, Euro, Server, PieChart, CheckCircle, AlertTriangle, MoreHorizontal, History, Replace, LogIn, Ban, X, Clock, File, User, Tag, ArrowRight } from 'lucide-react';
 
-// --- PIEZA 1: KpiCard ---
+// --- SUB-COMPONENTES DE UI ---
+
 const KpiCard = ({ title, value, icon, trend, trendDirection }: { title: string; value: string; icon: ReactNode; trend: string; trendDirection: 'up' | 'down' | 'none'; }) => {
-  const trendColor = trendDirection === 'up' ? 'text-green-600' : trendDirection === 'down' ? 'text-red-600' : 'text-gray-500 dark:text-gray-400';
+  const trendColor = trendDirection === 'up' ? 'text-green-500' : trendDirection === 'down' ? 'text-red-500' : 'text-gray-400';
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 transition-transform hover:-translate-y-1">
-      <div className="flex justify-between items-start">
-        <div><p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p><p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-2">{value}</p></div>
-        <div className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 p-2 rounded-lg">{icon}</div>
+    <div className="bg-white dark:bg-gray-800/50 p-5 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="flex justify-between items-center">
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+        <div className="text-gray-400">{icon}</div>
       </div>
-      <p className={`text-xs ${trendColor} flex items-center mt-4`}>{trend}</p>
+      <p className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mt-2">{value}</p>
+      <p className={`text-xs ${trendColor} mt-1`}>{trend}</p>
     </div>
   );
 };
 
-// --- PIEZA 2: ClientTable ---
-const ClientTable = ({ users }: { users: any[] }) => {
-  return (
-    <div className="mt-8 bg-white dark:bg-gray-800 shadow-md rounded-lg border border-gray-200 dark:border-gray-700">
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700"><h2 className="text-xl font-semibold">Gestión de Clientes</h2><input type="text" placeholder="Buscar por email..." className="mt-4 block w-full sm:w-1/3 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/10 shadow-sm p-2" /></div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-700/50">
-            <tr><th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Plan</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Uso Detallado</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Fecha Registro</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Acciones</th></tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                <td className="px-6 py-4 whitespace-nowrap font-medium">{user.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.plan === 'Pro' || user.plan === 'basico' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{user.plan}</span></td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{`${user.usage.totalFiles} archivos (${user.usage.breakdown})`}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.registeredAt}</td>
-                <td className="px-6 py-4 whitespace-nowrap relative">
-                  <div className="group inline-block">
-                    <button className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600"><MoreHorizontal /></button>
-                    <div className="absolute hidden group-hover:block right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10">
-                        <a href="#" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"><History size={16}/> Ver Historial</a>
-                        <a href="#" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"><Replace size={16}/> Cambiar Plan</a>
-                        <a href="#" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"><LogIn size={16}/> Impersonar</a>
-                        <a href="#" className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"><Ban size={16}/> Suspender</a>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
+const JobDetailPanel = ({ job, onClose }: { job: any | null, onClose: () => void }) => {
+    if (!job) return null;
 
-// --- ¡NUEVA PIEZA 3! JobsTable (Panel de Diagnóstico) ---
-const JobsTable = ({ jobs }: { jobs: any[] }) => {
+    const statusConfig: any = {
+        COMPLETED: { icon: <CheckCircle size={14} />, color: 'text-green-500' },
+        PROCESSING: { icon: <Clock size={14} />, color: 'text-blue-500' },
+        FAILED: { icon: <AlertTriangle size={14} />, color: 'text-red-500' },
+        QUEUED: { icon: <Clock size={14} />, color: 'text-yellow-500' },
+    };
+
     return (
-    <div className="mt-8 bg-white dark:bg-gray-800 shadow-md rounded-lg border border-gray-200 dark:border-gray-700">
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700"><h2 className="text-xl font-semibold">Registro de Actividad de Trabajos</h2></div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead className="bg-gray-50 dark:bg-gray-700/50">
-            <tr><th className="px-6 py-3 text-left text-xs font-medium uppercase">ID Trabajo</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Archivo</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Estado</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Coste</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Error</th></tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {jobs.map((job) => (
-              <tr key={job.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/50 ${job.status === 'FAILED' ? 'bg-red-50 dark:bg-red-900/20' : ''}`}>
-                <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-500">{job.id.slice(0, 8)}...</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">{job.userEmail}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">{job.filename}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                        ${job.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 
-                          job.status === 'FAILED' ? 'bg-red-100 text-red-800' : 
-                          'bg-blue-100 text-blue-800'}`}>
-                        {job.status}
-                    </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">{job.cost}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-xs text-red-600 font-mono">{job.error || 'N/A'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
+        <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-white dark:bg-gray-900 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out" style={{ transform: job ? 'translateX(0)' : 'translateX(100%)' }}>
+            <div className="flex flex-col h-full">
+                <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Detalles del Trabajo</h2>
+                        <p className="text-xs text-gray-500 font-mono">{job.id}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="flex-grow overflow-y-auto p-6 space-y-6">
+                    {/* Resumen del Trabajo */}
+                    <div className="space-y-4">
+                         <div className="flex items-center gap-3">
+                            <File size={16} className="text-gray-400" />
+                            <span className="font-medium">{job.filename}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <User size={16} className="text-gray-400" />
+                            <span>{job.userEmail}</span>
+                        </div>
+                         <div className="flex items-center gap-3">
+                            <Tag size={16} className="text-gray-400" />
+                            <span className={`flex items-center gap-2 text-sm font-medium ${statusConfig[job.status]?.color}`}>
+                                {statusConfig[job.status]?.icon} {job.status}
+                            </span>
+                        </div>
+                    </div>
 
+                    <hr className="border-gray-200 dark:border-gray-700" />
+
+                    {/* Timeline de Eventos */}
+                    <div>
+                        <h3 className="font-semibold mb-4">Línea de Tiempo del Proceso</h3>
+                        <div className="space-y-4">
+                            {job.steps.map((step: any, index: number) => (
+                                <div key={index} className="flex gap-4">
+                                    <div className={`flex items-center justify-center w-8 h-8 rounded-full ${step.status === 'COMPLETED' ? 'bg-green-100 text-green-600' : step.status === 'FAILED' ? 'bg-red-100 text-red-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-500'}`}>
+                                        {step.status === 'COMPLETED' ? <CheckCircle size={16} /> : step.status === 'FAILED' ? <X size={16} /> : <Clock size={16} />}
+                                    </div>
+                                    <div className="flex-grow">
+                                        <div className="flex justify-between items-center">
+                                            <p className="font-medium text-sm">{step.name}</p>
+                                            <p className="text-xs text-gray-400 font-mono">{step.duration}</p>
+                                        </div>
+                                        {step.error && (
+                                            <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 rounded-md">
+                                                <p className="text-xs text-red-600 dark:text-red-400 font-mono">{step.error}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <hr className="border-gray-200 dark:border-gray-700" />
+                    
+                     {/* Resumen de Costes */}
+                    <div>
+                        <h3 className="font-semibold mb-2">Resumen de Costes</h3>
+                        <div className="text-sm space-y-2">
+                             <div className="flex justify-between"><span>Transcripción (Deepgram):</span><span className="font-mono">{job.costs.transcription}</span></div>
+                             <div className="flex justify-between"><span>Resumen (OpenAI):</span><span className="font-mono">{job.costs.summary}</span></div>
+                             <div className="flex justify-between font-bold border-t border-gray-200 dark:border-gray-700 mt-2 pt-2"><span>Total:</span><span className="font-mono">{job.costs.total}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                    <h3 className="text-sm font-semibold mb-3">Acciones de Administrador</h3>
+                    <div className="flex gap-2">
+                         <button className="flex-1 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 p-2 rounded-md">Re-procesar Trabajo</button>
+                         <button className="flex-1 text-sm bg-red-500 text-white hover:bg-red-600 p-2 rounded-md">Marcar como Fallido</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // --- EL CEREBRO PRINCIPAL: AdminDashboard ---
 export function AdminDashboard() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedJob, setSelectedJob] = useState<any | null>(null);
 
   useEffect(() => {
-    // Para la demo, usamos datos de ejemplo. En la app real, harías un fetch a '/api/admin/dashboard-data'
+    // Usamos datos de ejemplo con la nueva estructura detallada
     const mockData = {
         kpis: { activeUsers: '12', revenue: '0.00', apiCosts: '0.84', grossMargin: '0.00' },
         users: [
@@ -107,24 +131,38 @@ export function AdminDashboard() {
           { id: 'd4f39938', email: 'test@test.com', plan: 'admin', registeredAt: '06/10/2025', usage: { totalFiles: 10, breakdown: '10/10' } },
         ],
         jobs: [
-            { id: 'job_1a2b3c4d', userEmail: 'nuevo.usuario@gmail.com', filename: 'reunion_semanal.mp3', status: 'COMPLETED', cost: '€0.12', error: null },
-            { id: 'job_5e6f7g8h', userEmail: 'cliente.importante@corp.com', filename: 'propuesta_Q4.pdf', status: 'PROCESSING', cost: '€0.01', error: null },
-            { id: 'job_9i0j1k2l', userEmail: 'test@test.com', filename: 'audio_largo_con_ruido.wav', status: 'FAILED', cost: '€0.05', error: 'Deepgram API timeout' },
-            { id: 'job_3m4n5o6p', userEmail: 'juan.perez@betatester.com', filename: 'entrevista_candidato.m4a', status: 'QUEUED', cost: '€0.00', error: null },
+            { id: 'job_1a2b3c4d', userEmail: 'nuevo.usuario@gmail.com', filename: 'reunion_semanal.mp3', status: 'COMPLETED', createdAt: '2025-10-20 18:15:00', duration: '45s',
+              steps: [
+                { name: 'UPLOAD', status: 'COMPLETED', duration: '2s', error: null },
+                { name: 'TRANSCRIPCIÓN (DEEPGRAM)', status: 'COMPLETED', duration: '28s', error: null },
+                { name: 'IDENTIFICAR ORADORES (OPENAI)', status: 'COMPLETED', duration: '10s', error: null },
+                { name: 'RESUMEN (OPENAI)', status: 'COMPLETED', duration: '5s', error: null },
+              ],
+              costs: { transcription: '€0.08', summary: '€0.04', total: '€0.12' }
+            },
+            { id: 'job_9i0j1k2l', userEmail: 'test@test.com', filename: 'audio_largo_con_ruido.wav', status: 'FAILED', createdAt: '2025-10-20 18:20:00', duration: '12s',
+              steps: [
+                { name: 'UPLOAD', status: 'COMPLETED', duration: '3s', error: null },
+                { name: 'TRANSCRIPCIÓN (DEEPGRAM)', status: 'FAILED', duration: '9s', error: 'API Error 502: Upstream server timed out after 8000ms' },
+                { name: 'IDENTIFICAR ORADORES (OPENAI)', status: 'SKIPPED', duration: '0s', error: null },
+                { name: 'RESUMEN (OPENAI)', status: 'SKIPPED', duration: '0s', error: null },
+              ],
+              costs: { transcription: '€0.05', summary: '€0.00', total: '€0.05' }
+            },
         ]
     };
     setData(mockData);
     setIsLoading(false);
   }, []);
 
-  useEffect(() => {
+  useEffect(() => { /* Lógica del modo noche (sin cambios) */
     const savedTheme = localStorage.getItem('theme') || 'light';
     const newIsDark = savedTheme === 'dark';
     setIsDarkMode(newIsDark);
     document.documentElement.classList.toggle('dark', newIsDark);
   }, []);
 
-  const toggleTheme = () => {
+  const toggleTheme = () => { /* Lógica del modo noche (sin cambios) */
     const newIsDark = !isDarkMode;
     setIsDarkMode(newIsDark);
     localStorage.setItem('theme', newIsDark ? 'dark' : 'light');
@@ -137,19 +175,58 @@ export function AdminDashboard() {
   return (
     <>
       <header className="flex justify-between items-center mb-8">
-        <div><h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Centro de Mando</h1><p className="mt-1 text-gray-500 dark:text-gray-400">Visión general de Annalogica</p></div>
+        <div><h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Centro de Mando</h1><p className="mt-1 text-gray-500 dark:text-gray-400">Visión general y diagnóstico de Annalogica</p></div>
         <div className="flex items-center gap-4">
           <button onClick={toggleTheme} className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">{isDarkMode ? <Sun /> : <Moon />}</button>
         </div>
       </header>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <KpiCard title="Usuarios Activos" value={data.kpis.activeUsers} icon={<Users />} trend="" trendDirection="none" />
-        <KpiCard title="Ingresos (Mes)" value={`${data.kpis.revenue}`} icon={<Euro />} trend="" trendDirection="none" />
-        <KpiCard title="Costes APIs (Mes)" value={`€${data.kpis.apiCosts}`} icon={<Server />} trend="-69%" trendDirection="up" />
-        <KpiCard title="Margen Bruto" value={`${data.kpis.grossMargin}%`} icon={<PieChart />} trend="Objetivo: > 85%" trendDirection="none" />
+        <KpiCard title="Usuarios Activos" value={data.kpis.activeUsers} icon={<Users size={20} />} trend="" trendDirection="none" />
+        <KpiCard title="Ingresos (Mes)" value={`€${data.kpis.revenue}`} icon={<Euro size={20} />} trend="" trendDirection="none" />
+        <KpiCard title="Costes APIs (Mes)" value={`€${data.kpis.apiCosts}`} icon={<Server size={20} />} trend="-69% (migración)" trendDirection="up" />
+        <KpiCard title="Margen Bruto" value={`${data.kpis.grossMargin}%`} icon={<PieChart size={20} />} trend="Objetivo: > 85%" trendDirection="none" />
       </div>
-      <ClientTable users={data.users} />
-      <JobsTable jobs={data.jobs} />
+      
+      {/* ¡NUEVA TABLA DE DIAGNÓSTICO! */}
+      <div className="mt-8 bg-white dark:bg-gray-800 shadow-md rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <h2 className="text-xl font-semibold">Registro de Actividad de Trabajos</h2>
+            <div className="flex gap-2">
+                <input type="text" placeholder="Buscar por archivo o email..." className="w-64 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/10 shadow-sm p-2 text-sm" />
+                <select className="rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/10 shadow-sm p-2 text-sm">
+                    <option>Todos los estados</option>
+                    <option>Fallido</option>
+                    <option>Completado</option>
+                    <option>Procesando</option>
+                </select>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700/50">
+                <tr><th className="px-6 py-3 text-left text-xs font-medium uppercase"></th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Archivo</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Fecha</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Duración</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Coste</th></tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {data.jobs.map((job: any) => (
+                  <tr key={job.id} onClick={() => setSelectedJob(job)} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td className="px-6 py-4">
+                        <span className={`flex items-center gap-2 text-sm font-medium ${job.status === 'COMPLETED' ? 'text-green-500' : job.status === 'FAILED' ? 'text-red-500' : 'text-blue-500'}`}>
+                            {job.status === 'COMPLETED' ? <CheckCircle size={16} /> : job.status === 'FAILED' ? <AlertTriangle size={16} /> : <Clock size={16} />}
+                        </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap font-semibold">{job.filename}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{job.userEmail}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{job.createdAt}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{job.duration}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">{job.costs.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      {selectedJob && <JobDetailPanel job={selectedJob} onClose={() => setSelectedJob(null)} />}
     </>
   );
 }
