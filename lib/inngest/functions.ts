@@ -1,5 +1,5 @@
 // DÓNDE: lib/inngest/functions.ts
-// VERSIÓN FINAL: Corregida la llamada a OpenAI en la función de resumen.
+// VERSIÓN FINAL: Corregida la llamada a OpenAI y desactivadas temporalmente las funciones de documentos.
 
 import { inngest } from './client';
 import { TranscriptionJobDB } from '@/lib/db';
@@ -18,7 +18,7 @@ const openai = new OpenAI({
 const saveTextToFile = async (text: string, baseFilename: string, extension: string) => {
     const timestamp = Date.now();
     const filename = `${timestamp}-${baseFilename.replace(/\.[^/.]+$/, '')}-annalogica.${extension}`;
-    const blob = await put(filename, text, { access: 'public', contentType: 'text/plain; charset=utf--8', token: process.env.BLOB_READ_WRITE_TOKEN!, addRandomSuffix: true });
+    const blob = await put(filename, text, { access: 'public', contentType: 'text/plain; charset=utf-8', token: process.env.BLOB_READ_WRITE_TOKEN!, addRandomSuffix: true });
     return blob.url;
 };
 const formatTimestamp = (seconds: number) => {
@@ -124,8 +124,6 @@ export const summarizeFile = inngest.createFunction(
         const prompt = `Analiza el siguiente texto. ${generateSummary ? `Genera un resumen de tipo "${summaryType}".` : ''} ${generateTags ? 'Genera una lista de 5 a 10 etiquetas clave (tags) relevantes.' : ''} Responde en formato JSON con las claves "summary" y "tags".`;
         
         const apiStartTime = Date.now();
-        // --- LÍNEA CORREGIDA ---
-        // Aquí estaba el error. He rellenado la llamada a la API con los datos correctos.
         const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [{ role: "user", content: prompt }, {role: "system", content: `El texto es:\n---\n${transcriptText}`}],
@@ -145,7 +143,9 @@ export const summarizeFile = inngest.createFunction(
 );
 
 
-// MANTENEMOS LAS FUNCIONES DE DOCUMENTOS (sin instrumentación para simplificar)
-export const processDocument = inngest.createFunction(/*...código anterior...*/);
-export const summarizeDocument = inngest.createFunction(/*...código anterior...*/);
+// --- LÍNEAS CORREGIDAS ---
+// He comentado estas líneas para que el build pueda completarse.
+// Las reactivaremos y migraremos después de probar el flujo de audio.
+// export const processDocument = inngest.createFunction(/*...código anterior...*/);
+// export const summarizeDocument = inngest.createFunction(/*...código anterior...*/);
 
