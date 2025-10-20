@@ -1,5 +1,5 @@
 // DÓNDE: lib/data.ts
-// MISIÓN: Centralizar las consultas a la base de datos y ahora también a Stripe.
+// MISIÓN: Centralizar las consultas a la base de datos y a Stripe.
 
 import { sql } from '@vercel/postgres';
 import { unstable_noStore as noStore } from 'next/cache';
@@ -10,7 +10,9 @@ import Stripe from 'stripe';
 // --- ¡NUEVO! INICIALIZAMOS STRIPE CON TU API KEY ---
 // Asegúrate de que tu STRIPE_SECRET_KEY está en las variables de entorno de Vercel
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-04-05', // Usa una versión de API explícita
+  // --- LÍNEA CORREGIDA ---
+  // Usamos la última versión oficial de la API de Stripe
+  apiVersion: '2024-06-20',
 });
 
 
