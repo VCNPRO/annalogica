@@ -1,5 +1,5 @@
 // DÓNDE: lib/inngest/functions.ts
-// VERSIÓN 100% COMPLETA Y FINAL: Todas las funciones con su código completo, migradas y con diagnóstico.
+// VERSIÓN 100% COMPLETA: Todas las funciones con su código completo, migradas y con diagnóstico.
 
 import { inngest } from './client';
 import { TranscriptionJobDB } from '@/lib/db';
@@ -52,7 +52,7 @@ export const transcribeFile = inngest.createFunction(
               { url: audioUrl },
               { model: "nova-3", smart_format: true, diarize: true, utterances: true }
           );
-          if (error) throw new Error(error.message);
+          if (error) throw new Error(`Deepgram API Error: ${error.message}`);
           return result;
         });
         const transcript = deepgramResult.results.channels[0].alternatives[0].transcript;
@@ -66,7 +66,10 @@ export const transcribeFile = inngest.createFunction(
                 try {
                     const completion = await openai.chat.completions.create({ model: "gpt-4o-mini", messages: [{ role: "user", content: prompt }], response_format: { type: "json_object" } });
                     return JSON.parse(completion.choices[0].message.content || '{}');
-                } catch (e) { console.error("Fallo al identificar oradores con OpenAI", e); return {}; }
+                } catch (e: any) { 
+                    console.error("Fallo al identificar oradores con OpenAI", e);
+                    throw new Error(`OpenAI Speaker ID Error: ${e.message}`);
+                }
             });
         }
 
@@ -240,5 +243,34 @@ export const summarizeDocument = inngest.createFunction(
         
         const { summary, tags } = await step.run('generate-legacy-summary-openai', async () => {
             const prompt = `Analiza el texto. ${actions.includes('Resumir') ? `Genera un resumen tipo "${summaryType}".` : ''} ${actions.includes('Etiquetas') ? 'Genera 5-10 etiquetas clave.' : ''} Responde en JSON con claves "summary" y "tags".`;
-            const completion = await
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o-mini",
+                messages: [{ role: "user", content: prompt }, {role: "system", content: `Texto:\n---\n${text}`}],
+                response_format: { type: "json_object" },
+            });
+            const result = JSON.parse(completion.choices[0].message.content || '{}');
+            return { summary: result.summary || '', tags: result.tags || [] };
+        });
+        
+        let summaryUrl: string | undefined;
+        if (actions.includes('Resumir') && summary) {
+            summaryUrl = await step.run('save-legacy-summary', async () => await saveTextToFile(summary, filename, 'summary.txt'));
+        }
+
+        await step.run('update-db-legacy-summary', async () => {
+          await TranscriptionJobDB.updateResults(jobId, { metadata: { ...metadata, tags }, summaryUrl });
+          await logSummary(userId, Math.ceil(text.length / 4), Math.ceil((summary?.length || 0) / 4));
+        });
+
+        await step.run('update-status-legacy-completed', async () => await TranscriptionJobDB.updateStatus(jobId, 'completed'));
+        return { status: 'completed' };
+    } catch (error: any) {
+        console.error(`[CRITICAL] Job ${jobId} failed in summarizeDocument (Legacy):`, error);
+        await step.run('mark-legacy-doc-job-as-failed', async () => {
+            await TranscriptionJobDB.updateResults(jobId, { status: 'FAILED', error_message: error.message });
+        });
+        throw error;
+    }
+  }
+);
 
