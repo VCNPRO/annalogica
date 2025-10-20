@@ -1,10 +1,99 @@
 // DÓNDE: components/admin/AdminDashboard.tsx
+// VERSIÓN DEFINITIVA: Todos los sub-componentes están en este único archivo para eliminar errores.
 'use client';
-import { useState, useEffect } from 'react';
-import { KpiCard } from './KpiCard';
-import { ClientTable } from './ClientTable';
-import { Sun, Moon, Users, Euro, Server, PieChart, CheckCircle, AlertTriangle } from 'lucide-react';
 
+import { useState, useEffect, type ReactNode } from 'react';
+import { Sun, Moon, Users, Euro, Server, PieChart, CheckCircle, AlertTriangle, MoreHorizontal } from 'lucide-react';
+
+// --- PIEZA DE LEGO 1: KpiCard (definida aquí mismo) ---
+const KpiCard = ({ title, value, icon, trend, trendDirection }: {
+  title: string;
+  value: string;
+  icon: ReactNode;
+  trend: string;
+  trendDirection: 'up' | 'down' | 'none';
+}) => {
+  const trendColor = trendDirection === 'up' ? 'text-green-600' :
+                     trendDirection === 'down' ? 'text-red-600' : 'text-gray-500 dark:text-gray-400';
+
+  return (
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 transition-transform hover:-translate-y-1">
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
+          <p className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-2">{value}</p>
+        </div>
+        <div className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 p-2 rounded-lg">
+          {icon}
+        </div>
+      </div>
+      <p className={`text-xs ${trendColor} flex items-center mt-4`}>{trend}</p>
+    </div>
+  );
+};
+
+
+// --- PIEZA DE LEGO 2: ClientTable (definida aquí mismo) ---
+interface UserData {
+  id: string;
+  email: string;
+  plan: string;
+  registeredAt: string;
+  usage: {
+    totalFiles: number;
+    breakdown: string;
+  };
+}
+
+const ClientTable = ({ users }: { users: UserData[] }) => {
+  return (
+    <div className="mt-8 bg-white dark:bg-gray-800 shadow-md rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+        <h2 className="text-xl font-semibold">Gestión de Clientes</h2>
+        <input 
+          type="text" 
+          placeholder="Buscar por email..." 
+          className="mt-4 block w-full sm:w-1/3 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-sm p-2"
+        />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <thead className="bg-gray-50 dark:bg-gray-700/50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase">Plan</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase">Uso Detallado</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase">Fecha Registro</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            {users.map((user) => (
+              <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                <td className="px-6 py-4 whitespace-nowrap font-medium">{user.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.plan === 'Pro' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                    {user.plan}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{`${user.usage.totalFiles} archivos (${user.usage.breakdown})`}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.registeredAt}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <button className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600">
+                    <MoreHorizontal />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+
+// --- EL CEREBRO PRINCIPAL: AdminDashboard ---
 export function AdminDashboard() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [data, setData] = useState<any>(null);
@@ -16,7 +105,6 @@ export function AdminDashboard() {
       .then(fetchedData => {
         if (fetchedData.error) {
           console.error("Error fetching admin data:", fetchedData.error);
-          // Opcional: mostrar un mensaje de error en la UI
         } else {
           setData(fetchedData);
         }
@@ -59,6 +147,21 @@ export function AdminDashboard() {
         <KpiCard title="Margen Bruto" value={`${data.kpis.grossMargin}%`} icon={<PieChart />} trend="Objetivo: > 85%" trendDirection="none" />
       </div>
       
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold">Actividad Financiera</h3>
+          <div className="h-64 flex items-center justify-center text-gray-400">Gráfico de barras</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+           <h3 className="text-lg font-semibold">Estado del Sistema</h3>
+           <div className="space-y-3 mt-4 text-sm">
+              <p className="flex items-center justify-between"><span>APIs</span><span className="flex items-center text-green-600"><CheckCircle className="w-4 h-4 mr-1"/>Operativo</span></p>
+              <p className="flex items-center justify-between"><span>Base de Datos</span><span className="flex items-center text-green-600"><CheckCircle className="w-4 h-4 mr-1"/>Operativo</span></p>
+              <p className="flex items-center justify-between"><span>Inngest</span><span className="flex items-center text-yellow-500"><AlertTriangle className="w-4 h-4 mr-1"/>1 Error Reciente</span></p>
+           </div>
+        </div>
+      </div>
+
       <ClientTable users={data.users} />
     </>
   );
