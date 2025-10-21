@@ -6,7 +6,6 @@ import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client';
 
-// Tipos admitidos
 const AUDIO = ['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/ogg','audio/webm','audio/mp4','audio/m4a','audio/x-m4a'];
 const VIDEO = ['video/mp4','video/mpeg','video/webm','video/quicktime','video/x-msvideo'];
 const DOCS  = ['text/plain','application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
@@ -38,18 +37,17 @@ export async function GET(_req: Request, context: any) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
 
-    // Algunos schemas guardan progreso dentro de metadata.progress
+    // Siempre devolver metadata (aunque sea objeto vacío) para no romper el cliente
+    const metadata = job.metadata ?? {};
     const progress =
-      (job as any).progress ??
-      (job.metadata && typeof job.metadata.progress === 'number'
-        ? job.metadata.progress
-        : undefined);
+      typeof metadata.progress === 'number' ? metadata.progress : undefined;
 
     return NextResponse.json({
       id: jobId,
       status: job.status, // 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed'
       progress,
-      error: job.metadata?.error ?? null,
+      metadata,            // 👈 añadido para compatibilidad con tu UI
+      error: metadata.error ?? null,
       updatedAt: job.updated_at ? new Date(job.updated_at).toISOString() : undefined,
     });
   } catch (e: any) {
@@ -61,13 +59,11 @@ export async function GET(_req: Request, context: any) {
    POST -> encola un job nuevo
    ========================= */
 export async function POST(req: NextRequest) {
-  // Autenticación
   const auth = verifyRequestAuth(req);
   if (!auth) {
     return NextResponse.json({ success: false, message: 'No autenticado' }, { status: 401 });
   }
 
-  // Carga body
   let body: QueueBody;
   try {
     body = await req.json();
@@ -75,7 +71,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message: 'JSON inválido' }, { status: 400 });
   }
 
-  // Validación básica
   const { url, filename, mime, size = 0, language = 'auto', actions = [], summaryType } = body;
   if (!url || !filename || !mime) {
     return NextResponse.json({ success: false, message: 'Faltan campos: url/filename/mime' }, { status: 400 });
@@ -90,12 +85,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1) Crear job en DB
+    // 1) Crear job
     const job = await TranscriptionJobDB.create(auth.userId, filename, url, language, size);
     const jobId = (job as any)?.id || (job as any)?._id || (job as any)?.jobId;
     if (!jobId) throw new Error('No se pudo obtener jobId');
 
-    // 2) Estado inicial visible para la UI
+    // 2) Estado inicial + metadata mínima (incluye progress para la barra)
     await TranscriptionJobDB.updateStatus(jobId, 'pending');
     await TranscriptionJobDB.updateResults(jobId, {
       metadata: {
@@ -103,12 +98,11 @@ export async function POST(req: NextRequest) {
         mime,
         actions,
         summaryType,
-        // progreso inicial suave (si tu UI lo usa desde metadata)
         progress: 5,
       },
     });
 
-    // 3) Disparar evento Inngest inmediatamente
+    // 3) Enviar evento
     if (isAudio || isVideo) {
       await inngest.send({ name: 'task/transcribe', data: { jobId } });
     } else {
@@ -118,7 +112,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4) Hint optimista: pasa a 'processing'
+    // 4) Hint optimista para empezar a mover la barra
     await TranscriptionJobDB.updateStatus(jobId, 'processing');
     await TranscriptionJobDB.updateResults(jobId, {
       metadata: { startedAt: new Date().toISOString(), progress: 20 },
