@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
+import { inngest } from '@/lib/inngest/clients';
 
 // Tamaños máximos (bytes)
 const MAX_FILE_SIZE_AUDIO = 500 * 1024 * 1024;      // 500 MB
@@ -119,6 +120,9 @@ export async function POST(request: NextRequest): Promise<Response> {
             size: fileSize,
             language,
             userId: auth.userId,
+            // Opcional: si tu UI manda acciones/tipo de resumen, viajan aquí
+            actions: Array.isArray(payload?.actions) ? payload.actions : undefined,
+            summaryType: payload?.summaryType,
           }),
         };
       },
@@ -136,6 +140,8 @@ export async function POST(request: NextRequest): Promise<Response> {
         // Usamos los valores enviados en clientPayload (compatibles con tipos del SDK)
         const fileSizeBytes = Number(payload?.size ?? 0);
         const fileType = String(payload?.type ?? '').toLowerCase();
+        const actions = Array.isArray(payload?.actions) ? payload.actions : [];
+        const summaryType = payload?.summaryType;
 
         if (!userId) {
           console.error('[blob-upload] Falta userId en tokenPayload');
@@ -143,17 +149,50 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
 
         try {
-          // ⚠️ create acepta 3–5 args: quitamos el 6º (fileType)
-          await TranscriptionJobDB.create(
+          // Crea el job en DB (tu create acepta 3–5 args)
+          const jobRecord = await TranscriptionJobDB.create(
             userId,
             filename,
             blob.url,        // URL del Blob (se procesará/transcribirá por URL)
             language,
             fileSizeBytes
           );
-          console.log('[blob-upload] Job creado', { userId, filename, url: blob.url, fileType });
-        } catch (dbError) {
-          console.error('[blob-upload] Error guardando job en DB:', dbError);
+
+          // Obtiene el ID real del job desde el registro retornado
+          const jobId =
+            (jobRecord as any)?.id ||
+            (jobRecord as any)?._id ||
+            (jobRecord as any)?.jobId;
+
+          console.log('[blob-upload] Job creado', { userId, filename, url: blob.url, fileType, jobId });
+
+          // Dispara el evento correcto de Inngest para que empiece YA el procesamiento
+          if (fileType.startsWith('audio/') || fileType.startsWith('video/')) {
+            await inngest.send({
+              name: 'task/transcribe',
+              data: { jobId },
+            });
+            // (opcional): estado optimista
+            // await TranscriptionJobDB.updateStatus(jobId, 'transcribing');
+            console.log('[blob-upload] Evento enviado: task/transcribe', { jobId });
+          } else {
+            await inngest.send({
+              name: 'task/process-document',
+              data: {
+                jobId,
+                documentUrl: blob.url,
+                filename,
+                actions,
+                language,
+                summaryType,
+              },
+            });
+            // (opcional): estado optimista
+            // await TranscriptionJobDB.updateStatus(jobId, 'processing');
+            console.log('[blob-upload] Evento enviado: task/process-document', { jobId });
+          }
+        } catch (dbOrEventError) {
+          console.error('[blob-upload] Error tras crear job o enviar evento:', dbOrEventError);
         }
       },
     });
