@@ -40,9 +40,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success:false, message:'Faltan campos: url/filename/mime' }, { status:400 });
   }
 
-  const isAudio = AUDIO.includes(mime.toLowerCase());
-  const isVideo = VIDEO.includes(mime.toLowerCase());
-  const isDoc   = DOCS.includes(mime.toLowerCase());
+  const m = mime.toLowerCase();
+  const isAudio = AUDIO.includes(m);
+  const isVideo = VIDEO.includes(m);
+  const isDoc   = DOCS.includes(m);
   if (!isAudio && !isVideo && !isDoc) {
     return NextResponse.json({ success:false, message:`Tipo no permitido: ${mime}` }, { status:415 });
   }
@@ -60,9 +61,16 @@ export async function POST(req: NextRequest) {
     const jobId = (job as any)?.id || (job as any)?._id || (job as any)?.jobId;
     if (!jobId) throw new Error('No se pudo obtener jobId');
 
-    // Estado “en cola” para que la UI lo vea ya
+    // Estado “en cola” visible en la UI (usa 'pending' según tu tipo)
     await TranscriptionJobDB.updateStatus(jobId, 'pending');
-    await TranscriptionJobDB.updateResults(jobId, { enqueuedAt: new Date().toISOString(), mime, actions, summaryType });
+    await TranscriptionJobDB.updateResults(jobId, {
+      metadata: {
+        enqueuedAt: new Date().toISOString(),
+        mime,
+        actions,
+        summaryType,
+      },
+    });
 
     // 2) Disparar el evento correcto de Inngest (INMEDIATO)
     const tSend = Date.now();
@@ -70,14 +78,13 @@ export async function POST(req: NextRequest) {
 
     if (isAudio || isVideo) {
       sendResult = await inngest.send({ name: 'task/transcribe', data: { jobId } });
-      // (opcional) sensación de “arrancó”
-      await TranscriptionJobDB.updateStatus(jobId, 'transcribing');
+      // Estado optimista permitido por tu tipo:
+      await TranscriptionJobDB.updateStatus(jobId, 'processing');
     } else {
       sendResult = await inngest.send({
         name: 'task/process-document',
         data: { jobId, documentUrl: url, filename, actions, language, summaryType }
       });
-      // (opcional)
       await TranscriptionJobDB.updateStatus(jobId, 'processing');
     }
 
