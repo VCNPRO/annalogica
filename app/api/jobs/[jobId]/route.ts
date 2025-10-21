@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     if (!jobId) throw new Error('No se pudo obtener jobId');
 
     // Estado “en cola” para que la UI lo vea ya
-    await TranscriptionJobDB.updateStatus(jobId, 'queued');
+    await TranscriptionJobDB.updateStatus(jobId, 'pending');
     await TranscriptionJobDB.updateResults(jobId, { enqueuedAt: new Date().toISOString(), mime, actions, summaryType });
 
     // 2) Disparar el evento correcto de Inngest (INMEDIATO)
