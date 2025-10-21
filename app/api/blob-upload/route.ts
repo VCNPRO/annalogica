@@ -53,7 +53,7 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   try {
-    // ✅ FIX: handleUpload devuelve un objeto; lo devolvemos como JSON
+    // handleUpload devuelve un objeto (no Response); lo convertimos a JSON
     const result = await handleUpload({
       request,
       body,
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         if (!isAudio && !isVideo && !isDocument) {
           throw new Error(
-            'Tipo de archivo no permitido. Solo audio (MP3/WAV/OGG/M4A), vídeo (MP4/WEBM/MOV/AVI) o documentos (TXT/PDF/DOCX).'
+            'Tipo no permitido. Solo audio (MP3/WAV/OGG/M4A), vídeo (MP4/WEBM/MOV/AVI) o documentos (TXT/PDF/DOCX).'
           );
         }
 
@@ -107,11 +107,13 @@ export async function POST(request: NextRequest): Promise<Response> {
         return {
           allowedContentTypes,
           addRandomSuffix: true,
+          // Usa el mayor límite para que el SDK pueda validar bien en cliente
           maximumSizeInBytes: Math.max(
             MAX_FILE_SIZE_AUDIO,
             MAX_FILE_SIZE_VIDEO,
             MAX_FILE_SIZE_DOCUMENT
           ),
+          // Pasamos todo lo que necesitaremos en onUploadCompleted
           clientPayload: JSON.stringify({
             filename,
             type: fileType,
@@ -123,11 +125,8 @@ export async function POST(request: NextRequest): Promise<Response> {
       },
 
       onUploadCompleted: async ({ blob, tokenPayload }) => {
-        console.log('[blob-upload] onUploadCompleted', {
-          url: blob.url,
-          size: blob.size,
-          type: blob.contentType,
-        });
+        // OJO: algunas versiones de tipos no exponen blob.size ni blob.contentType
+        console.log('[blob-upload] onUploadCompleted', { url: blob.url });
 
         const payload =
           typeof tokenPayload === 'string' ? safeJsonParse(tokenPayload) : tokenPayload ?? {};
@@ -135,8 +134,10 @@ export async function POST(request: NextRequest): Promise<Response> {
         const userId = payload?.userId as string | undefined;
         const filename = String(payload?.filename ?? 'unknown');
         const language = String(payload?.language ?? 'auto');
-        const fileSizeBytes = Number(payload?.size ?? blob.size ?? 0);
-        const fileType = String(payload?.type ?? blob.contentType ?? '').toLowerCase();
+
+        // Usamos SIEMPRE los valores enviados en clientPayload
+        const fileSizeBytes = Number(payload?.size ?? 0);
+        const fileType = String(payload?.type ?? '').toLowerCase();
 
         if (!userId) {
           console.error('[blob-upload] Falta userId en tokenPayload');
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest): Promise<Response> {
           await TranscriptionJobDB.create(
             userId,
             filename,
-            blob.url,        // Usamos la URL del Blob para procesar/transcribir
+            blob.url,        // URL del Blob (se procesará/transcribirá por URL)
             language,
             fileSizeBytes,
             fileType
