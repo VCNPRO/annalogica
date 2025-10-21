@@ -5,15 +5,15 @@ import { unstable_noStore as noStore } from 'next/cache';
 
 export const runtime = 'nodejs';
 
-// ---- AUTH PLACEHOLDER (ajusta a tu sistema real) ----
+// --- AUTH placeholders (cámbialos por tu auth real) ---
 async function auth() { return { user: { id: 'admin-placeholder' } }; }
 async function getUserIsAdmin(userId: string) { return Boolean(userId); }
 
-// ---- CSV helpers (escape + mitigación CSV injection) ----
+// --- CSV helpers (escape + mitigación CSV injection) ---
 function mitigateCsvInjection(s: string): string {
   if (!s) return s;
-  const first = s[0];
-  return (first === '=' || first === '+' || first === '-' || first === '@' || first === '\t') ? `'` + s : s;
+  const c = s[0];
+  return (c === '=' || c === '+' || c === '-' || c === '@' || c === '\t') ? `'` + s : s;
 }
 function escapeCsvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
@@ -29,20 +29,11 @@ function rowsToCsv(rows: any[]): string {
   return `${head}\n${body}`;
 }
 
-// ---- Util para detectar si falta config de BD ----
+// --- DB env presence (mensaje claro si falta) ---
 function getDbUrlPresence() {
-  const candidates = [
-    'POSTGRES_URL',
-    'POSTGRES_URL_NON_POOLING',
-    'DATABASE_URL',
-    'DB_URL',
-    'POSTGRES_PRISMA_URL',
-    'POSTGRES_URL_NO_SSL',
-  ];
-  const presence: Record<string, 'SET' | 'MISSING'> = {};
-  for (const k of candidates) presence[k] = process.env[k] ? 'SET' : 'MISSING';
-  const anySet = Object.values(presence).includes('SET');
-  return { anySet, presence };
+  const keys = ['POSTGRES_URL','POSTGRES_URL_NON_POOLING','DATABASE_URL','DB_URL','POSTGRES_PRISMA_URL','POSTGRES_URL_NO_SSL'];
+  const presence = Object.fromEntries(keys.map(k => [k, process.env[k] ? 'SET' : 'MISSING'])) as Record<string,'SET'|'MISSING'>;
+  return { presence, anySet: Object.values(presence).includes('SET') };
 }
 
 export async function GET(request: Request) {
@@ -54,87 +45,78 @@ export async function GET(request: Request) {
   const isAdmin = await getUserIsAdmin(session.user.id);
   if (!isAdmin) return new Response('Acceso denegado', { status: 403 });
 
-  // 2) Variables de entorno de BD
-  const { anySet, presence } = getDbUrlPresence();
+  // 2) Comprobar variables BD
+  const { presence, anySet } = getDbUrlPresence();
   if (!anySet) {
-    console.error('[admin/export] No DB env set:', presence);
-    return NextResponse.json(
-      { error: 'BD no configurada. Faltan variables de conexión', details: presence },
-      { status: 500 }
-    );
+    console.error('[admin/export] Missing DB env:', presence);
+    return NextResponse.json({ error: 'BD no configurada', details: presence }, { status: 500 });
   }
 
-  // 3) Filtros
+  // 3) Filtros (permiten null)
   const url = new URL(request.url);
-  const status = url.searchParams.get('status') || undefined;
-  const from = url.searchParams.get('from') || undefined; // YYYY-MM-DD
-  const to   = url.searchParams.get('to')   || undefined; // YYYY-MM-DD
-  const limit = Math.min(Math.max(Number(url.searchParams.get('limit') || 5000), 1), 10000);
+  const status = url.searchParams.get('status');           // string | null
+  const from   = url.searchParams.get('from');             // YYYY-MM-DD | null
+  const to     = url.searchParams.get('to');               // YYYY-MM-DD | null
+  const limitQ = Number(url.searchParams.get('limit') || 5000);
+  const limit  = Math.min(Math.max(limitQ, 1), 10000);
 
   try {
     // 4) Ping de conectividad
-    await sql`SELECT 1 as ok`;
+    await sql`SELECT 1`;
 
-    // 5) Construir condiciones
-    const conds: any[] = [];
-    if (status) conds.push(sql`t.status = ${status}`);
-    if (from)   conds.push(sql`t.created_at >= ${from}`);
-    if (to)     conds.push(sql`t.created_at <= ${to}`);
-    const whereClause = conds.length ? sql`WHERE ${sql.join(conds, sql` AND `)}` : sql``;
-
-    // 6) Intento 1: con LEFT JOIN users (si existe)
-    const baseQuery = sql`
-      SELECT 
-        t.id,
-        u.email        AS user_email,
-        t.filename,
-        t.status,
-        t.created_at,
-        t.audio_duration,
-        t.total_cost_usd,
-        t.metadata->>'error' AS error_message
-      FROM transcription_jobs t
-      LEFT JOIN users u ON u.id = t.user_id
-      ${whereClause}
-      ORDER BY t.created_at DESC
-      LIMIT ${limit};
-    `;
-
+    // 5) Consulta con WHERE parametrizado SIEMPRE VÁLIDO
+    // (${status}::text IS NULL OR t.status = ${status})
+    // (${from}::timestamptz IS NULL OR t.created_at >= ${from})
+    // (${to}::timestamptz IS NULL OR t.created_at <= ${to})
     let rows: any[] = [];
     try {
-      const r = await baseQuery;
+      const r = await sql`
+        SELECT 
+          t.id,
+          u.email        AS user_email,
+          t.filename,
+          t.status,
+          t.created_at,
+          t.audio_duration,
+          t.total_cost_usd,
+          t.metadata->>'error' AS error_message
+        FROM transcription_jobs t
+        LEFT JOIN users u ON u.id = t.user_id
+        WHERE (${status}::text IS NULL OR t.status = ${status})
+          AND (${from}::timestamptz IS NULL OR t.created_at >= ${from})
+          AND (${to}::timestamptz IS NULL OR t.created_at <= ${to})
+        ORDER BY t.created_at DESC
+        LIMIT ${limit};
+      `;
       rows = r.rows;
-    } catch (err: any) {
-      // Tabla/columna inexistente → reintentar sin users
-      const code = err?.code || err?.errno || err?.name;
-      console.error('[admin/export] Query attempt 1 failed:', { code, message: err?.message });
-      // 42P01 = undefined_table, 42703 = undefined_column (Postgres)
-      if (code === '42P01' || code === '42703' || /undefined_table|relation .* does not exist/i.test(err?.message)) {
-        const fallback = await sql`
-          SELECT
-            t.id,
-            t.filename,
-            t.status,
-            t.created_at,
-            t.audio_duration,
-            t.total_cost_usd,
-            t.metadata->>'error' AS error_message
-          FROM transcription_jobs t
-          ${whereClause}
-          ORDER BY t.created_at DESC
-          LIMIT ${limit};
-        `;
-        rows = fallback.rows;
-      } else {
-        throw err; // otro tipo de error → propagar
-      }
+    } catch (e: any) {
+      // Si falla por tabla/columna de users inexistente, reintenta sin JOIN
+      const code = e?.code;
+      console.error('[admin/export] Attempt with users join failed:', { code, message: e?.message });
+      const fb = await sql`
+        SELECT 
+          t.id,
+          t.filename,
+          t.status,
+          t.created_at,
+          t.audio_duration,
+          t.total_cost_usd,
+          t.metadata->>'error' AS error_message
+        FROM transcription_jobs t
+        WHERE (${status}::text IS NULL OR t.status = ${status})
+          AND (${from}::timestamptz IS NULL OR t.created_at >= ${from})
+          AND (${to}::timestamptz IS NULL OR t.created_at <= ${to})
+        ORDER BY t.created_at DESC
+        LIMIT ${limit};
+      `;
+      rows = fb.rows;
     }
 
-    // 7) CSV
+    // 6) CSV
     const csv = rowsToCsv(rows);
-    const BOM = '\uFEFF';
-    const out = BOM + csv;
+    const out = '\uFEFF' + csv; // BOM para Excel
 
+    // 7) Respuesta
     const now = new Date();
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -143,20 +125,13 @@ export async function GET(request: Request) {
       'Content-Type': 'text/csv; charset=utf-8',
       'Content-Disposition': `attachment; filename="annalogica_export_${yyyy}-${mm}-${dd}.csv"`,
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-      Pragma: 'no-cache',
-      Expires: '0',
+      'Pragma': 'no-cache',
+      'Expires': '0',
     });
 
     return new Response(out, { status: 200, headers });
   } catch (error: any) {
-    console.error('[admin/export] Error al generar el CSV:', {
-      message: error?.message,
-      code: error?.code,
-      stack: error?.stack,
-    });
-    return NextResponse.json(
-      { error: 'Error interno del servidor al generar el CSV' },
-      { status: 500 }
-    );
+    console.error('[admin/export] Error al generar el CSV:', { message: error?.message, code: error?.code, stack: error?.stack });
+    return NextResponse.json({ error: 'Error interno del servidor al generar el CSV' }, { status: 500 });
   }
 }
