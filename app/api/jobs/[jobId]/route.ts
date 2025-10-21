@@ -23,18 +23,22 @@ type QueueBody = {
 
 /* =========================
    GET -> estado por jobId
-   (usar Request + context.params en Next 15)
+   (usamos tipos flexibles para evitar el error de compilación)
    ========================= */
-export async function GET(
-  _req: Request,
-  context: { params: { jobId: string } }
-) {
+export async function GET(_req: Request, context: any) {
   try {
-    const { jobId } = context.params;
+    const jobId: string | undefined =
+      context?.params?.jobId ?? context?.params?.id ?? context?.jobId;
+
+    if (!jobId) {
+      return NextResponse.json({ error: 'missing_jobId' }, { status: 400 });
+    }
+
     const job = await TranscriptionJobDB.findById(jobId);
     if (!job) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
+
     return NextResponse.json({
       id: jobId,
       status: job.status,                // 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed'
@@ -49,7 +53,6 @@ export async function GET(
 
 /* =========================
    POST -> encola un job nuevo
-   (podemos seguir usando NextRequest)
    ========================= */
 export async function POST(req: NextRequest) {
   // Autenticación
