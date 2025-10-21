@@ -20,7 +20,7 @@ const saveTextToFile = async (text: string, baseFilename: string, extension: str
   const timestamp = Date.now();
   const filename = `${timestamp}-${baseFilename.replace(/\.[^/.]+$/, '')}-annalogica.${extension}`;
   // Body REAL: Blob con content-type correcto
-  const body = new Blob([text], { type: 'text/plain; charset=utf-8' });
+  const body = Buffer.from(text, "utf-8") 
 
   const blob = await put(
     filename,
