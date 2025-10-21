@@ -1,4 +1,4 @@
-// app/api/jobs/queue/route.ts
+// app/api/jobs/[jobId]/route.ts
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -6,38 +6,73 @@ import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client';
 
-// Tipos admitidos
+/**
+ * Este endpoint soporta:
+ * - POST /api/jobs/[jobId]  -> ENCOLAR un nuevo job (ignora [jobId] del path; devuelve jobId real)
+ *   Body: { url, filename, mime, size?, language?, actions?, summaryType? }
+ * - GET  /api/jobs/[jobId]  -> ESTADO de un job existente
+ *
+ * Motivo de mantenerlo aquí: no cambiamos tu estructura de rutas.
+ */
+
+// Tipos admitidos (coinciden con el resto del backend)
 const AUDIO = ['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/ogg','audio/webm','audio/mp4','audio/m4a','audio/x-m4a'];
 const VIDEO = ['video/mp4','video/mpeg','video/webm','video/quicktime','video/x-msvideo'];
 const DOCS  = ['text/plain','application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
 
 type QueueBody = {
-  url: string;           // Blob público (p.ej. https://...public.blob.vercel-storage.com/...)
+  url: string;
   filename: string;
   mime: string;
   size?: number;
-  language?: string;     // 'auto' por defecto
-  actions?: string[];    // ['Transcribir','Resumir','Subtítulos','Oradores'] etc.
-  summaryType?: string;  // p.ej. 'detailed'
+  language?: string;
+  actions?: string[];
+  summaryType?: string;
 };
 
-export async function POST(req: NextRequest) {
-  // Auth
-  const auth = verifyRequestAuth(req);
-  if (!auth) return NextResponse.json({ success:false, message:'No autenticado' }, { status:401 });
+/* =========================
+   GET -> estado por jobId
+   ========================= */
+export async function GET(_req: NextRequest, { params }: { params: { jobId: string } }) {
+  try {
+    const job = await TranscriptionJobDB.findById(params.jobId);
+    if (!job) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    return NextResponse.json({
+      id: params.jobId,
+      status: job.status,                // 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed'
+      progress: job.progress ?? undefined,
+      error: job.metadata?.error ?? null,
+      updatedAt: job.updated_at ? new Date(job.updated_at).toISOString() : undefined,
+    });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'status_error' }, { status: 500 });
+  }
+}
 
+/* =========================
+   POST -> encola un job nuevo
+   ========================= */
+export async function POST(req: NextRequest) {
+  // Autenticación
+  const auth = verifyRequestAuth(req);
+  if (!auth) {
+    return NextResponse.json({ success: false, message: 'No autenticado' }, { status: 401 });
+  }
+
+  // Carga body
   let body: QueueBody;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ success:false, message:'JSON inválido' }, { status:400 });
+    return NextResponse.json({ success: false, message: 'JSON inválido' }, { status: 400 });
   }
 
+  // Validación básica
   const { url, filename, mime, size = 0, language = 'auto', actions = [], summaryType } = body;
-
-  // Validaciones mínimas
   if (!url || !filename || !mime) {
-    return NextResponse.json({ success:false, message:'Faltan campos: url/filename/mime' }, { status:400 });
+    return NextResponse.json({ success: false, message: 'Faltan campos: url/filename/mime' }, { status: 400 });
   }
 
   const m = mime.toLowerCase();
@@ -45,23 +80,17 @@ export async function POST(req: NextRequest) {
   const isVideo = VIDEO.includes(m);
   const isDoc   = DOCS.includes(m);
   if (!isAudio && !isVideo && !isDoc) {
-    return NextResponse.json({ success:false, message:`Tipo no permitido: ${mime}` }, { status:415 });
+    return NextResponse.json({ success: false, message: `Tipo no permitido: ${mime}` }, { status: 415 });
   }
 
   try {
-    // 1) Crear el job en DB
-    const tCreate = Date.now();
-    const job = await TranscriptionJobDB.create(
-      auth.userId,
-      filename,
-      url,            // URL del Blob
-      language,
-      size
-    );
+    // 1) Crear job en DB (usa tu firma existente de 3–5 args)
+    const job = await TranscriptionJobDB.create(auth.userId, filename, url, language, size);
     const jobId = (job as any)?.id || (job as any)?._id || (job as any)?.jobId;
     if (!jobId) throw new Error('No se pudo obtener jobId');
 
-    // Estado “en cola” visible en la UI (usa 'pending' según tu tipo)
+    // 2) Estado inicial visible para la UI
+    //    (IMPORTANTE: usa estados que tu tipo admite: 'pending' y 'processing')
     await TranscriptionJobDB.updateStatus(jobId, 'pending');
     await TranscriptionJobDB.updateResults(jobId, {
       metadata: {
@@ -72,38 +101,29 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 2) Disparar el evento correcto de Inngest (INMEDIATO)
-    const tSend = Date.now();
-    let sendResult: unknown;
-
+    // 3) Disparar evento Inngest inmediatamente (audio/video vs docs)
     if (isAudio || isVideo) {
-      sendResult = await inngest.send({ name: 'task/transcribe', data: { jobId } });
-      // Estado optimista permitido por tu tipo:
-      await TranscriptionJobDB.updateStatus(jobId, 'processing');
+      await inngest.send({ name: 'task/transcribe', data: { jobId } });
     } else {
-      sendResult = await inngest.send({
+      await inngest.send({
         name: 'task/process-document',
-        data: { jobId, documentUrl: url, filename, actions, language, summaryType }
+        data: { jobId, documentUrl: url, filename, actions, language, summaryType },
       });
-      await TranscriptionJobDB.updateStatus(jobId, 'processing');
     }
 
-    console.log('[queue] job created + event sent', {
-      jobId,
-      mime,
-      t_create_ms: tSend - tCreate,
-      t_send_ms: Date.now() - tSend,
-      sendResult
-    });
+    // 4) Hint optimista: pasa a 'processing' para que la barra arranque ya
+    await TranscriptionJobDB.updateStatus(jobId, 'processing');
 
-    return NextResponse.json({
-      success: true,
-      message: 'Job creado y encolado',
-      data: { jobId, mime, queuedAt: new Date().toISOString() }
-    }, { status: 201 });
-
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Job creado y encolado',
+        data: { jobId, mime, queuedAt: new Date().toISOString() },
+      },
+      { status: 201 }
+    );
   } catch (e: any) {
-    console.error('[queue] error', e?.message || e);
-    return NextResponse.json({ success:false, message:e?.message || 'Error encolar job' }, { status:500 });
+    console.error('[jobs/[jobId]] enqueue error:', e?.message || e);
+    return NextResponse.json({ success: false, message: e?.message || 'Error encolar job' }, { status: 500 });
   }
 }
