@@ -107,13 +107,12 @@ export async function POST(request: NextRequest): Promise<Response> {
         return {
           allowedContentTypes,
           addRandomSuffix: true,
-          // Usa el mayor límite para que el SDK pueda validar bien en cliente
           maximumSizeInBytes: Math.max(
             MAX_FILE_SIZE_AUDIO,
             MAX_FILE_SIZE_VIDEO,
             MAX_FILE_SIZE_DOCUMENT
           ),
-          // Pasamos todo lo que necesitaremos en onUploadCompleted
+          // Pasamos info necesaria para onUploadCompleted
           clientPayload: JSON.stringify({
             filename,
             type: fileType,
@@ -125,7 +124,6 @@ export async function POST(request: NextRequest): Promise<Response> {
       },
 
       onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // OJO: algunas versiones de tipos no exponen blob.size ni blob.contentType
         console.log('[blob-upload] onUploadCompleted', { url: blob.url });
 
         const payload =
@@ -135,7 +133,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         const filename = String(payload?.filename ?? 'unknown');
         const language = String(payload?.language ?? 'auto');
 
-        // Usamos SIEMPRE los valores enviados en clientPayload
+        // Usamos los valores enviados en clientPayload (compatibles con tipos del SDK)
         const fileSizeBytes = Number(payload?.size ?? 0);
         const fileType = String(payload?.type ?? '').toLowerCase();
 
@@ -145,13 +143,13 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
 
         try {
+          // ⚠️ create acepta 3–5 args: quitamos el 6º (fileType)
           await TranscriptionJobDB.create(
             userId,
             filename,
             blob.url,        // URL del Blob (se procesará/transcribirá por URL)
             language,
-            fileSizeBytes,
-            fileType
+            fileSizeBytes
           );
           console.log('[blob-upload] Job creado', { userId, filename, url: blob.url, fileType });
         } catch (dbError) {
