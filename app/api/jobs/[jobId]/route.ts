@@ -1,14 +1,14 @@
 // DÓNDE: app/api/jobs/[jobId]/route.ts
-// VERSIÓN CORREGIDA: Se ajusta la firma de la función GET a las especificaciones de Next.js.
+// VERSIÓN CORREGIDA: Se ajusta la firma de la función GET a la sintaxis alternativa de Next.js.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { unstable_noStore as noStore } from 'next/cache';
 
-// --- FIRMA DE LA FUNCIÓN CORREGIDA ---
-// Cambiamos la desestructuración '{ params }' por un objeto 'context' completo.
-export async function GET(request: NextRequest, context: { params: { jobId: string } }) {
+// --- FIRMA DE LA FUNCIÓN CORREGIDA (VERSIÓN ALTERNATIVA) ---
+// Cambiamos 'context' por la desestructuración directa '{ params }'
+export async function GET(request: NextRequest, { params }: { params: { jobId: string } }) {
   noStore(); // Asegura que siempre obtenemos el estado más reciente del trabajo
 
   try {
@@ -19,8 +19,8 @@ export async function GET(request: NextRequest, context: { params: { jobId: stri
     }
 
     // --- LÍNEA CORREGIDA ---
-    // Ahora usamos 'context.params' para acceder al jobId
-    const { jobId } = context.params;
+    // Ahora usamos 'params' directamente en lugar de 'context.params'
+    const { jobId } = params;
     if (!jobId) {
       return NextResponse.json({ error: 'jobId es requerido' }, { status: 400 });
     }
@@ -51,8 +51,8 @@ export async function GET(request: NextRequest, context: { params: { jobId: stri
 
   } catch (error: any) {
     // --- LÍNEA CORREGIDA ---
-    // Usamos 'context.params.jobId' para el log de error
-    console.error(`[API Job Getter /api/jobs/${context.params.jobId}] Error:`, error);
+    // Usamos 'params.jobId' para el log de error
+    console.error(`[API Job Getter /api/jobs/${params.jobId}] Error:`, error);
     return NextResponse.json({ error: error.message || 'Error interno al obtener el estado del trabajo' }, { status: 500 });
   }
 }
