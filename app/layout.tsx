@@ -1,48 +1,27 @@
-import type { Metadata } from "next";
-import { Orbitron } from "next/font/google";
-import "./globals.css";
-
-const orbitron = Orbitron({
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-orbitron",
-});
+// app/layout.tsx
+import type { Metadata } from 'next';
+import I18nProvider from './providers/I18nProvider';
 
 export const metadata: Metadata = {
-  title: "Anna Logica - Procesamiento IA",
-  description: "Procesamiento inteligente de archivos multimedia",
+  title: 'anna-codice',
+  description: 'Plataforma anna-codice',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
+  // Por ahora fijamos el idioma manualmente.
+  // Más adelante lo podremos detectar por URL o cabeceras.
+  const locale: 'es' | 'en' = 'es';
+
   return (
-    <html lang="es" className={`${orbitron.variable}`}>
+    <html lang={locale}>
       <body>
-        {children}
-        <footer className="bg-slate-900 text-gray-300 py-6 px-4 mt-auto">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <p className="text-sm">
-              © 2025 Annalogica. Todos los derechos reservados.
-            </p>
-            <div className="flex gap-6 text-sm">
-              <a href="/privacy" className="text-white hover:text-gray-300 transition-colors">
-                Privacidad
-              </a>
-              <a href="/terms" className="text-white hover:text-gray-300 transition-colors">
-                Términos
-              </a>
-              <a href="mailto:legal@annalogica.eu" className="text-white hover:text-gray-300 transition-colors">
-                Contacto
-              </a>
-            </div>
-            <p className="text-sm">
-              soporte@annalogica.eu
-            </p>
-          </div>
-        </footer>
+        <I18nProvider locale={locale}>
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );
