@@ -1,65 +1,102 @@
-// DÓNDE: app/api/jobs/[jobId]/route.ts
-// VERSIÓN FINAL — Compatible con Next.js 15.5.4 y Vercel
+// app/api/jobs/queue/route.ts
+export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
-import { unstable_noStore as noStore } from 'next/cache';
+import { inngest } from '@/lib/inngest/client';
 
-export async function GET(request: NextRequest, context: any) {
-  // Evita caché, asegura estado actualizado del trabajo
-  noStore();
+// Tipos admitidos
+const AUDIO = ['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/ogg','audio/webm','audio/mp4','audio/m4a','audio/x-m4a'];
+const VIDEO = ['video/mp4','video/mpeg','video/webm','video/quicktime','video/x-msvideo'];
+const DOCS  = ['text/plain','application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+
+type QueueBody = {
+  url: string;           // Blob público (p.ej. https://...public.blob.vercel-storage.com/...)
+  filename: string;
+  mime: string;
+  size?: number;
+  language?: string;     // 'auto' por defecto
+  actions?: string[];    // ['Transcribir','Resumir','Subtítulos','Oradores'] etc.
+  summaryType?: string;  // p.ej. 'detailed'
+};
+
+export async function POST(req: NextRequest) {
+  // Auth
+  const auth = verifyRequestAuth(req);
+  if (!auth) return NextResponse.json({ success:false, message:'No autenticado' }, { status:401 });
+
+  let body: QueueBody;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ success:false, message:'JSON inválido' }, { status:400 });
+  }
+
+  const { url, filename, mime, size = 0, language = 'auto', actions = [], summaryType } = body;
+
+  // Validaciones mínimas
+  if (!url || !filename || !mime) {
+    return NextResponse.json({ success:false, message:'Faltan campos: url/filename/mime' }, { status:400 });
+  }
+
+  const isAudio = AUDIO.includes(mime.toLowerCase());
+  const isVideo = VIDEO.includes(mime.toLowerCase());
+  const isDoc   = DOCS.includes(mime.toLowerCase());
+  if (!isAudio && !isVideo && !isDoc) {
+    return NextResponse.json({ success:false, message:`Tipo no permitido: ${mime}` }, { status:415 });
+  }
 
   try {
-    // 1. Verificar autenticación
-    const user = await verifyRequestAuth(request);
-    if (!user) {
-      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-    }
-
-    // 2. Obtener el parámetro dinámico jobId
-    const { jobId } = context.params || {};
-    if (!jobId) {
-      return NextResponse.json({ error: 'jobId es requerido' }, { status: 400 });
-    }
-
-    // 3. Buscar el trabajo en la base de datos
-    const job = await TranscriptionJobDB.findById(jobId);
-    if (!job || job.user_id !== user.userId) {
-      return NextResponse.json(
-        { error: 'Trabajo no encontrado o no autorizado' },
-        { status: 404 }
-      );
-    }
-
-    // 4. Construir respuesta segura
-    const safeJobResponse = {
-      id: job.id,
-      status: job.status,
-      filename: job.filename,
-      created_at: job.created_at,
-
-      txtUrl: job.txt_url || undefined,
-      srtUrl: job.srt_url || undefined,
-      vttUrl: job.vtt_url || undefined,
-      summaryUrl: job.summary_url || undefined,
-
-      error: job.metadata?.error || null,
-      metadata: job.metadata,
-    };
-
-    return NextResponse.json({ job: safeJobResponse });
-  } catch (error: unknown) {
-    console.error(
-      `[API Job Getter /api/jobs/${context?.params?.jobId ?? 'unknown'}] Error:`,
-      error
+    // 1) Crear el job en DB
+    const tCreate = Date.now();
+    const job = await TranscriptionJobDB.create(
+      auth.userId,
+      filename,
+      url,            // URL del Blob
+      language,
+      size
     );
+    const jobId = (job as any)?.id || (job as any)?._id || (job as any)?.jobId;
+    if (!jobId) throw new Error('No se pudo obtener jobId');
 
-    const message =
-      error instanceof Error
-        ? error.message
-        : 'Error interno al obtener el estado del trabajo';
+    // Estado “en cola” para que la UI lo vea ya
+    await TranscriptionJobDB.updateStatus(jobId, 'queued');
+    await TranscriptionJobDB.updateResults(jobId, { enqueuedAt: new Date().toISOString(), mime, actions, summaryType });
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    // 2) Disparar el evento correcto de Inngest (INMEDIATO)
+    const tSend = Date.now();
+    let sendResult: unknown;
+
+    if (isAudio || isVideo) {
+      sendResult = await inngest.send({ name: 'task/transcribe', data: { jobId } });
+      // (opcional) sensación de “arrancó”
+      await TranscriptionJobDB.updateStatus(jobId, 'transcribing');
+    } else {
+      sendResult = await inngest.send({
+        name: 'task/process-document',
+        data: { jobId, documentUrl: url, filename, actions, language, summaryType }
+      });
+      // (opcional)
+      await TranscriptionJobDB.updateStatus(jobId, 'processing');
+    }
+
+    console.log('[queue] job created + event sent', {
+      jobId,
+      mime,
+      t_create_ms: tSend - tCreate,
+      t_send_ms: Date.now() - tSend,
+      sendResult
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Job creado y encolado',
+      data: { jobId, mime, queuedAt: new Date().toISOString() }
+    }, { status: 201 });
+
+  } catch (e: any) {
+    console.error('[queue] error', e?.message || e);
+    return NextResponse.json({ success:false, message:e?.message || 'Error encolar job' }, { status:500 });
   }
 }
