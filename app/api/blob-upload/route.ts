@@ -39,7 +39,7 @@ const ALLOWED_DOCUMENT_TYPES = [
 ];
 
 export async function POST(request: NextRequest): Promise<Response> {
-  // Autenticación (ajusta a tu lógica)
+  // Autenticación
   const auth = verifyRequestAuth(request);
   if (!auth) {
     return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
@@ -53,13 +53,12 @@ export async function POST(request: NextRequest): Promise<Response> {
   }
 
   try {
-    // IMPORTANTÍSIMO: devolvemos la Response de handleUpload TAL CUAL
-    return await handleUpload({
+    // ✅ FIX: handleUpload devuelve un objeto; lo devolvemos como JSON
+    const result = await handleUpload({
       request,
       body,
 
       onBeforeGenerateToken: async (_pathname, clientPayload) => {
-        // Normalizamos el payload del cliente (ahí suele venir size/type/filename/language)
         const payload =
           typeof clientPayload === 'string' ? safeJsonParse(clientPayload) : clientPayload ?? {};
 
@@ -99,14 +98,12 @@ export async function POST(request: NextRequest): Promise<Response> {
           throw new Error(`El archivo de ${label} es demasiado grande. Límite: ${maxMB} MB`);
         }
 
-        // Construimos lista total de tipos aceptados
         const allowedContentTypes = [
           ...ALLOWED_AUDIO_TYPES,
           ...ALLOWED_VIDEO_TYPES,
           ...ALLOWED_DOCUMENT_TYPES,
         ];
 
-        // OJO: devolvemos el token config; máximo por seguridad: el mayor límite
         return {
           allowedContentTypes,
           addRandomSuffix: true,
@@ -115,7 +112,6 @@ export async function POST(request: NextRequest): Promise<Response> {
             MAX_FILE_SIZE_VIDEO,
             MAX_FILE_SIZE_DOCUMENT
           ),
-          // Guardamos info necesaria para onUploadCompleted
           clientPayload: JSON.stringify({
             filename,
             type: fileType,
@@ -127,7 +123,11 @@ export async function POST(request: NextRequest): Promise<Response> {
       },
 
       onUploadCompleted: async ({ blob, tokenPayload }) => {
-        console.log('[blob-upload] onUploadCompleted', { url: blob.url, size: blob.size, type: blob.contentType });
+        console.log('[blob-upload] onUploadCompleted', {
+          url: blob.url,
+          size: blob.size,
+          type: blob.contentType,
+        });
 
         const payload =
           typeof tokenPayload === 'string' ? safeJsonParse(tokenPayload) : tokenPayload ?? {};
@@ -140,16 +140,14 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         if (!userId) {
           console.error('[blob-upload] Falta userId en tokenPayload');
-          return; // si prefieres, lanza error para bloquear el flujo
+          return;
         }
 
         try {
-          // Creamos SIEMPRE un "job" de transcripción/ingesta; MP4/MP3 se transcriben por URL.
-          // Si es documento, tu pipeline de documentos lo consumirá igual desde la URL.
           await TranscriptionJobDB.create(
             userId,
             filename,
-            blob.url,        // URL segura del Blob (se transcribe/parsea por URL)
+            blob.url,        // Usamos la URL del Blob para procesar/transcribir
             language,
             fileSizeBytes,
             fileType
@@ -160,9 +158,10 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
       },
     });
+
+    return NextResponse.json(result, { status: 200 });
   } catch (error: any) {
     console.error('[blob-upload] Error:', error?.message ?? error);
-    // handleUpload ya devuelve respuestas adecuadas; aquí solo errores “externos”
     return NextResponse.json(
       { error: error?.message ?? 'Upload error' },
       { status: 400 }
