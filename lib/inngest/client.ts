@@ -1,8 +1,8 @@
-import { Inngest } from 'inngest';
+// lib/inngest/clients.ts
+import { Inngest } from "inngest";
 
-// Create Inngest client
 export const inngest = new Inngest({
-  id: 'annalogica',
-  name: 'Annalogica Transcription Service',
-  eventKey: process.env.INNGEST_EVENT_KEY, // Required for production
+  id: "annalogica",
+  eventKey: process.env.INNGEST_EVENT_KEY,
+  signingKey: process.env.INNGEST_SIGNING_KEY,
 });
