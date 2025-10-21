@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { RefreshCw, Trash2, Sun, Moon, BookOpen, LogOut } from 'lucide-react
+import { RefreshCw, Trash2, Sun, Moon, BookOpen, LogOut } from 'lucide-react';
 import jsPDF from 'jspdf';
 
 // AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
-type FileStatus = 'uploading' | 'pending' | 'processing' | 'completed' | 'er
+type FileStatus = 'uploading' | 'pending' | 'processing' | 'completed' | 'error';
 
 interface UploadedFile {
 id: string;
