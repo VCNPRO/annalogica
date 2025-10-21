@@ -1,19 +1,14 @@
 // DÓNDE: app/api/jobs/[jobId]/route.ts
-// VERSIÓN CORREGIDA Y COMENTADA
+// VERSIÓN FINAL — Compatible con Next.js 15.5.4 y Vercel
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { unstable_noStore as noStore } from 'next/cache';
 
-// --- FIRMA DE FUNCIÓN ROBUSTA ---
-// Si no usas TypeScript estricto, `context: any` está bien.
-// Pero si sí, mejor usar: { params: { jobId: string } }
-export async function GET(
-  request: NextRequest,
-  context: { params: { jobId?: string } } // <-- Tipado más preciso
-) {
-  noStore(); // Evita la caché y fuerza obtener el estado más reciente
+export async function GET(request: NextRequest, context: any) {
+  // Evita caché, asegura estado actualizado del trabajo
+  noStore();
 
   try {
     // 1. Verificar autenticación
@@ -23,7 +18,7 @@ export async function GET(
     }
 
     // 2. Obtener el parámetro dinámico jobId
-    const jobId = context.params?.jobId;
+    const { jobId } = context.params || {};
     if (!jobId) {
       return NextResponse.json({ error: 'jobId es requerido' }, { status: 400 });
     }
@@ -37,7 +32,7 @@ export async function GET(
       );
     }
 
-    // 4. Respuesta segura (evita exponer campos sensibles)
+    // 4. Construir respuesta segura
     const safeJobResponse = {
       id: job.id,
       status: job.status,
@@ -56,7 +51,7 @@ export async function GET(
     return NextResponse.json({ job: safeJobResponse });
   } catch (error: unknown) {
     console.error(
-      `[API Job Getter /api/jobs/${context.params?.jobId ?? 'unknown'}] Error:`,
+      `[API Job Getter /api/jobs/${context?.params?.jobId ?? 'unknown'}] Error:`,
       error
     );
 
