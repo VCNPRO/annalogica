@@ -6,16 +6,7 @@ import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client';
 
-/**
- * Este endpoint soporta:
- * - POST /api/jobs/[jobId]  -> ENCOLAR un nuevo job (ignora [jobId] del path; devuelve jobId real)
- *   Body: { url, filename, mime, size?, language?, actions?, summaryType? }
- * - GET  /api/jobs/[jobId]  -> ESTADO de un job existente
- *
- * Motivo de mantenerlo aquí: no cambiamos tu estructura de rutas.
- */
-
-// Tipos admitidos (coinciden con el resto del backend)
+// Tipos admitidos
 const AUDIO = ['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/ogg','audio/webm','audio/mp4','audio/m4a','audio/x-m4a'];
 const VIDEO = ['video/mp4','video/mpeg','video/webm','video/quicktime','video/x-msvideo'];
 const DOCS  = ['text/plain','application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
@@ -32,15 +23,20 @@ type QueueBody = {
 
 /* =========================
    GET -> estado por jobId
+   (usar Request + context.params en Next 15)
    ========================= */
-export async function GET(_req: NextRequest, { params }: { params: { jobId: string } }) {
+export async function GET(
+  _req: Request,
+  context: { params: { jobId: string } }
+) {
   try {
-    const job = await TranscriptionJobDB.findById(params.jobId);
+    const { jobId } = context.params;
+    const job = await TranscriptionJobDB.findById(jobId);
     if (!job) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
     return NextResponse.json({
-      id: params.jobId,
+      id: jobId,
       status: job.status,                // 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed'
       progress: job.progress ?? undefined,
       error: job.metadata?.error ?? null,
@@ -53,6 +49,7 @@ export async function GET(_req: NextRequest, { params }: { params: { jobId: stri
 
 /* =========================
    POST -> encola un job nuevo
+   (podemos seguir usando NextRequest)
    ========================= */
 export async function POST(req: NextRequest) {
   // Autenticación
@@ -84,13 +81,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1) Crear job en DB (usa tu firma existente de 3–5 args)
+    // 1) Crear job en DB
     const job = await TranscriptionJobDB.create(auth.userId, filename, url, language, size);
     const jobId = (job as any)?.id || (job as any)?._id || (job as any)?.jobId;
     if (!jobId) throw new Error('No se pudo obtener jobId');
 
     // 2) Estado inicial visible para la UI
-    //    (IMPORTANTE: usa estados que tu tipo admite: 'pending' y 'processing')
     await TranscriptionJobDB.updateStatus(jobId, 'pending');
     await TranscriptionJobDB.updateResults(jobId, {
       metadata: {
@@ -101,7 +97,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 3) Disparar evento Inngest inmediatamente (audio/video vs docs)
+    // 3) Disparar evento Inngest inmediatamente
     if (isAudio || isVideo) {
       await inngest.send({ name: 'task/transcribe', data: { jobId } });
     } else {
