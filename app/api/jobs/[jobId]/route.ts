@@ -6,7 +6,6 @@ import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client';
 
-// Tipos admitidos
 const AUDIO = ['audio/mpeg','audio/mp3','audio/wav','audio/x-wav','audio/ogg','audio/webm','audio/mp4','audio/m4a','audio/x-m4a'];
 const VIDEO = ['video/mp4','video/mpeg','video/webm','video/quicktime','video/x-msvideo'];
 const DOCS  = ['text/plain','application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
@@ -23,13 +22,13 @@ type QueueBody = {
 
 /* =========================
    GET -> estado por jobId
+   (⚠️ sin tipar el segundo argumento para evitar el error)
    ========================= */
-export async function GET(
-  _req: Request,
-  context: { params: { jobId: string } }
-): Promise<Response> {
+export async function GET(_req: Request, context: any) {
   try {
-    const jobId = context?.params?.jobId;
+    const jobId: string | undefined =
+      context?.params?.jobId ?? context?.params?.id ?? context?.jobId;
+
     if (!jobId) {
       return NextResponse.json(
         { error: 'missing_jobId', id: null, status: null, metadata: {} },
@@ -45,16 +44,15 @@ export async function GET(
       );
     }
 
-    // Siempre devolver metadata (aunque sea objeto vacío) para no romper el cliente
     const metadata = job.metadata ?? {};
     const progress =
       typeof metadata.progress === 'number' ? metadata.progress : undefined;
 
     return NextResponse.json({
       id: jobId,
-      status: job.status, // 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed'
+      status: job.status,       // 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed'
       progress,
-      metadata,            // compatibilidad con el cliente
+      metadata,                 // para compatibilidad con tu UI
       error: metadata.error ?? null,
       updatedAt: job.updated_at ? new Date(job.updated_at).toISOString() : undefined,
     });
@@ -66,14 +64,12 @@ export async function GET(
 /* =========================
    POST -> encola un job nuevo
    ========================= */
-export async function POST(req: NextRequest): Promise<Response> {
-  // Autenticación
+export async function POST(req: NextRequest) {
   const auth = verifyRequestAuth(req);
   if (!auth) {
     return NextResponse.json({ success: false, message: 'No autenticado' }, { status: 401 });
   }
 
-  // Carga body
   let body: QueueBody;
   try {
     body = await req.json();
@@ -81,7 +77,6 @@ export async function POST(req: NextRequest): Promise<Response> {
     return NextResponse.json({ success: false, message: 'JSON inválido' }, { status: 400 });
   }
 
-  // Validación básica
   const { url, filename, mime, size = 0, language = 'auto', actions = [], summaryType } = body;
   if (!url || !filename || !mime) {
     return NextResponse.json({ success: false, message: 'Faltan campos: url/filename/mime' }, { status: 400 });
