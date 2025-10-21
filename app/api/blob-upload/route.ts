@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
-import { inngest } from '@/lib/inngest/clients';
+import { inngest } from '@/lib/inngest/client'; // 👈 CORREGIDO (singular)
 
 // Tamaños máximos (bytes)
 const MAX_FILE_SIZE_AUDIO = 500 * 1024 * 1024;      // 500 MB
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest): Promise<Response> {
         const filename = String(payload?.filename ?? 'unknown');
         const language = String(payload?.language ?? 'auto');
 
-        // Usamos los valores enviados en clientPayload (compatibles con tipos del SDK)
+        // Usamos los valores enviados en clientPayload
         const fileSizeBytes = Number(payload?.size ?? 0);
         const fileType = String(payload?.type ?? '').toLowerCase();
         const actions = Array.isArray(payload?.actions) ? payload.actions : [];
@@ -172,8 +172,6 @@ export async function POST(request: NextRequest): Promise<Response> {
               name: 'task/transcribe',
               data: { jobId },
             });
-            // (opcional): estado optimista
-            // await TranscriptionJobDB.updateStatus(jobId, 'transcribing');
             console.log('[blob-upload] Evento enviado: task/transcribe', { jobId });
           } else {
             await inngest.send({
@@ -187,8 +185,6 @@ export async function POST(request: NextRequest): Promise<Response> {
                 summaryType,
               },
             });
-            // (opcional): estado optimista
-            // await TranscriptionJobDB.updateStatus(jobId, 'processing');
             console.log('[blob-upload] Evento enviado: task/process-document', { jobId });
           }
         } catch (dbOrEventError) {
