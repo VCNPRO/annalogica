@@ -23,7 +23,6 @@ type QueueBody = {
 
 /* =========================
    GET -> estado por jobId
-   (usamos tipos flexibles para evitar el error de compilación)
    ========================= */
 export async function GET(_req: Request, context: any) {
   try {
@@ -39,10 +38,17 @@ export async function GET(_req: Request, context: any) {
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
 
+    // Algunos schemas guardan progreso dentro de metadata.progress
+    const progress =
+      (job as any).progress ??
+      (job.metadata && typeof job.metadata.progress === 'number'
+        ? job.metadata.progress
+        : undefined);
+
     return NextResponse.json({
       id: jobId,
-      status: job.status,                // 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed'
-      progress: job.progress ?? undefined,
+      status: job.status, // 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed'
+      progress,
       error: job.metadata?.error ?? null,
       updatedAt: job.updated_at ? new Date(job.updated_at).toISOString() : undefined,
     });
@@ -97,6 +103,8 @@ export async function POST(req: NextRequest) {
         mime,
         actions,
         summaryType,
+        // progreso inicial suave (si tu UI lo usa desde metadata)
+        progress: 5,
       },
     });
 
@@ -110,8 +118,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4) Hint optimista: pasa a 'processing' para que la barra arranque ya
+    // 4) Hint optimista: pasa a 'processing'
     await TranscriptionJobDB.updateStatus(jobId, 'processing');
+    await TranscriptionJobDB.updateResults(jobId, {
+      metadata: { startedAt: new Date().toISOString(), progress: 20 },
+    });
 
     return NextResponse.json(
       {
