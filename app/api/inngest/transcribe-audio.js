@@ -12,7 +12,31 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-export default inngest.createFunction(
+// ============================================
+// FUNCIONES HELPER PARA SUBTÍTULOS
+// ============================================
+function formatTimeSRT(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const millis = Math.floor((seconds % 1) * 1000);
+  
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(millis).padStart(3, '0')}`;
+}
+
+function formatTimeVTT(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const millis = Math.floor((seconds % 1) * 1000);
+  
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
+// ============================================
+// FUNCIÓN PRINCIPAL DE TRANSCRIPCIÓN
+// ============================================
+const transcribeFile = inngest.createFunction(
   { 
     id: 'transcribe-audio-whisper',
     name: 'Transcribe Audio with OpenAI Whisper',
@@ -282,4 +306,49 @@ Responde SOLO con JSON:
         };
       });
 
-      await updateTranscriptionProgress
+      await updateTranscriptionProgress(jobId, 95);
+
+      // ============================================
+      // PASO 8: Guardar resultados en BD
+      // ============================================
+      await step.run('save-results', async () => {
+        console.log('💾 Guardando resultados en BD...');
+        
+        await saveTranscriptionResults(jobId, {
+          txtUrl: textFiles.txt,
+          srtUrl: subtitles.srt,
+          vttUrl: subtitles.vtt,
+          summaryUrl: textFiles.summary,
+          speakersUrl: textFiles.speakers,
+          tags: tags,
+          duration: transcription.duration,
+          metadata: {
+            speakers: speakers,
+            segments: transcription.segments?.length || 0,
+            language: 'es'
+          }
+        });
+        
+        console.log('✅ Resultados guardados en BD');
+      });
+
+      await updateTranscriptionProgress(jobId, 100);
+
+      console.log('🎉 Transcripción completada:', jobId);
+      
+      return { 
+        success: true, 
+        jobId,
+        duration: transcription.duration
+      };
+      
+    } catch (error) {
+      console.error('❌ Error en transcripción:', error);
+      await markTranscriptionError(jobId, error.message);
+      throw error;
+    }
+  }
+);
+
+// Exportar por defecto
+export default transcribeFile;
