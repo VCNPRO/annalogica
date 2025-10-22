@@ -174,44 +174,44 @@ export default function AudioUpload() {
         </div>
       )}
 
-      {/* Mensaje de éxito */}
-      {result && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-6 space-y-4">
-          <div className="flex items-start space-x-3">
-            <svg className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="flex-1">
-              <h3 className="font-medium text-green-900">
-                ¡Archivo subido correctamente!
-              </h3>
-              <p className="text-sm text-green-700 mt-1">
-                {result.message}
-              </p>
-              <div className="mt-3 text-sm text-gray-600">
-                <p><strong>ID:</strong> {result.jobId}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex space-x-4">
-            <button
-              onClick={resetUpload}
-              className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              Transcribir otro archivo
-            </button>
-            
-              href={`/transcriptions/${result.jobId}`}
-              className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-center"
-            >
-              Ver progreso
-            </a>
-          </div>
+     {/* Mensaje de éxito */}
+{result && (
+  <div className="bg-green-50 border border-green-200 rounded-lg p-6 space-y-4">
+    <div className="flex items-start space-x-3">
+      <svg className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <div className="flex-1">
+        <h3 className="font-medium text-green-900">
+          ¡Archivo subido correctamente!
+        </h3>
+        <p className="text-sm text-green-700 mt-1">
+          {result.message}
+        </p>
+        <div className="mt-3 text-sm text-gray-600">
+          <p><strong>ID:</strong> {result.jobId}</p>
         </div>
-      )}
-
-      {/* Mensaje de error */}
+      </div>
+    </div>
+    
+    <div className="flex space-x-4">
+      <button
+        onClick={resetUpload}
+        className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+      >
+        Transcribir otro archivo
+      </button>
+      
+        href={'/transcriptions/' + result.jobId}
+        className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-center block"
+      >
+        Ver progreso
+      </a>
+    </div>
+  </div>
+)}
+        
+     {/* Mensaje de error */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <div className="flex items-start space-x-3">
