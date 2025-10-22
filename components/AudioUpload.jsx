@@ -184,4 +184,47 @@ export default function AudioUpload() {
                 {result.message}
               </p>
               <div className="mt-3 text-sm text-gray-600">
-                <p><strong>ID:</strong> {re
+                <p><strong>ID:</strong> {result.jobId}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex space-x-4">
+            <button
+              onClick={resetUpload}
+              className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Transcribir otro
+            </button>
+            
+              href={'/transcriptions/' + result.jobId}
+              className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-center block leading-6"
+            >
+              Ver progreso
+            </a>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="flex items-start space-x-3">
+            <svg className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1">
+              <h3 className="font-medium text-red-900">Error</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+          <button
+            onClick={resetUpload}
+            className="mt-4 w-full px-6 py-2 border border-red-300 rounded-lg hover:bg-red-50 transition-colors text-red-700"
+          >
+            Intentar de nuevo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
