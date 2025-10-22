@@ -1,4 +1,3 @@
-// components/AudioUpload.jsx
 'use client';
 
 import { useState, useRef } from 'react';
@@ -71,7 +70,6 @@ export default function AudioUpload() {
   return (
     <div className="w-full max-w-2xl mx-auto p-6 space-y-6">
       
-      {/* Área de selección de archivo */}
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
         <input
           ref={fileInputRef}
@@ -98,12 +96,12 @@ export default function AudioUpload() {
             </p>
             {file && (
               <p className="text-sm text-gray-500 mt-1">
-                {formatFileSize(file.size)} • {file.type}
+                {formatFileSize(file.size)}
               </p>
             )}
             {!file && (
               <p className="text-sm text-gray-500 mt-1">
-                MP3, WAV, M4A, OGG, FLAC o WebM • Máx. 25MB
+                MP3, WAV, M4A, OGG, FLAC o WebM - Máx. 25MB
               </p>
             )}
           </div>
@@ -119,7 +117,6 @@ export default function AudioUpload() {
         </label>
       </div>
 
-      {/* Opciones de resumen */}
       {file && !result && (
         <div className="bg-gray-50 p-4 rounded-lg space-y-3">
           <label className="block text-sm font-medium text-gray-700">
@@ -135,7 +132,7 @@ export default function AudioUpload() {
                 onChange={(e) => setSummaryType(e.target.value)}
                 className="w-4 h-4 text-blue-500"
               />
-              <span className="text-sm text-gray-700">Breve (3 párrafos)</span>
+              <span className="text-sm text-gray-700">Breve</span>
             </label>
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
@@ -152,7 +149,6 @@ export default function AudioUpload() {
         </div>
       )}
 
-      {/* Botones de acción */}
       {file && !result && (
         <div className="flex space-x-4">
           <button
@@ -174,63 +170,18 @@ export default function AudioUpload() {
         </div>
       )}
 
-     {/* Mensaje de éxito */}
-{result && (
-  <div className="bg-green-50 border border-green-200 rounded-lg p-6 space-y-4">
-    <div className="flex items-start space-x-3">
-      <svg className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <div className="flex-1">
-        <h3 className="font-medium text-green-900">
-          ¡Archivo subido correctamente!
-        </h3>
-        <p className="text-sm text-green-700 mt-1">
-          {result.message}
-        </p>
-        <div className="mt-3 text-sm text-gray-600">
-          <p><strong>ID:</strong> {result.jobId}</p>
-        </div>
-      </div>
-    </div>
-    
-    <div className="flex space-x-4">
-      <button
-        onClick={resetUpload}
-        className="flex-1 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-      >
-        Transcribir otro archivo
-      </button>
-      
-        href={'/transcriptions/' + result.jobId}
-        className="flex-1 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-center block"
-      >
-        Ver progreso
-      </a>
-    </div>
-  </div>
-)}
-        
-     {/* Mensaje de error */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+      {result && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6 space-y-4">
           <div className="flex items-start space-x-3">
-            <svg className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <div className="flex-1">
-              <h3 className="font-medium text-red-900">Error</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-            </div>
-          </div>
-          <button
-            onClick={resetUpload}
-            className="mt-4 w-full px-6 py-2 border border-red-300 rounded-lg hover:bg-red-50 transition-colors text-red-700"
-          >
-            Intentar de nuevo
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
+              <h3 className="font-medium text-green-900">
+                Archivo subido correctamente
+              </h3>
+              <p className="text-sm text-green-700 mt-1">
+                {result.message}
+              </p>
+              <div className="mt-3 text-sm text-gray-600">
+                <p><strong>ID:</strong> {re
