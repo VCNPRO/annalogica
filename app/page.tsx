@@ -1,20 +1,19 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import AudioUpload from '@/components/AudioUpload';
 
 export default function HomePage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.push('/test-audio');
-  }, [router]);
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-gray-600">Cargando...</p>
+    <div className="min-h-screen bg-gray-50 py-12">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            Transcripción de Audio
+          </h1>
+          <p className="text-gray-600">
+            Sube un archivo de audio y obtén transcripción automática
+          </p>
+        </div>
+
+        <AudioUpload />
       </div>
     </div>
   );
