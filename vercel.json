@@ -4,7 +4,10 @@
       "maxDuration": 300
     },
     "app/api/process/route.ts": {
-      "maxDuration": 60
+      "maxDuration": 300
+    },
+    "app/api/process-document/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
