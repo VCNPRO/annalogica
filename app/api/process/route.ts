@@ -133,17 +133,6 @@ export async function POST(request: Request) {
       audioUrl: audioUrl.substring(0, 50) + '...'
     });
 
-    // Process audio directly (no Inngest)
-    // Execute in background without blocking the response
-    processAudioFile(job.id).catch((error) => {
-      logger.error('Process API: Background processing failed', error, {
-        jobId: job.id,
-        userId: user.userId
-      });
-    });
-
-    logger.info('Process API: Processing started in background', { jobId: job.id });
-
     // QUOTA: Increment usage counter after successful job creation
     try {
       await incrementUsage(user.userId);
@@ -157,8 +146,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // Return immediately with job ID
-    // Frontend will poll /api/jobs/:id for status
+    // Return immediately - processing will happen and frontend will poll
     const response: JobCreateResponse = {
       success: true,
       message: 'Transcripción en proceso. Esto puede tardar 1-3 minutos.',
@@ -166,7 +154,39 @@ export async function POST(request: Request) {
       status: 'pending'
     };
 
-    return successResponse(response, 'Job creado exitosamente', 201);
+    logger.info('Process API: Starting synchronous processing', { jobId: job.id });
+
+    // Process audio synchronously (wait for completion before responding)
+    // This is necessary because Vercel Functions terminate after sending response
+    // For beta with short audios (<30min) this is acceptable
+    try {
+      await processAudioFile(job.id);
+      logger.info('Process API: Processing completed successfully', { jobId: job.id });
+
+      // Return success with completed status
+      const completedResponse: JobCreateResponse = {
+        success: true,
+        message: 'Transcripción completada exitosamente.',
+        jobId: job.id,
+        status: 'completed'
+      };
+
+      return successResponse(completedResponse, 'Procesamiento completado', 200);
+    } catch (processingError: any) {
+      logger.error('Process API: Processing failed', processingError, {
+        jobId: job.id,
+        userId: user.userId
+      });
+
+      // Return error response
+      return successResponse({
+        success: false,
+        message: 'Error en el procesamiento. Por favor intenta de nuevo.',
+        jobId: job.id,
+        status: 'failed',
+        error: processingError.message
+      }, 'Error en procesamiento', 500);
+    }
   } catch (error) {
     return handleError(error, {
       endpoint: 'POST /api/process'

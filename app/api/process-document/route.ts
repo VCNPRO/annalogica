@@ -94,28 +94,38 @@ export async function POST(request: NextRequest) {
 
     console.log(`[ProcessDocument] Job created: ${job.id}`);
 
-    // Process document directly (no Inngest)
-    // Execute in background without blocking the response
-    processDocumentFile(job.id, blobUrl, fileName, actions, language, summaryType)
-      .catch((error) => {
-        console.error('[ProcessDocument] Background processing failed:', {
-          error: error.message,
-          stack: error.stack,
-          jobId: job.id
-        });
+    // Process document synchronously (wait for completion before responding)
+    // This is necessary because Vercel Functions terminate after sending response
+    // For beta with PDFs this is acceptable (typically <60 seconds)
+    try {
+      console.log('[ProcessDocument] Starting synchronous processing:', job.id);
+      await processDocumentFile(job.id, blobUrl, fileName, actions, language, summaryType);
+      console.log('[ProcessDocument] Processing completed successfully:', job.id);
+
+      // Increment usage after successful processing
+      await incrementUsage(auth.userId);
+
+      return NextResponse.json({
+        success: true,
+        jobId: job.id,
+        message: 'Documento procesado exitosamente',
+        status: 'completed'
+      });
+    } catch (error: any) {
+      console.error('[ProcessDocument] Processing failed:', {
+        error: error.message,
+        stack: error.stack,
+        jobId: job.id
       });
 
-    console.log('[ProcessDocument] Processing started in background for job:', job.id);
-
-    // Increment usage
-    await incrementUsage(auth.userId);
-
-    return NextResponse.json({
-      success: true,
-      jobId: job.id,
-      message: 'Documento en cola de procesamiento',
-      status: 'processing'
-    });
+      return NextResponse.json({
+        success: false,
+        jobId: job.id,
+        message: 'Error procesando el documento',
+        status: 'failed',
+        error: error.message
+      }, { status: 500 });
+    }
 
   } catch (error: any) {
     console.error('[ProcessDocument] Error:', error);
