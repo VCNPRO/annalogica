@@ -51,16 +51,24 @@ const transcribeFile = inngest.createFunction(
 
     const { jobId } = event.data;
 
-    // Obtener datos del job desde la BD
-    const job = await TranscriptionJobDB.findById(jobId);
-    if (!job) {
-      throw new Error(`Job ${jobId} no encontrado en la base de datos`);
-    }
+    // Obtener datos del job desde la BD (dentro de un step para manejo de errores)
+    const jobData = await step.run('fetch-job-data', async () => {
+      const job = await TranscriptionJobDB.findById(jobId);
+      if (!job) {
+        throw new Error(`Job ${jobId} no encontrado en la base de datos`);
+      }
 
-    const audioUrl = job.audio_url;
-    const fileName = job.filename;
-    const userId = job.user_id;
-    const summaryType = job.metadata?.summaryType || 'detailed';
+      console.log('✅ Job encontrado:', { jobId, filename: job.filename });
+
+      return {
+        audioUrl: job.audio_url,
+        fileName: job.filename,
+        userId: job.user_id,
+        summaryType: job.metadata?.summaryType || 'detailed'
+      };
+    });
+
+    const { audioUrl, fileName, userId, summaryType } = jobData;
 
     console.log('🚀 Iniciando transcripción:', { jobId, fileName, userId });
 
