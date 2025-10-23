@@ -79,7 +79,9 @@ export async function POST(request: NextRequest) {
       auth.userId,
       fileName,
       blobUrl, // Store document URL in audio_url field
-      language
+      language,
+      undefined, // audioSizeBytes not needed for documents
+      'document' // Mark as document for analytics
     );
 
     // Update job metadata

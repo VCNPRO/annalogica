@@ -201,11 +201,12 @@ export const TranscriptionJobDB = {
     filename: string,
     audioUrl: string,
     language: string = 'auto', // Default to auto-detection
-    audioSizeBytes?: number
+    audioSizeBytes?: number,
+    fileType: 'audio' | 'document' = 'audio' // Default to audio
   ): Promise<TranscriptionJob> => {
     const result = await sql<TranscriptionJob>`
-      INSERT INTO transcription_jobs (user_id, filename, audio_url, language, audio_size_bytes, status)
-      VALUES (${userId}, ${filename}, ${audioUrl}, ${language}, ${audioSizeBytes || null}, 'pending')
+      INSERT INTO transcription_jobs (user_id, filename, audio_url, language, audio_size_bytes, file_type, status)
+      VALUES (${userId}, ${filename}, ${audioUrl}, ${language}, ${audioSizeBytes || null}, ${fileType}, 'pending')
       RETURNING *
     `;
     return result.rows[0];

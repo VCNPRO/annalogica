@@ -106,37 +106,99 @@ export function AdminDashboard() {
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [editingQuota, setEditingQuota] = useState<string | null>(null);
+  const [newQuota, setNewQuota] = useState<number>(0);
 
+  // Fetch real data from APIs
   useEffect(() => {
-    // Usamos datos de ejemplo con la nueva estructura detallada
-    const mockData = {
-        kpis: { activeUsers: '12', revenue: '0.00', apiCosts: '0.84', grossMargin: '0.00' },
-        users: [
-          { id: 'd8ffa022', email: 'pagament@pagament.com', plan: 'basico', registeredAt: '11/10/2025', usage: { totalFiles: 100, breakdown: '100/100' } },
-          { id: 'd4f39938', email: 'test@test.com', plan: 'admin', registeredAt: '06/10/2025', usage: { totalFiles: 10, breakdown: '10/10' } },
-        ],
-        jobs: [
-            { id: 'job_1a2b3c4d', userEmail: 'nuevo.usuario@gmail.com', filename: 'reunion_semanal.mp3', status: 'COMPLETED', createdAt: '2025-10-20 18:15:00', duration: '45s',
-              steps: [
-                { name: 'UPLOAD', status: 'COMPLETED', duration: '2s', error: null },
-                { name: 'TRANSCRIPCIÓN (DEEPGRAM)', status: 'COMPLETED', duration: '28s', error: null },
-                { name: 'RESUMEN (OPENAI)', status: 'COMPLETED', duration: '5s', error: null },
-              ],
-              costs: { transcription: '€0.08', summary: '€0.04', total: '€0.12' }
-            },
-            { id: 'job_9i0j1k2l', userEmail: 'test@test.com', filename: 'audio_largo_con_ruido.wav', status: 'FAILED', createdAt: '2025-10-20 18:20:00', duration: '12s',
-              steps: [
-                { name: 'UPLOAD', status: 'COMPLETED', duration: '3s', error: null },
-                { name: 'TRANSCRIPCIÓN (DEEPGRAM)', status: 'FAILED', duration: '9s', error: 'API Error 502: Upstream server timed out after 8000ms' },
-                { name: 'RESUMEN (OPENAI)', status: 'SKIPPED', duration: '0s', error: null },
-              ],
-              costs: { transcription: '€0.05', summary: '€0.00', total: '€0.05' }
-            },
-        ]
+    const fetchData = async () => {
+      try {
+        // Fetch stats and users
+        const [statsRes, usersRes] = await Promise.all([
+          fetch('/api/admin/stats'),
+          fetch('/api/admin/users')
+        ]);
+
+        if (!statsRes.ok || !usersRes.ok) {
+          console.error('Failed to fetch admin data');
+          setIsLoading(false);
+          return;
+        }
+
+        const stats = await statsRes.json();
+        const users = await usersRes.json();
+
+        setData({
+          kpis: {
+            activeUsers: stats.totalUsers?.toString() || '0',
+            revenue: '0.00',
+            apiCosts: stats.totalCost?.toFixed(2) || '0.00',
+            grossMargin: '0.00'
+          },
+          users: users.users || [],
+          jobs: []
+        });
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching admin data:', error);
+        setIsLoading(false);
+      }
     };
-    setData(mockData);
-    setIsLoading(false);
+
+    fetchData();
   }, []);
+
+  const handleUpdateQuota = async (userId: string, quota: number) => {
+    try {
+      const res = await fetch('/api/admin/user-quota', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, monthlyQuota: quota })
+      });
+
+      if (res.ok) {
+        // Refresh data
+        const usersRes = await fetch('/api/admin/users');
+        const users = await usersRes.json();
+        setData({ ...data, users: users.users || [] });
+        setEditingQuota(null);
+      }
+    } catch (error) {
+      console.error('Error updating quota:', error);
+    }
+  };
+
+  const handleResetUsage = async (userId: string) => {
+    try {
+      const res = await fetch('/api/admin/user-quota/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+
+      if (res.ok) {
+        // Refresh data
+        const usersRes = await fetch('/api/admin/users');
+        const users = await usersRes.json();
+        setData({ ...data, users: users.users || [] });
+      }
+    } catch (error) {
+      console.error('Error resetting usage:', error);
+    }
+  };
+
+  const handleViewUserStats = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/admin/user-stats?userId=${userId}`);
+      if (res.ok) {
+        const stats = await res.json();
+        setSelectedUser(stats);
+      }
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+    }
+  };
 
   useEffect(() => { 
     const savedTheme = localStorage.getItem('theme') || 'light';
@@ -170,28 +232,96 @@ export function AdminDashboard() {
         <KpiCard title="Margen Bruto" value={`${data.kpis.grossMargin}%`} icon={<PieChart size={20} />} trend="Objetivo: > 85%" trendDirection="none" />
       </div>
       
+      {/* Beta Testers Management */}
       <div className="mt-8 bg-white dark:bg-gray-800 shadow-md rounded-lg border border-gray-200 dark:border-gray-700">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Registro de Actividad de Trabajos</h2>
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold">Gestión de Beta Testers</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Ver consumo, modificar cuotas y gestionar accesos</p>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700/50">
-                <tr><th className="px-6 py-3 text-left text-xs font-medium uppercase"></th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Archivo</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Fecha</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Duración</th><th className="px-6 py-3 text-left text-xs font-medium uppercase">Coste</th></tr>
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Plan</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Cuota Mensual</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Uso Actual</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Reset</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Acciones</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {data.jobs.map((job: any) => (
-                  <tr key={job.id} onClick={() => setSelectedJob(job)} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                {data?.users?.map((user: any) => (
+                  <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-6 py-4">
-                        <span className={`flex items-center gap-2 text-sm font-medium ${job.status === 'COMPLETED' ? 'text-green-500' : job.status === 'FAILED' ? 'text-red-500' : 'text-blue-500'}`}>
-                            {job.status === 'COMPLETED' ? <CheckCircle size={16} /> : job.status === 'FAILED' ? <AlertTriangle size={16} /> : <Clock size={16} />}
-                        </span>
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-sm">{user.email}</span>
+                        <span className="text-xs text-gray-400 font-mono">{user.id}</span>
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap font-semibold">{job.filename}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{job.userEmail}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{job.createdAt}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{job.duration}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">{job.costs.total}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                        {user.subscription_tier || 'free'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {editingQuota === user.id ? (
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            value={newQuota}
+                            onChange={(e) => setNewQuota(parseInt(e.target.value))}
+                            className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                          />
+                          <button
+                            onClick={() => handleUpdateQuota(user.id, newQuota)}
+                            className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={() => setEditingQuota(null)}
+                            className="px-2 py-1 text-xs bg-gray-300 dark:bg-gray-600 rounded hover:bg-gray-400"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditingQuota(user.id);
+                            setNewQuota(user.monthly_quota || 0);
+                          }}
+                          className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm"
+                        >
+                          {user.monthly_quota || 0} / mes
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`font-mono text-sm ${(user.monthly_usage || 0) >= (user.monthly_quota || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {user.monthly_usage || 0}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                      {user.quota_reset_date ? new Date(user.quota_reset_date).toLocaleDateString('es-ES') : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleViewUserStats(user.id)}
+                          className="px-3 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                        >
+                          Ver Stats
+                        </button>
+                        <button
+                          onClick={() => handleResetUsage(user.id)}
+                          className="px-3 py-1 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded hover:bg-orange-200 dark:hover:bg-orange-900/50"
+                        >
+                          Reset Uso
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -200,6 +330,108 @@ export function AdminDashboard() {
         </div>
 
       {selectedJob && <JobDetailPanel job={selectedJob} onClose={() => setSelectedJob(null)} />}
+
+      {/* User Stats Panel */}
+      {selectedUser && (
+        <div className="fixed inset-y-0 right-0 w-full max-w-2xl bg-white dark:bg-gray-900 shadow-2xl z-50 transform transition-transform duration-300">
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Estadísticas de Usuario</h2>
+                <p className="text-sm text-gray-500">{selectedUser.user?.email}</p>
+              </div>
+              <button onClick={() => setSelectedUser(null)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-grow overflow-y-auto p-6 space-y-6">
+              {/* User Info */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3">Información del Usuario</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Plan:</span>
+                    <span className="font-medium">{selectedUser.user?.subscriptionTier || 'free'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Cuota Mensual:</span>
+                    <span className="font-medium">{selectedUser.user?.monthlyQuota || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Uso Actual:</span>
+                    <span className={`font-medium ${(selectedUser.user?.monthlyUsage || 0) >= (selectedUser.user?.monthlyQuota || 0) ? 'text-red-600' : 'text-green-600'}`}>
+                      {selectedUser.user?.monthlyUsage || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Reset:</span>
+                    <span className="font-medium">{selectedUser.user?.quotaResetDate ? new Date(selectedUser.user.quotaResetDate).toLocaleDateString('es-ES') : '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Breakdown by Type */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3">Consumo por Tipo de Archivo</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white dark:bg-gray-800 p-3 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {selectedUser.stats?.byType?.audio?.total || 0}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">Audio</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      ✓ {selectedUser.stats?.byType?.audio?.completed || 0} • ✗ {selectedUser.stats?.byType?.audio?.failed || 0}
+                    </div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 p-3 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {selectedUser.stats?.byType?.document?.total || 0}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">Documentos</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      ✓ {selectedUser.stats?.byType?.document?.completed || 0} • ✗ {selectedUser.stats?.byType?.document?.failed || 0}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Month Usage */}
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3">Mes Actual</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="text-xl font-bold">{selectedUser.stats?.currentMonth?.audio || 0}</div>
+                    <div className="text-xs text-gray-500">Audio</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xl font-bold">{selectedUser.stats?.currentMonth?.document || 0}</div>
+                    <div className="text-xs text-gray-500">Documentos</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Stats */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 p-4 rounded-lg">
+                <h3 className="font-semibold mb-3">Totales</h3>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <div className="text-lg font-bold">{selectedUser.stats?.total?.jobs || 0}</div>
+                    <div className="text-xs text-gray-500">Total Jobs</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-green-600">{selectedUser.stats?.total?.completed || 0}</div>
+                    <div className="text-xs text-gray-500">Completados</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-red-600">{selectedUser.stats?.total?.failed || 0}</div>
+                    <div className="text-xs text-gray-500">Fallidos</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
