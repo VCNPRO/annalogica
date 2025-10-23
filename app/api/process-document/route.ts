@@ -4,6 +4,9 @@ import { TranscriptionJobDB } from '@/lib/db';
 import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guard';
 import { processDocumentFile } from '@/lib/processors/document-processor';
 
+// Configure maximum execution time for document processing
+export const maxDuration = 300; // 5 minutes
+
 /**
  * POST /api/process-document
  *

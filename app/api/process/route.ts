@@ -19,10 +19,14 @@ import {
 import { logger } from '@/lib/logger';
 import type { JobCreateResponse } from '@/types/job';
 
+// Configure maximum execution time for audio processing
+// Pro plan: 300s (5 minutes), Hobby: 10s
+export const maxDuration = 300; // 5 minutes
+
 /**
  * POST /api/process
- * Create transcription job (async) - returns immediately
- * Job will be processed in background by Inngest
+ * Process audio transcription synchronously
+ * May take 2-5 minutes for audio files
  */
 export async function POST(request: Request) {
   try {
