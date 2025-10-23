@@ -55,6 +55,14 @@ export async function GET(_req: Request, context: any) {
       metadata,                 // para compatibilidad con tu UI
       error: metadata.error ?? null,
       updatedAt: job.updated_at ? new Date(job.updated_at).toISOString() : undefined,
+      // Include URLs for downloads (only present when completed)
+      txt_url: job.txt_url,
+      srt_url: job.srt_url,
+      vtt_url: job.vtt_url,
+      speakers_url: job.speakers_url,
+      summary_url: job.summary_url,
+      audio_duration_seconds: job.audio_duration_seconds,
+      created_at: job.created_at ? new Date(job.created_at).toISOString() : undefined,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'status_error' }, { status: 500 });

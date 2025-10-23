@@ -154,10 +154,26 @@ export default function Dashboard() {
             credentials: 'include'
           });
 
-          if (!res.ok) continue;
+          if (!res.ok) {
+            // Si el job no existe (404), marcarlo como error
+            if (res.status === 404) {
+              console.warn(`[Polling] Job ${file.jobId} not found (404) - marking as error`);
+              setUploadedFiles(prev => prev.map(f =>
+                f.id === file.id ? { ...f, status: 'error' } : f
+              ));
+            }
+            continue;
+          }
 
           const data = await res.json();
-          const job = data.job;
+          // La API devuelve directamente el objeto, no anidado en data.job
+          const job = data;
+
+          // Verificar que job existe y tiene la estructura esperada
+          if (!job || !job.status) {
+            console.error(`[Polling] Invalid job data for ${file.jobId}:`, data);
+            continue;
+          }
 
           // Auto-restart logic: Check if job is stuck (no progress for too long)
           if (file.processingStartTime) {
@@ -1490,7 +1506,8 @@ export default function Dashboard() {
                           const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
                           if (res.ok) {
                             const data = await res.json();
-                            const job = data.job;
+                            // La API devuelve directamente el objeto job
+                            const job = data;
                             if (downloadDirHandle) {
                               await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
                             } else {
@@ -1571,7 +1588,8 @@ export default function Dashboard() {
                             const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
                             if (res.ok) {
                               const data = await res.json();
-                              const job = data.job;
+                              // La API devuelve directamente el objeto job
+                              const job = data;
                               if (downloadDirHandle) {
                                 await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
                               } else {
