@@ -144,7 +144,17 @@ export default function Dashboard() {
       f => f.jobId && (f.status === 'pending' || f.status === 'processing')
     );
 
-    if (activeJobs.length === 0) return;
+    console.log('[Polling] useEffect triggered:', {
+      totalFiles: uploadedFiles.length,
+      filesWithJobId: uploadedFiles.filter(f => f.jobId).length,
+      activeJobs: activeJobs.length,
+      activeJobsList: activeJobs.map(f => ({ id: f.id, jobId: f.jobId, status: f.status, name: f.name }))
+    });
+
+    if (activeJobs.length === 0) {
+      console.log('[Polling] No active jobs to poll');
+      return;
+    }
 
     const pollJobs = async () => {
       for (const file of activeJobs) {
@@ -607,13 +617,19 @@ export default function Dashboard() {
           processedCount++;
 
           // Update file with jobId
-          setUploadedFiles(prev => prev.map(f => {
-            if (f.id === file.id) {
-              console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
-              return { ...f, jobId, status: 'pending' as const };
-            }
-            return f;
-          }));
+          setUploadedFiles(prev => {
+            const updated = prev.map(f => {
+              if (f.id === file.id) {
+                console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
+                const updatedFile = { ...f, jobId, status: 'pending' as const };
+                console.log('[Process] Updated file object:', updatedFile);
+                return updatedFile;
+              }
+              return f;
+            });
+            console.log('[Process] New state after update:', updated.map(f => ({ id: f.id, jobId: f.jobId, status: f.status })));
+            return updated;
+          });
         }
 
       } catch (err: any) {
