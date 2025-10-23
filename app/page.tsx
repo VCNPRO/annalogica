@@ -50,6 +50,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]); // Keep this state
+  // 🔥 NUEVO: Flag para forzar polling después de crear jobs
+  const [forcePolling, setForcePolling] = useState(0);
 
   // Load files from localStorage on initial render
   useEffect(() => {
@@ -286,7 +288,7 @@ export default function Dashboard() {
     const interval = setInterval(pollJobs, 5000);
 
     return () => clearInterval(interval);
-  }, [uploadedFiles]);
+  }, [uploadedFiles, forcePolling]); // 🔥 FIX: Agregar forcePolling como dependencia
 
   const getFileType = (mimeType: string, filename: string): 'audio' | 'video' | 'text' => {
     // Check MIME type first
@@ -580,6 +582,12 @@ export default function Dashboard() {
             return f;
           }));
 
+          // 🔥 FIX: Forzar polling para documentos también
+          setTimeout(() => {
+            setForcePolling(prev => prev + 1);
+          }, 100);
+
+
         } else {
           // Procesar como audio/video (la transcripción se hace siempre internamente)
           console.log('[Process] 🎵 Processing as AUDIO/VIDEO');
@@ -630,6 +638,11 @@ export default function Dashboard() {
             console.log('[Process] New state after update:', updated.map(f => ({ id: f.id, jobId: f.jobId, status: f.status })));
             return updated;
           });
+
+          // 🔥 FIX: Forzar polling inmediatamente después de crear el job
+          setTimeout(() => {
+            setForcePolling(prev => prev + 1);
+          }, 100);
         }
 
       } catch (err: any) {
