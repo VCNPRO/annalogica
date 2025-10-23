@@ -9,13 +9,13 @@ import {
 } from '@/lib/db/transcriptions';
 import { TranscriptionJobDB } from '@/lib/db';
 
-// Inicialización segura de OpenAI (solo si la key existe)
+// Inicializacion segura de OpenAI (solo si la key existe)
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
 // ============================================
-// FUNCIONES HELPER PARA SUBTÍTULOS
+// FUNCIONES HELPER PARA SUBTITULOS
 // ============================================
 function formatTimeSRT(seconds) {
   const hours = Math.floor(seconds / 3600);
@@ -36,7 +36,7 @@ function formatTimeVTT(seconds) {
 }
 
 // ============================================
-// FUNCIÓN PRINCIPAL DE TRANSCRIPCIÓN
+// FUNCION PRINCIPAL DE TRANSCRIPCION
 // ============================================
 const transcribeFile = inngest.createFunction(
   {
@@ -58,7 +58,7 @@ const transcribeFile = inngest.createFunction(
         throw new Error(`Job ${jobId} no encontrado en la base de datos`);
       }
 
-      console.log(' Job encontrado:', { jobId, filename: job.filename });
+      console.log('[transcribe] Job encontrado:', { jobId, filename: job.filename });
 
       return {
         audioUrl: job.audio_url,
@@ -70,7 +70,7 @@ const transcribeFile = inngest.createFunction(
 
     const { audioUrl, fileName, userId, summaryType } = jobData;
 
-    console.log('=€ Iniciando transcripción:', { jobId, fileName, userId });
+    console.log('[transcribe] Iniciando transcripcion:', { jobId, fileName, userId });
 
     try {
       // ============================================
@@ -83,7 +83,7 @@ const transcribeFile = inngest.createFunction(
       let audioFileForWhisper;
 
       await step.run('download-audio', async () => {
-        console.log('=å Descargando audio:', fileName);
+        console.log('[transcribe] Descargando audio:', fileName);
 
         const response = await fetch(audioUrl);
         if (!response.ok) {
@@ -105,7 +105,7 @@ const transcribeFile = inngest.createFunction(
           }
         );
 
-        console.log(' Audio descargado:', {
+        console.log('[transcribe] Audio descargado:', {
           size: `${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB`,
           type: audioFileForWhisper.type,
           name: audioFileForWhisper.name
@@ -127,7 +127,7 @@ const transcribeFile = inngest.createFunction(
       let transcriptionSegments;
 
       await step.run('whisper-transcribe', async () => {
-        console.log('<¤ Iniciando transcripción con Whisper...');
+        console.log('[transcribe] Iniciando transcripcion con Whisper...');
 
         const response = await openai.audio.transcriptions.create({
           file: audioFileForWhisper,
@@ -137,7 +137,7 @@ const transcribeFile = inngest.createFunction(
           timestamp_granularities: ["segment", "word"]
         });
 
-        console.log(' Transcripción completada:', {
+        console.log('[transcribe] Transcripcion completada:', {
           duration: `${response.duration}s`,
           segments: response.segments?.length || 0
         });
@@ -165,32 +165,32 @@ const transcribeFile = inngest.createFunction(
       let speakers;
 
       await step.run('identify-speakers', async () => {
-        console.log('=e Identificando intervinientes...');
+        console.log('[transcribe] Identificando intervinientes...');
 
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
-              content: `Eres un asistente experto en análisis de transcripciones.
-Identifica a todos los intervinientes/oradores en la transcripción.
+              content: `Eres un asistente experto en analisis de transcripciones.
+Identifica a todos los intervinientes/oradores en la transcripcion.
 
 Para cada interviniente, extrae:
 - Nombre completo
-- Cargo/rol/descripción (si se menciona)
+- Cargo/rol/descripcion (si se menciona)
 
 Responde SOLO con un JSON array:
 {"speakers": [
-  {"name": "Juan Pérez", "role": "Director General"},
-  {"name": "María García", "role": "Responsable de Marketing"}
+  {"name": "Juan Perez", "role": "Director General"},
+  {"name": "Maria Garcia", "role": "Responsable de Marketing"}
 ]}
 
 Si no se menciona el cargo, usa "Interviniente" como role.
-Si no hay indicadores claros de speakers, devuelve array vacío.`
+Si no hay indicadores claros de speakers, devuelve array vacio.`
             },
             {
               role: "user",
-              content: `Transcripción:\n\n${transcriptionText}`
+              content: `Transcripcion:\n\n${transcriptionText}`
             }
           ],
           temperature: 0.3,
@@ -200,7 +200,7 @@ Si no hay indicadores claros de speakers, devuelve array vacío.`
         const result = JSON.parse(completion.choices[0].message.content);
         speakers = result.speakers || [];
 
-        console.log(' Intervinientes identificados:', speakers.length);
+        console.log('[transcribe] Intervinientes identificados:', speakers.length);
         return { success: true, count: speakers.length };
       });
 
@@ -214,18 +214,18 @@ Si no hay indicadores claros de speakers, devuelve array vacío.`
       let summary;
 
       await step.run('generate-summary', async () => {
-        console.log('=Ý Generando resumen...');
+        console.log('[transcribe] Generando resumen...');
 
         const summaryPrompt = summaryType === 'short'
-          ? 'Genera un resumen ejecutivo muy breve (máximo 3 párrafos) de esta transcripción.'
-          : 'Genera un resumen detallado y estructurado de esta transcripción, incluyendo todos los puntos clave discutidos.';
+          ? 'Genera un resumen ejecutivo muy breve (maximo 3 parrafos) de esta transcripcion.'
+          : 'Genera un resumen detallado y estructurado de esta transcripcion, incluyendo todos los puntos clave discutidos.';
 
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
-              content: `Eres un asistente experto en generar resúmenes de transcripciones.
+              content: `Eres un asistente experto en generar resumenes de transcripciones.
 ${summaryPrompt}
 
 El resumen debe:
@@ -236,7 +236,7 @@ El resumen debe:
             },
             {
               role: "user",
-              content: `Transcripción:\n\n${transcriptionText}`
+              content: `Transcripcion:\n\n${transcriptionText}`
             }
           ],
           temperature: 0.5,
@@ -245,7 +245,7 @@ El resumen debe:
 
         summary = completion.choices[0].message.content;
 
-        console.log(' Resumen generado');
+        console.log('[transcribe] Resumen generado');
         return { success: true, length: summary.length };
       });
 
@@ -259,28 +259,28 @@ El resumen debe:
       let tags;
 
       await step.run('generate-tags', async () => {
-        console.log('<÷ Generando tags...');
+        console.log('[transcribe] Generando tags...');
 
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
-              content: `Eres un asistente experto en categorización.
-Analiza la transcripción y genera entre 5 y 10 tags relevantes.
+              content: `Eres un asistente experto en categorizacion.
+Analiza la transcripcion y genera entre 5 y 10 tags relevantes.
 
 Los tags deben ser:
 - Palabras clave o frases cortas (1-3 palabras)
 - Relevantes al contenido principal
-- En español
-- Sin símbolos especiales
+- En espanol
+- Sin simbolos especiales
 
 Responde SOLO con JSON:
 {"tags": ["tag1", "tag2", "tag3"]}`
             },
             {
               role: "user",
-              content: `Transcripción:\n\n${transcriptionText}`
+              content: `Transcripcion:\n\n${transcriptionText}`
             }
           ],
           temperature: 0.3,
@@ -290,7 +290,7 @@ Responde SOLO con JSON:
         const result = JSON.parse(completion.choices[0].message.content);
         tags = result.tags || [];
 
-        console.log(' Tags generados:', tags);
+        console.log('[transcribe] Tags generados:', tags);
         return { success: true, count: tags.length };
       });
 
@@ -299,12 +299,12 @@ Responde SOLO con JSON:
       });
 
       // ============================================
-      // PASO 6: Generar subtítulos SRT y VTT
+      // PASO 6: Generar subtitulos SRT y VTT
       // ============================================
       let subtitles;
 
       await step.run('generate-subtitles', async () => {
-        console.log('=Ä Generando subtítulos...');
+        console.log('[transcribe] Generando subtitulos...');
 
         const segments = transcriptionSegments || [];
 
@@ -333,7 +333,7 @@ Responde SOLO con JSON:
           contentType: 'text/vtt'
         });
 
-        console.log(' Subtítulos generados');
+        console.log('[transcribe] Subtitulos generados');
 
         subtitles = {
           srt: srtBlob.url,
@@ -353,9 +353,9 @@ Responde SOLO con JSON:
       let textFiles;
 
       await step.run('save-text-files', async () => {
-        console.log('=¾ Guardando archivos de texto...');
+        console.log('[transcribe] Guardando archivos de texto...');
 
-        // Guardar transcripción completa
+        // Guardar transcripcion completa
         const txtBlob = await put(
           `transcriptions/${jobId}.txt`,
           transcriptionText,
@@ -376,7 +376,7 @@ Responde SOLO con JSON:
           { access: 'public', contentType: 'application/json' }
         );
 
-        console.log(' Archivos de texto guardados');
+        console.log('[transcribe] Archivos de texto guardados');
 
         textFiles = {
           txt: txtBlob.url,
@@ -395,7 +395,7 @@ Responde SOLO con JSON:
       // PASO 8: Guardar resultados en BD
       // ============================================
       await step.run('save-results', async () => {
-        console.log('=¾ Guardando resultados en BD...');
+        console.log('[transcribe] Guardando resultados en BD...');
 
         await saveTranscriptionResults(jobId, {
           txtUrl: textFiles.txt,
@@ -412,7 +412,7 @@ Responde SOLO con JSON:
           }
         });
 
-        console.log(' Resultados guardados en BD');
+        console.log('[transcribe] Resultados guardados en BD');
         return { success: true };
       });
 
@@ -420,7 +420,7 @@ Responde SOLO con JSON:
         await updateTranscriptionProgress(jobId, 100);
       });
 
-      console.log('<‰ Transcripción completada:', jobId);
+      console.log('[transcribe] Transcripcion completada:', jobId);
 
       return {
         success: true,
@@ -429,7 +429,7 @@ Responde SOLO con JSON:
       };
 
     } catch (error) {
-      console.error('L Error en transcripción:', error);
+      console.error('[transcribe] Error en transcripcion:', error);
       await markTranscriptionError(jobId, error.message);
       throw error;
     }
