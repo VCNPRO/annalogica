@@ -88,7 +88,9 @@ const transcribeFile = inngest.createFunction(
         return { file, buffer, fileName };
       });
 
-      await updateTranscriptionProgress(jobId, 20);
+      await step.run('update-progress-20', async () => {
+        await updateTranscriptionProgress(jobId, 20);
+      });
 
       // ============================================
       // PASO 2: Transcribir con Whisper
@@ -112,7 +114,9 @@ const transcribeFile = inngest.createFunction(
         return response;
       });
 
-      await updateTranscriptionProgress(jobId, 50);
+      await step.run('update-progress-50', async () => {
+        await updateTranscriptionProgress(jobId, 50);
+      });
 
       // ============================================
       // PASO 3: Identificar speakers
@@ -157,7 +161,9 @@ Si no hay indicadores claros de speakers, devuelve array vacío.`
         return speakersList;
       });
 
-      await updateTranscriptionProgress(jobId, 65);
+      await step.run('update-progress-65', async () => {
+        await updateTranscriptionProgress(jobId, 65);
+      });
 
       // ============================================
       // PASO 4: Generar resumen
@@ -198,7 +204,9 @@ El resumen debe:
         return summaryText;
       });
 
-      await updateTranscriptionProgress(jobId, 75);
+      await step.run('update-progress-75', async () => {
+        await updateTranscriptionProgress(jobId, 75);
+      });
 
       // ============================================
       // PASO 5: Generar tags
@@ -239,7 +247,9 @@ Responde SOLO con JSON:
         return tagsList;
       });
 
-      await updateTranscriptionProgress(jobId, 85);
+      await step.run('update-progress-85', async () => {
+        await updateTranscriptionProgress(jobId, 85);
+      });
 
       // ============================================
       // PASO 6: Generar subtítulos SRT y VTT
@@ -282,7 +292,9 @@ Responde SOLO con JSON:
         };
       });
 
-      await updateTranscriptionProgress(jobId, 90);
+      await step.run('update-progress-90', async () => {
+        await updateTranscriptionProgress(jobId, 90);
+      });
 
       // ============================================
       // PASO 7: Guardar archivos de texto
@@ -320,7 +332,9 @@ Responde SOLO con JSON:
         };
       });
 
-      await updateTranscriptionProgress(jobId, 95);
+      await step.run('update-progress-95', async () => {
+        await updateTranscriptionProgress(jobId, 95);
+      });
 
       // ============================================
       // PASO 8: Guardar resultados en BD
@@ -346,7 +360,9 @@ Responde SOLO con JSON:
         console.log('✅ Resultados guardados en BD');
       });
 
-      await updateTranscriptionProgress(jobId, 100);
+      await step.run('update-progress-100', async () => {
+        await updateTranscriptionProgress(jobId, 100);
+      });
 
       console.log('🎉 Transcripción completada:', jobId);
       
