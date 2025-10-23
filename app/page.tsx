@@ -159,12 +159,17 @@ export default function Dashboard() {
     }
 
     const pollJobs = async () => {
+      console.log('[Polling] pollJobs() called - starting to poll', activeJobs.length, 'jobs');
+
       for (const file of activeJobs) {
+        console.log('[Polling] Polling job:', file.jobId, 'for file:', file.name);
         try {
           // SECURITY: Cookie httpOnly se envía automáticamente
+          console.log('[Polling] Fetching:', `/api/jobs/${file.jobId}`);
           const res = await fetch(`/api/jobs/${file.jobId}`, {
             credentials: 'include'
           });
+          console.log('[Polling] Fetch response status:', res.status);
 
           if (!res.ok) {
             // Si el job no existe (404), marcarlo como error
@@ -180,12 +185,15 @@ export default function Dashboard() {
           const data = await res.json();
           // La API devuelve directamente el objeto, no anidado en data.job
           const job = data;
+          console.log('[Polling] Job data received:', { id: job.id, status: job.status, progress: job.progress, metadata: job.metadata });
 
           // Verificar que job existe y tiene la estructura esperada
           if (!job || !job.status) {
             console.error(`[Polling] Invalid job data for ${file.jobId}:`, data);
             continue;
           }
+
+          console.log('[Polling] Job status:', job.status, 'Progress:', job.progress || 0);
 
           // Auto-restart logic: Check if job is stuck (no progress for too long)
           if (file.processingStartTime) {
