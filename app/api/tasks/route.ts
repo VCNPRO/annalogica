@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     let eventName: string;
     switch (task) {
       case 'transcribe':
-        eventName = 'task/transcribe';
+        eventName = 'audio/transcribe.requested';
         break;
       case 'summarize':
         eventName = 'task/summarize';

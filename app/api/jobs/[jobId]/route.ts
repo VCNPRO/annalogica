@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
 
     // 3) Enviar evento
     if (isAudio || isVideo) {
-      await inngest.send({ name: 'task/transcribe', data: { jobId } });
+      await inngest.send({ name: 'audio/transcribe.requested', data: { jobId } });
     } else {
       await inngest.send({
         name: 'task/process-document',

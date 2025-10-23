@@ -169,10 +169,10 @@ export async function POST(request: NextRequest): Promise<Response> {
           // Dispara el evento correcto de Inngest para que empiece YA el procesamiento
           if (fileType.startsWith('audio/') || fileType.startsWith('video/')) {
             await inngest.send({
-              name: 'task/transcribe',
+              name: 'audio/transcribe.requested',
               data: { jobId },
             });
-            console.log('[blob-upload] Evento enviado: task/transcribe', { jobId });
+            console.log('[blob-upload] Evento enviado: audio/transcribe.requested', { jobId });
           } else {
             await inngest.send({
               name: 'task/process-document',

@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
     // Send job to Inngest queue for async processing
     await inngest.send({
-      name: 'task/transcribe',
+      name: 'audio/transcribe.requested',
       data: {
         jobId: job.id,
         userId: user.userId,
