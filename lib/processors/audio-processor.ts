@@ -5,9 +5,9 @@ import { put } from '@vercel/blob';
 import {
   updateTranscriptionProgress,
   saveTranscriptionResults,
-  markTranscriptionError
+  markTranscriptionError,
+  getTranscriptionJob
 } from '@/lib/db/transcriptions';
-import { TranscriptionJobDB } from '@/lib/db';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -44,7 +44,7 @@ export async function processAudioFile(jobId: string): Promise<void> {
     console.log('[AudioProcessor] Starting processing for job:', jobId);
 
     // Get job data from database
-    const job = await TranscriptionJobDB.findById(jobId);
+    const job = await getTranscriptionJob(jobId);
     if (!job) {
       throw new Error(`Job ${jobId} not found in database`);
     }

@@ -2,6 +2,7 @@
 // Direct document processing without Inngest
 import OpenAI from 'openai';
 import { put } from '@vercel/blob';
+import { getTranscriptionJob } from '@/lib/db/transcriptions';
 import { TranscriptionJobDB } from '@/lib/db';
 
 const openai = process.env.OPENAI_API_KEY
@@ -26,7 +27,7 @@ export async function processDocumentFile(
   try {
     console.log('[DocumentProcessor] Starting processing for job:', jobId);
 
-    const job = await TranscriptionJobDB.findById(jobId);
+    const job = await getTranscriptionJob(jobId);
     if (!job) {
       throw new Error('Job not found');
     }
@@ -125,7 +126,7 @@ export async function processDocumentFile(
 
   } catch (error: any) {
     console.error('[DocumentProcessor] Error processing document:', error);
-    const job = await TranscriptionJobDB.findById(jobId);
+    const job = await getTranscriptionJob(jobId);
     await TranscriptionJobDB.updateStatus(jobId, 'failed');
     await TranscriptionJobDB.updateResults(jobId, {
       metadata: { ...job?.metadata, error: error.message }
