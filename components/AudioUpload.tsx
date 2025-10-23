@@ -2,16 +2,21 @@
 
 import { useState, useRef } from 'react';
 
-export default function AudioUpload() {
-  const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [summaryType, setSummaryType] = useState('detailed');
-  
-  const fileInputRef = useRef(null);
+interface UploadResult {
+  message: string;
+  jobId: string;
+}
 
-  const handleFileChange = (e) => {
+export default function AudioUpload() {
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<UploadResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
@@ -45,7 +50,7 @@ export default function AudioUpload() {
       const data = await response.json();
       setResult(data);
 
-    } catch (err) {
+    } catch (err: any) {
       setError(err.message);
     } finally {
       setUploading(false);
@@ -61,7 +66,7 @@ export default function AudioUpload() {
     }
   };
 
-  const formatFileSize = (bytes) => {
+  const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
@@ -129,7 +134,7 @@ export default function AudioUpload() {
                 name="summaryType"
                 value="short"
                 checked={summaryType === 'short'}
-                onChange={(e) => setSummaryType(e.target.value)}
+                onChange={(e) => setSummaryType(e.target.value as 'short' | 'detailed')}
                 className="w-4 h-4 text-blue-500"
               />
               <span className="text-sm text-gray-700">Breve</span>
@@ -140,7 +145,7 @@ export default function AudioUpload() {
                 name="summaryType"
                 value="detailed"
                 checked={summaryType === 'detailed'}
-                onChange={(e) => setSummaryType(e.target.value)}
+                onChange={(e) => setSummaryType(e.target.value as 'short' | 'detailed')}
                 className="w-4 h-4 text-blue-500"
               />
               <span className="text-sm text-gray-700">Detallado</span>

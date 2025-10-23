@@ -2,15 +2,16 @@
 import { inngest } from '@/lib/inngest/client';
 import OpenAI from 'openai';
 import { put } from '@vercel/blob';
-import { 
-  updateTranscriptionProgress, 
+import {
+  updateTranscriptionProgress,
   saveTranscriptionResults,
-  markTranscriptionError 
+  markTranscriptionError
 } from '@/lib/db/transcriptions';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Inicialización segura de OpenAI (solo si la key existe)
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 // ============================================
 // FUNCIONES HELPER PARA SUBTÍTULOS

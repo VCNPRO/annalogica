@@ -11,22 +11,19 @@ export interface JWTPayload {
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
-    console.log('[verifyToken] Verificando token...');
-    console.log('[verifyToken] Token (primeros 20 chars):', token.substring(0, 20) + '...');
-
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
-      console.error('[verifyToken] JWT_SECRET no configurado');
+      console.error('[Auth] JWT_SECRET no configurado');
       throw new Error('JWT_SECRET not configured');
     }
 
-    console.log('[verifyToken] JWT_SECRET existe:', !!jwtSecret);
-
     const decoded = jwt.verify(token, jwtSecret) as JWTPayload;
-    console.log('[verifyToken] Token decodificado exitosamente:', { userId: decoded.userId, email: decoded.email });
     return decoded;
   } catch (error) {
-    console.error('[verifyToken] Error al verificar token:', error);
+    // Solo loguear en desarrollo para evitar ruido en producción
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Auth] Error al verificar token:', error);
+    }
     return null;
   }
 }
@@ -72,7 +69,9 @@ export async function verifyAdmin(request: Request): Promise<boolean> {
     const user = await UserDB.findById(auth.userId);
     return user?.role === 'admin';
   } catch (error) {
-    console.error('[verifyAdmin] Error verificando admin:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[Auth] Error verificando admin:', error);
+    }
     return false;
   }
 }

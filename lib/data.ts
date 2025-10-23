@@ -9,11 +9,12 @@ import Stripe from 'stripe';
 
 // --- ¡NUEVO! INICIALIZAMOS STRIPE CON TU API KEY ---
 // Asegúrate de que tu STRIPE_SECRET_KEY está en las variables de entorno de Vercel
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  // --- LÍNEA CORREGIDA (LA DEFINITIVA) ---
-  // Usamos la versión exacta que nos pide el error de compilación
-  apiVersion: '2025-09-30.clover',
-});
+// Inicialización segura: solo crea el cliente si la key existe (evita fallos en build)
+const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-09-30.clover',
+    })
+  : null;
 
 
 export async function getUserIsAdmin(userId: string) {
@@ -33,11 +34,16 @@ export async function getUserIsAdmin(userId: string) {
 export async function getAdminDashboardData() {
     noStore();
     try {
+        // Verificar que stripe esté disponible
+        if (!stripe) {
+            throw new Error('Stripe no configurado - falta STRIPE_SECRET_KEY');
+        }
+
         // --- CONSULTA ACTUALIZADA ---
         // Ahora ejecutamos 3 consultas en paralelo: usuarios, costes y los ingresos de Stripe
         const [usersData, kpiData, balanceTransactions] = await Promise.all([
             sql`SELECT id, email, subscription_plan, created_at, monthly_usage, monthly_quota FROM users ORDER BY created_at DESC;`,
-            sql`SELECT 
+            sql`SELECT
                     COUNT(*) as total_users,
                     SUM(total_cost_usd::numeric) as total_costs
                  FROM users;`,

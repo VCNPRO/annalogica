@@ -13,11 +13,6 @@ export async function GET(request: Request) {
     // Get completed jobs from database
     const jobs = await TranscriptionJobDB.findByUserId(user.userId);
 
-    // DEBUG: Log the raw metadata from the DB
-    jobs.forEach(job => {
-      console.log(`[API Files] Metadata for job ${job.id}:`, JSON.stringify(job.metadata, null, 2));
-    });
-
     // Return all jobs for the frontend to display
     const files = jobs.map(job => ({
         name: job.filename.replace(/\.[^/.]+$/, ''), // Remove extension

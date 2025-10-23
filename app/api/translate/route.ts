@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
+import OpenAI from 'openai';
+
+// Inicialización segura de OpenAI
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,34 +53,28 @@ export async function POST(request: NextRequest) {
     }
     const originalText = await txtResponse.text();
 
-    // Use AssemblyAI LeMUR for translation (similar to how we do summaries)
-    const assemblyApiKey = process.env.ASSEMBLYAI_API_KEY;
-    if (!assemblyApiKey) {
-      throw new Error('ASSEMBLYAI_API_KEY not configured');
+    // Verificar que OpenAI esté configurado
+    if (!openai) {
+      throw new Error('OPENAI_API_KEY not configured');
     }
 
-    // Use LeMUR to translate the text
-    const lemurResponse = await fetch('https://api.assemblyai.com/lemur/v3/generate/task', {
-      method: 'POST',
-      headers: {
-        'Authorization': assemblyApiKey,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        prompt: `Translate the following text to ${getLanguageName(targetLanguage)}. Provide only the translation, without any additional commentary:\n\n${originalText}`,
-        context: 'This is a transcription that needs to be translated accurately.',
-        final_model: 'claude-3-5-sonnet'
-      })
+    // Usar GPT-4o para traducir el texto
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "Eres un traductor profesional. Traduce el texto de manera precisa y natural, manteniendo el tono y contexto original. Proporciona SOLO la traducción, sin comentarios adicionales."
+        },
+        {
+          role: "user",
+          content: `Traduce el siguiente texto a ${getLanguageName(targetLanguage)}:\n\n${originalText}`
+        }
+      ],
+      temperature: 0.3, // Más determinístico para traducciones
     });
 
-    if (!lemurResponse.ok) {
-      const errorData = await lemurResponse.json();
-      console.error('LeMUR translation error:', errorData);
-      throw new Error('Error al traducir con AssemblyAI LeMUR');
-    }
-
-    const lemurData = await lemurResponse.json();
-    const translatedText = lemurData.response;
+    const translatedText = completion.choices[0].message.content || '';
 
     return NextResponse.json({
       success: true,

@@ -17,26 +17,29 @@ npm run start
 ## 🔧 Contexto para Claude
 
 **Proyecto:** Annalogica - App transcripción audio con IA
-**Estado:** Migración completa AWS → Replicate/Vercel ✅
+**Estado:** Migración completa a OpenAI Whisper V3 + GPT-4o ✅
 **Puerto:** http://localhost:3000
 **Framework:** Next.js 15.5.4 + TypeScript + Tailwind
 **Última actualización:** 2025-10-06
 
 ### Archivos Clave
-- `app/page.tsx` - Dashboard principal (refactorizado)
-- `app/api/process/route.ts` - Procesamiento con Replicate + Claude
+- `app/page.tsx` - Dashboard principal
+- `app/api/inngest/transcribe-audio.js` - Transcripción con Whisper V3 + GPT-4o
+- `app/api/translate/route.ts` - Traducción con GPT-4o-mini
 - `app/api/auth/` - Autenticación JWT
-- `lib/users-db.ts` - Base datos usuarios (in-memory)
-- `.env.local` - Variables entorno (configurado con JWT_SECRET)
+- `lib/inngest/functions.ts` - Funciones de procesamiento de documentos
+- `.env.local` - Variables entorno
 
 ### Funcionalidades
 1. ✅ Carga archivos audio/video → Vercel Blob
-2. ✅ Transcripción → AssemblyAI
+2. ✅ Transcripción → OpenAI Whisper V3 (whisper-1)
 3. ✅ Generación SRT + TXT + VTT + Speakers
-4. ✅ Resúmenes y Tags → AssemblyAI LeMUR (multiidioma)
-5. ✅ Descarga PDF
-6. ✅ Dashboard con dark/light mode
-7. ✅ Autenticación JWT
+4. ✅ Resúmenes y Tags → OpenAI GPT-4o-mini (multiidioma)
+5. ✅ Identificación de speakers → OpenAI GPT-4o-mini
+6. ✅ Traducciones → OpenAI GPT-4o-mini
+7. ✅ Descarga PDF
+8. ✅ Dashboard con dark/light mode
+9. ✅ Autenticación JWT
 
 ### Problemas Resueltos
 1. Error sintaxis línea 566 → Refactorización completa
@@ -47,12 +50,14 @@ npm run start
 
 ### Configuración Requerida
 Editar `.env.local` con tus tokens:
-- `ASSEMBLYAI_API_KEY` → https://www.assemblyai.com/dashboard/api-keys
-- `BLOB_READ_WRITE_TOKEN` → Vercel Dashboard
-- `JWT_SECRET` → ✅ Ya generado automáticamente
+- `OPENAI_API_KEY` → https://platform.openai.com/api-keys
+- `POSTGRES_URL` → Vercel Dashboard > Storage > Postgres
+- `BLOB_READ_WRITE_TOKEN` → Vercel Dashboard > Storage > Blob
+- `JWT_SECRET` → Generar con: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 - `CRON_SECRET` → Generar token aleatorio para seguridad del cron job
+- `INNGEST_EVENT_KEY` y `INNGEST_SIGNING_KEY` → https://app.inngest.com
 
-**NOTA:** Ya NO se necesita `CLAUDE_API_KEY`. Se usa AssemblyAI LeMUR para resúmenes.
+**Stack actual:** OpenAI Whisper V3 + GPT-4o-mini para todas las funcionalidades de IA.
 
 ### Retención de Archivos
 **IMPORTANTE**: Política de almacenamiento actualizada (2025-10-10)

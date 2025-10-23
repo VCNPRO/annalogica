@@ -11,7 +11,10 @@ import { logTranscription, logSummary } from '@/lib/usage-tracking';
 import { put, del } from '@vercel/blob';
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+// Inicialización segura de OpenAI (solo si la key existe)
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 // ---------- HELPERS ----------
 const saveTextToFile = async (text: string, baseFilename: string, extension: string) => {
@@ -59,6 +62,9 @@ export const summarizeFile = inngest.createFunction(
       const transcriptText = await textResponse.text();
 
       const { summary, tags } = await step.run('generate-summary-and-tags-openai', async () => {
+        if (!openai) {
+          throw new Error('OpenAI no configurado - falta OPENAI_API_KEY');
+        }
         const prompt = `Analiza el texto transcrito. ${generateSummary ? 'Genera un resumen detallado.' : ''} ${generateTags ? 'Genera 5-10 etiquetas clave.' : ''} Responde en JSON con claves "summary" y "tags".`;
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
@@ -139,6 +145,9 @@ export const processDocument = inngest.createFunction(
       let summaryUrl: string | undefined, tags: string[] | undefined;
       if (actions.includes('Resumir') || actions.includes('Etiquetas')) {
         const result = await step.run('generate-doc-summary-openai', async () => {
+          if (!openai) {
+            throw new Error('OpenAI no configurado - falta OPENAI_API_KEY');
+          }
           const prompt = `Analiza el texto de un documento. ${actions.includes('Resumir') ? `Genera un resumen tipo "${summaryType}".` : ''} ${actions.includes('Etiquetas') ? 'Genera 5-10 etiquetas clave.' : ''} Responde en JSON con claves "summary" y "tags".`;
           const completion = await openai.chat.completions.create({
             model: "gpt-4o-mini",
@@ -200,6 +209,9 @@ export const summarizeDocument = inngest.createFunction(
       const { user_id: userId, filename, metadata } = job;
 
       const { summary, tags } = await step.run('generate-legacy-summary-openai', async () => {
+        if (!openai) {
+          throw new Error('OpenAI no configurado - falta OPENAI_API_KEY');
+        }
         const prompt = `Analiza el texto. ${actions.includes('Resumir') ? `Genera un resumen tipo "${summaryType}".` : ''} ${actions.includes('Etiquetas') ? 'Genera 5-10 etiquetas clave.' : ''} Responde en JSON con claves "summary" y "tags".`;
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",

@@ -2,16 +2,17 @@ import { sql } from '@vercel/postgres';
 
 // Cost constants (from COSTES-DETALLADOS.md)
 const COSTS = {
-  // Vercel Blob
+  // Vercel Blob Storage
   STORAGE_PER_GB_MONTH: 0.023,
   BANDWIDTH_PER_GB: 0.05,
 
-  // Replicate Whisper
-  WHISPER_PER_RUN: 0.00046,
+  // OpenAI Whisper V3 (whisper-1 model)
+  // Precio: $0.006 por minuto de audio
+  WHISPER_PER_MINUTE: 0.006,
 
-  // AssemblyAI LeMUR (uses Claude 3.5 Sonnet)
-  LEMUR_INPUT_PER_1M: 3.0,
-  LEMUR_OUTPUT_PER_1M: 15.0,
+  // OpenAI GPT-4o-mini (para resúmenes, traducciones, identificación de speakers)
+  GPT4O_MINI_INPUT_PER_1M: 0.15,
+  GPT4O_MINI_OUTPUT_PER_1M: 0.60,
 };
 
 export interface UsageLog {
@@ -61,8 +62,9 @@ export async function logTranscription(
   filename: string,
   durationSeconds: number | null = null
 ): Promise<void> {
-  // Whisper costs per run, not per duration
-  const costUSD = COSTS.WHISPER_PER_RUN;
+  // Whisper V3 costs $0.006 per minute
+  const durationMinutes = durationSeconds ? durationSeconds / 60 : 1;
+  const costUSD = durationMinutes * COSTS.WHISPER_PER_MINUTE;
 
   await sql`
     INSERT INTO usage_logs (user_id, event_type, duration_seconds, cost_usd, metadata)
@@ -71,22 +73,22 @@ export async function logTranscription(
       'transcription',
       ${durationSeconds},
       ${costUSD},
-      ${JSON.stringify({ filename, service: 'replicate-whisper' })}
+      ${JSON.stringify({ filename, service: 'openai-whisper-v3' })}
     )
   `;
 }
 
 /**
- * Log summary generation (AssemblyAI LeMUR)
+ * Log summary generation (OpenAI GPT-4o)
  */
 export async function logSummary(
   userId: string,
   tokensInput: number,
   tokensOutput: number
 ): Promise<void> {
-  // Calculate cost using LeMUR pricing (same as Claude 3.5 Sonnet)
-  const inputCost = COSTS.LEMUR_INPUT_PER_1M;
-  const outputCost = COSTS.LEMUR_OUTPUT_PER_1M;
+  // Calculate cost using GPT-4o-mini pricing
+  const inputCost = COSTS.GPT4O_MINI_INPUT_PER_1M;
+  const outputCost = COSTS.GPT4O_MINI_OUTPUT_PER_1M;
 
   const costUSD =
     (tokensInput / 1_000_000) * inputCost +
@@ -100,7 +102,7 @@ export async function logSummary(
       ${tokensInput},
       ${tokensOutput},
       ${costUSD},
-      ${JSON.stringify({ service: 'assemblyai-lemur' })}
+      ${JSON.stringify({ service: 'openai-gpt4o-mini' })}
     )
   `;
 }

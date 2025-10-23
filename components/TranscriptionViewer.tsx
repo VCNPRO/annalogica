@@ -1,19 +1,23 @@
-// components/TranscriptionViewer.jsx
+// components/TranscriptionViewer.tsx
 'use client';
 
 import { useTranscriptionPolling } from '@/hooks/useTranscriptionPolling';
 
-export default function TranscriptionViewer({ jobId }) {
+interface TranscriptionViewerProps {
+  jobId: string;
+}
+
+export default function TranscriptionViewer({ jobId }: TranscriptionViewerProps) {
   const { job, loading, error } = useTranscriptionPolling({
     jobId,
     enabled: true,
-    onComplete: (job) => {
+    onComplete: (job: any) => {
       console.log('✅ Transcripción completada:', job.id);
     },
-    onError: (err) => {
+    onError: (err: any) => {
       console.error('❌ Error:', err);
     }
-  });
+  }) as { job: any; loading: boolean; error: string | null };
 
   // Loading inicial
   if (loading && !job) {
@@ -98,7 +102,7 @@ export default function TranscriptionViewer({ jobId }) {
   }
 
   // Completado
-  const formatDuration = (seconds) => {
+  const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
@@ -132,7 +136,7 @@ export default function TranscriptionViewer({ jobId }) {
           {/* Botones de descarga */}
           <div className="flex space-x-2">
             {job.srtUrl && (
-              
+              <a
                 href={job.srtUrl}
                 download
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
@@ -141,7 +145,7 @@ export default function TranscriptionViewer({ jobId }) {
               </a>
             )}
             {job.vttUrl && (
-              
+              <a
                 href={job.vttUrl}
                 download
                 className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
@@ -150,7 +154,7 @@ export default function TranscriptionViewer({ jobId }) {
               </a>
             )}
             {job.txtUrl && (
-              
+              <a
                 href={job.txtUrl}
                 download
                 className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm"
@@ -176,7 +180,7 @@ export default function TranscriptionViewer({ jobId }) {
                 className="w-full h-64 border rounded"
                 title="Resumen"
               />
-              
+              <a
                 href={job.summaryUrl}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -196,7 +200,7 @@ export default function TranscriptionViewer({ jobId }) {
                 className="w-full h-96 border rounded"
                 title="Transcripción"
               />
-              
+              <a
                 href={job.txtUrl}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -220,7 +224,7 @@ export default function TranscriptionViewer({ jobId }) {
                 className="w-full h-48 border rounded"
                 title="Intervinientes"
               />
-              
+              <a
                 href={job.speakersUrl}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -236,7 +240,7 @@ export default function TranscriptionViewer({ jobId }) {
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">🏷️ Etiquetas</h2>
               <div className="flex flex-wrap gap-2">
-                {job.tags.map((tag, index) => (
+                {job.tags.map((tag: string, index: number) => (
                   <span
                     key={index}
                     className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium"
