@@ -5,7 +5,7 @@ import { Inngest } from "inngest";
 // En desarrollo, Inngest puede funcionar sin eventKey/signingKey
 // En producción, estas claves son obligatorias y se configuran en Vercel
 const inngestConfig: any = {
-  id: "annalogica",
+  id: "annalógica",
 };
 
 // Solo agregar eventKey si está definida (necesario para producción)
