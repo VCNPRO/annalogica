@@ -7,6 +7,7 @@ import {
   saveTranscriptionResults,
   markTranscriptionError
 } from '@/lib/db/transcriptions';
+import { TranscriptionJobDB } from '@/lib/db';
 
 // Inicialización segura de OpenAI (solo si la key existe)
 const openai = process.env.OPENAI_API_KEY
@@ -47,9 +48,22 @@ const transcribeFile = inngest.createFunction(
   },
   { event: 'audio/transcribe.requested' },
   async ({ event, step }) => {
-    
-    const { jobId, audioUrl, fileName, userId, summaryType = 'detailed' } = event.data;
-    
+
+    const { jobId } = event.data;
+
+    // Obtener datos del job desde la BD
+    const job = await TranscriptionJobDB.findById(jobId);
+    if (!job) {
+      throw new Error(`Job ${jobId} no encontrado en la base de datos`);
+    }
+
+    const audioUrl = job.audio_url;
+    const fileName = job.filename;
+    const userId = job.user_id;
+    const summaryType = job.metadata?.summaryType || 'detailed';
+
+    console.log('🚀 Iniciando transcripción:', { jobId, fileName, userId });
+
     try {
       // ============================================
       // PASO 1: Descargar audio y preparar para Whisper
