@@ -56,23 +56,36 @@ const transcribeFile = inngest.createFunction(
       // ============================================
       const audioFile = await step.run('download-audio', async () => {
         console.log('📥 Descargando audio:', fileName);
-        
+
         const response = await fetch(audioUrl);
         if (!response.ok) {
           throw new Error(`Error descargando audio: ${response.status}`);
         }
-        
-        const blob = await response.blob();
-        const file = new File([blob], fileName, { 
-          type: response.headers.get('content-type') || 'audio/mpeg'
-        });
-        
+
+        // En Node.js, necesitamos buffer en lugar de File
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        // Crear un objeto File compatible con OpenAI SDK para Node.js
+        const file = {
+          name: fileName,
+          type: response.headers.get('content-type') || 'audio/mpeg',
+          size: buffer.length,
+          // OpenAI SDK necesita esto para enviar el archivo
+          arrayBuffer: async () => buffer,
+          stream: () => {
+            const { Readable } = require('stream');
+            return Readable.from(buffer);
+          },
+          slice: (start, end) => buffer.slice(start, end)
+        };
+
         console.log('✅ Audio descargado:', {
-          size: `${(blob.size / 1024 / 1024).toFixed(2)} MB`,
+          size: `${(buffer.length / 1024 / 1024).toFixed(2)} MB`,
           type: file.type
         });
-        
-        return file;
+
+        return { file, buffer, fileName };
       });
 
       await updateTranscriptionProgress(jobId, 20);
@@ -82,9 +95,9 @@ const transcribeFile = inngest.createFunction(
       // ============================================
       const transcription = await step.run('whisper-transcribe', async () => {
         console.log('🎤 Iniciando transcripción con Whisper...');
-        
+
         const response = await openai.audio.transcriptions.create({
-          file: audioFile,
+          file: audioFile.file,
           model: "whisper-1",
           language: "es",
           response_format: "verbose_json",
