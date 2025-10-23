@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
-import { inngest } from '@/lib/inngest/client';
 import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guard';
+import { processDocumentFile } from '@/lib/processors/document-processor';
 
 /**
  * POST /api/process-document
@@ -94,52 +94,18 @@ export async function POST(request: NextRequest) {
 
     console.log(`[ProcessDocument] Job created: ${job.id}`);
 
-    // Trigger Inngest worker for document processing
-    try {
-      console.log('[ProcessDocument] About to send Inngest event:', {
-        name: 'task/process-document',
-        jobId: job.id,
-        documentUrl: blobUrl,
-        filename: fileName
+    // Process document directly (no Inngest)
+    // Execute in background without blocking the response
+    processDocumentFile(job.id, blobUrl, fileName, actions, language, summaryType)
+      .catch((error) => {
+        console.error('[ProcessDocument] Background processing failed:', {
+          error: error.message,
+          stack: error.stack,
+          jobId: job.id
+        });
       });
 
-      const eventResult = await inngest.send({
-        name: 'task/process-document',
-        data: {
-          jobId: job.id,
-          documentUrl: blobUrl,
-          filename: fileName,
-          actions,
-          language,
-          summaryType
-        }
-      });
-
-      console.log('[ProcessDocument] ✅ Inngest event sent successfully:', eventResult);
-      console.log(`[ProcessDocument] Inngest worker triggered for job ${job.id}`);
-    } catch (inngestError: any) {
-      console.error('[ProcessDocument] ❌ FAILED to send Inngest event:', {
-        error: inngestError.message,
-        stack: inngestError.stack,
-        jobId: job.id,
-        eventName: 'task/process-document'
-      });
-
-      // Mark job as failed since we couldn't trigger processing
-      await TranscriptionJobDB.updateStatus(job.id, 'failed');
-      await TranscriptionJobDB.updateResults(job.id, {
-        metadata: {
-          actions,
-          summaryType,
-          isDocument: true,
-          fileType: ext,
-          error: `Error al enviar evento a Inngest: ${inngestError.message}`,
-          errorTimestamp: new Date().toISOString()
-        }
-      });
-
-      throw inngestError; // Re-throw to return 500 error to client
-    }
+    console.log('[ProcessDocument] Processing started in background for job:', job.id);
 
     // Increment usage
     await incrementUsage(auth.userId);

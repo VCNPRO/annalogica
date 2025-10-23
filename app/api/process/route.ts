@@ -1,8 +1,8 @@
 import { verifyRequestAuth } from '@/lib/auth';
 import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 import { TranscriptionJobDB } from '@/lib/db';
-import { inngest } from '@/lib/inngest/client';
 import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guard';
+import { processAudioFile } from '@/lib/processors/audio-processor';
 import {
   successResponse,
   handleError,
@@ -133,18 +133,16 @@ export async function POST(request: Request) {
       audioUrl: audioUrl.substring(0, 50) + '...'
     });
 
-    // Send job to Inngest queue for async processing
-    await inngest.send({
-      name: 'audio/transcribe.requested',
-      data: {
+    // Process audio directly (no Inngest)
+    // Execute in background without blocking the response
+    processAudioFile(job.id).catch((error) => {
+      logger.error('Process API: Background processing failed', error, {
         jobId: job.id,
-        userId: user.userId,
-        audioUrl,
-        filename: filename.trim()
-      }
+        userId: user.userId
+      });
     });
 
-    logger.info('Process API: Job sent to Inngest', { jobId: job.id });
+    logger.info('Process API: Processing started in background', { jobId: job.id });
 
     // QUOTA: Increment usage counter after successful job creation
     try {
