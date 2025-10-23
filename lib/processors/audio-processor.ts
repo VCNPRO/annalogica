@@ -279,7 +279,7 @@ Responde SOLO con JSON:
       summaryUrl: summaryBlob.url,
       speakersUrl: speakersBlob.url,
       tags: tags,
-      duration: transcriptionDuration,
+      duration: Math.round(transcriptionDuration), // Round to integer for DB
       metadata: {
         speakers: speakers,
         segments: transcriptionSegments?.length || 0,
