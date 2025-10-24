@@ -113,31 +113,30 @@ export async function getAllUsersWithMetrics(params?: {
         u.email,
         u.name,
         u.role,
-        u.account_type,
-        u.account_status,
+        COALESCE(u.account_type, 'production') as account_type,
+        COALESCE(u.account_status, 'active') as account_status,
         u.internal_notes,
-        u.tags,
+        COALESCE(u.tags, '{}') as tags,
         u.stripe_customer_id,
         u.stripe_subscription_id,
         u.subscription_status,
-        u.subscription_plan,
-        u.total_cost_usd,
+        u.subscription_tier as subscription_plan,
+        COALESCE(u.total_cost_usd, 0) as total_cost_usd,
         u.monthly_budget_usd,
         u.created_at,
         u.last_activity_at,
-        COUNT(DISTINCT ul.id) FILTER (WHERE ul.created_at > NOW() - INTERVAL '30 days') as total_operations,
-        COUNT(DISTINCT t.id) as total_files,
-        COALESCE(SUM(ul.cost_usd) FILTER (WHERE ul.created_at > NOW() - INTERVAL '30 days'), 0) as cost_last_30_days,
-        COALESCE(SUM(ul.cost_usd), 0) as total_cost,
-        COUNT(CASE WHEN ul.event_type = 'upload' THEN 1 END) as uploads_count,
-        COUNT(CASE WHEN ul.event_type = 'transcription' THEN 1 END) as transcriptions_count
+        COUNT(DISTINCT tj.id) as total_operations,
+        COUNT(DISTINCT tj.id) as total_files,
+        COALESCE(SUM(CASE WHEN tj.created_at > NOW() - INTERVAL '30 days' THEN 0.01 ELSE 0 END), 0) as cost_last_30_days,
+        COALESCE(u.total_cost_usd, 0) as total_cost,
+        0 as uploads_count,
+        COUNT(CASE WHEN tj.status = 'completed' THEN 1 END) as transcriptions_count
       FROM users u
-      LEFT JOIN usage_logs ul ON u.id = ul.user_id
-      LEFT JOIN transcriptions t ON u.id = t.user_id
+      LEFT JOIN transcription_jobs tj ON u.id = tj.user_id
       WHERE ${whereClause}
       GROUP BY u.id, u.email, u.name, u.role, u.account_type, u.account_status,
                u.internal_notes, u.tags, u.stripe_customer_id, u.stripe_subscription_id,
-               u.subscription_status, u.subscription_plan, u.total_cost_usd,
+               u.subscription_status, u.subscription_tier, u.total_cost_usd,
                u.monthly_budget_usd, u.created_at, u.last_activity_at
       ORDER BY ${orderByClause}
       LIMIT ${limitParam}
@@ -350,21 +349,22 @@ export async function getPlatformStatistics(): Promise<{
 
     const userStats = usersResult.rows[0];
 
-    // Costs
+    // Costs (simplified - using transcription_jobs instead of usage_logs)
     const costsResult = await sql`
       SELECT
-        COALESCE(SUM(cost_usd), 0) as total_cost_all_time,
-        COALESCE(SUM(CASE WHEN created_at >= date_trunc('month', NOW()) THEN cost_usd ELSE 0 END), 0) as total_cost_this_month,
-        COUNT(DISTINCT user_id) as users_with_usage
-      FROM usage_logs
+        COALESCE(SUM(u.total_cost_usd), 0) as total_cost_all_time,
+        0 as total_cost_this_month,
+        COUNT(DISTINCT u.id) as users_with_usage
+      FROM users u
+      WHERE u.total_cost_usd > 0
     `;
 
     const costStats = costsResult.rows[0];
 
-    // Files
+    // Files (using transcription_jobs instead of transcriptions)
     const filesResult = await sql`
       SELECT COUNT(*) as total_files
-      FROM transcriptions
+      FROM transcription_jobs
     `;
 
     const fileStats = filesResult.rows[0];

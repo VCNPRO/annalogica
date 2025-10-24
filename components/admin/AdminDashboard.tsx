@@ -202,7 +202,7 @@ export function AdminDashboard() {
 
   const handleResetUsage = async (userId: string) => {
     try {
-      const res = await fetch('/api/admin/user-quota/reset', {
+      const res = await fetch('/api/admin/user-quota', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
