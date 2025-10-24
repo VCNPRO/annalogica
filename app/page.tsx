@@ -583,6 +583,16 @@ export default function Dashboard() {
             throw new Error(`Las acciones ${invalidActions.join(', ')} no están disponibles para documentos de texto. Solo puedes usar Resumen y Etiquetas.`);
           }
 
+          // 🔥 CAMBIO: Poner el archivo en estado "processing" ANTES de llamar al API
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === file.id ? {
+              ...f,
+              status: 'processing' as const,
+              processingProgress: 5,
+              processingStartTime: Date.now()
+            } : f
+          ));
+
           // Send document URL to server for processing (same as audio/video)
           // Server will download, parse with multi-layer fallback, and process
           const processRes = await fetch('/api/process-document', {
@@ -633,6 +643,17 @@ export default function Dashboard() {
         } else {
           // Procesar como audio/video (la transcripción se hace siempre internamente)
           console.log('[Process] 🎵 Processing as AUDIO/VIDEO');
+
+          // 🔥 CAMBIO: Poner el archivo en estado "processing" ANTES de llamar al API
+          // para que el usuario vea la barra de progreso inmediatamente
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === file.id ? {
+              ...f,
+              status: 'processing' as const,
+              processingProgress: 5,
+              processingStartTime: Date.now()
+            } : f
+          ));
 
           // SECURITY: Cookie httpOnly se envía automáticamente
           const processRes = await fetch('/api/process', {
