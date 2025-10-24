@@ -17,6 +17,7 @@ import {
   validateUrl
 } from '@/lib/errors';
 import { logger } from '@/lib/logger';
+import { trackError, extractRequestContext } from '@/lib/error-tracker';
 import type { JobCreateResponse } from '@/types/job';
 
 // Configure maximum execution time for audio processing
@@ -187,6 +188,27 @@ export async function POST(request: Request) {
         userId: user.userId
       });
 
+      // Track error en sistema de monitoreo
+      const context = extractRequestContext(request);
+      await trackError(
+        'processing_error',
+        'critical',
+        processingError.message || 'Error desconocido en procesamiento de audio',
+        processingError,
+        {
+          ...context,
+          userId: user.userId,
+          userEmail: user.email,
+          metadata: {
+            jobId: job.id,
+            filename,
+            audioUrl: audioUrl.substring(0, 100),
+            actions,
+            summaryType
+          }
+        }
+      );
+
       // Return error response
       return successResponse({
         success: false,
@@ -196,7 +218,17 @@ export async function POST(request: Request) {
         error: processingError.message
       }, 'Error en procesamiento', 500);
     }
-  } catch (error) {
+  } catch (error: any) {
+    // Track error en sistema de monitoreo
+    const context = extractRequestContext(request);
+    await trackError(
+      'api_process_error',
+      'high',
+      error.message || 'Error desconocido en API /api/process',
+      error,
+      context
+    );
+
     return handleError(error, {
       endpoint: 'POST /api/process'
     });
