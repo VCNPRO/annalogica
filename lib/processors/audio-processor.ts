@@ -102,7 +102,7 @@ export async function processAudioFile(jobId: string): Promise<void> {
       console.log('[AudioProcessor] Using automatic language detection');
     }
 
-    const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams);
+    const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams) as any;
 
     const transcriptionText = transcriptionResponse.text;
     const transcriptionDuration = transcriptionResponse.duration;
