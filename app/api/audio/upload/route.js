@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { put } from '@vercel/blob';
 import { inngest } from '@/lib/inngest/client';
 import { createTranscriptionJob } from '@/lib/db/transcriptions';
+import { trackError, extractRequestContext } from '@/lib/error-tracker';
 
 export const config = {
   api: {
@@ -11,14 +12,18 @@ export const config = {
 };
 
 export async function POST(request) {
+  let formData;
+  let file;
+  let summaryType;
+
   try {
     // TODO: Obtener userId de tu sistema de autenticación
     // Por ahora usa un userId temporal para testing
     const userId = request.headers.get('x-user-id') || 'test-user';
-    
-    const formData = await request.formData();
-    const file = formData.get('file');
-    const summaryType = formData.get('summaryType') || 'detailed';
+
+    formData = await request.formData();
+    file = formData.get('file');
+    summaryType = formData.get('summaryType') || 'detailed';
     
     if (!file) {
       return NextResponse.json(
@@ -96,6 +101,24 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('❌ Error en upload:', error);
+
+    // Track error en sistema de monitoreo
+    const context = extractRequestContext(request);
+    await trackError(
+      'upload_error',
+      'high',
+      error.message || 'Error desconocido en upload de audio',
+      error,
+      {
+        ...context,
+        metadata: {
+          fileName: file?.name,
+          fileSize: file?.size,
+          summaryType,
+        }
+      }
+    );
+
     return NextResponse.json(
       { error: 'Error al procesar el archivo', details: error.message },
       { status: 500 }

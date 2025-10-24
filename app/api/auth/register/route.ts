@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserDB } from '@/lib/db';
 import { registerRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
+import { trackError, extractRequestContext } from '@/lib/error-tracker';
 
 export async function POST(request: NextRequest) {
   try {
@@ -99,6 +100,16 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Track error en sistema de monitoreo (solo para errores inesperados)
+    const context = extractRequestContext(request);
+    await trackError(
+      'auth_register_error',
+      'high',
+      error.message || 'Error desconocido en registro de usuario',
+      error,
+      context
+    );
 
     return NextResponse.json(
       { error: 'Error interno del servidor' },

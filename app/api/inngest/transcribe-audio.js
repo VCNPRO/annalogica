@@ -8,6 +8,7 @@ import {
   markTranscriptionError
 } from '@/lib/db/transcriptions';
 import { TranscriptionJobDB } from '@/lib/db';
+import { trackError } from '@/lib/error-tracker';
 
 // Inicializacion segura de OpenAI (solo si la key existe)
 const openai = process.env.OPENAI_API_KEY
@@ -431,6 +432,24 @@ Responde SOLO con JSON:
     } catch (error) {
       console.error('[transcribe] Error en transcripcion:', error);
       await markTranscriptionError(jobId, error.message);
+
+      // Track error en sistema de monitoreo
+      await trackError(
+        'transcription_error',
+        'critical',
+        error.message || 'Error desconocido en transcripción de audio',
+        error,
+        {
+          userId: jobData.userId,
+          metadata: {
+            jobId,
+            fileName: jobData.fileName,
+            audioUrl: jobData.audioUrl,
+            summaryType: jobData.summaryType,
+          }
+        }
+      );
+
       throw error;
     }
   }

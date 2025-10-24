@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { UserDB } from '@/lib/db';
 import { loginRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
+import { trackError, extractRequestContext } from '@/lib/error-tracker';
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,8 +81,19 @@ export async function POST(request: NextRequest) {
 
     return response;
 
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error in login endpoint', error);
+
+    // Track error en sistema de monitoreo
+    const context = extractRequestContext(request);
+    await trackError(
+      'auth_login_error',
+      'high',
+      error.message || 'Error desconocido en login',
+      error,
+      context
+    );
+
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }

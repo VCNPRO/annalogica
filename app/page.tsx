@@ -254,7 +254,8 @@ export default function Dashboard() {
           // Check if this is a document (PDF, DOCX, TXT)
           const isDocument = file.fileType === 'text' || job.metadata?.isDocument;
 
-          if (job.status === 'processing' || job.status === 'transcribed') {
+          // 🔥 ARREGLO: Cambiar automáticamente de "pending" a "processing"
+          if (job.status === 'pending' || job.status === 'processing' || job.status === 'transcribed') {
             newStatus = 'processing';
 
             // Set processing start time if not already set
@@ -1431,70 +1432,83 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="ml-6 space-y-1">
+                    <div className="ml-6 space-y-2">
                       {file.status === 'uploading' && (
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <span className={`text-xs ${textSecondary}`}>Subida</span>
+                        <div className={`${darkMode ? 'bg-blue-950/30' : 'bg-blue-50'} p-3 rounded-lg border ${darkMode ? 'border-blue-800' : 'border-blue-200'}`}>
+                          <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2">
-                              <span className="relative flex h-2 w-2">
+                              <span className="relative flex h-3 w-3">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
                               </span>
-                              <span className="text-xs text-blue-500">{file.uploadProgress.toFixed(0)}%</span>
+                              <span className={`text-sm font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>Subiendo archivo...</span>
                             </div>
+                            <span className={`text-sm font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>{file.uploadProgress.toFixed(0)}%</span>
                           </div>
-                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
-                            <div className="bg-blue-500 h-1 rounded-full transition-all" style={{ width: `${file.uploadProgress}%` }} />
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className={`text-xs ${textSecondary}`} title="Tamaño del archivo">
+                              📦 {formatFileSize(file.fileSize)}
+                            </span>
+                          </div>
+                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-2.5 overflow-hidden`}>
+                            <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                                 style={{ width: `${file.uploadProgress}%` }} />
                           </div>
                         </div>
                       )}
                       {file.status === 'processing' && (
-                        <div>
-                          <div className="flex justify-between items-center mb-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`text-xs ${textSecondary}`}>
-                                {(file.processingProgress || 0) >= 98 ? '🟡 Finalizando...' : 'Procesando'}
-                              </span>
-                              {(file.processingProgress || 0) >= 98 && (
-                                <span className={`text-xs ${textSecondary} italic`}>(Generando resumen)</span>
-                              )}
-                            </div>
+                        <div className={`${darkMode ? 'bg-purple-950/30' : 'bg-purple-50'} p-3 rounded-lg border ${darkMode ? 'border-purple-800' : 'border-purple-200'}`}>
+                          <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-2">
                               {(file.processingProgress || 0) >= 90 ? (
-                                <span className="relative flex h-2 w-2" title="Finalizando - Generando resumen y oradores">
+                                <span className="relative flex h-3 w-3" title="Finalizando - Generando resumen y oradores">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
                                 </span>
                               ) : (
-                                <span className="relative flex h-2 w-2" title="Procesando - Transcribiendo audio">
+                                <span className="relative flex h-3 w-3" title="Procesando - Transcribiendo audio">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                                 </span>
                               )}
-                              <span className="text-xs text-purple-500">{file.processingProgress || 0}%</span>
+                              <span className={`text-sm font-medium ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
+                                {(file.processingProgress || 0) >= 98 ? '🟡 Finalizando...' : (file.processingProgress || 0) >= 90 ? '⚡ Generando resumen' : '🎙️ Transcribiendo'}
+                              </span>
                             </div>
+                            <span className={`text-sm font-bold ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>{file.processingProgress || 0}%</span>
                           </div>
 
-                          {/* Timer, file size, and estimated time info */} 
-                          <div className="flex justify-between items-center mb-1">
-                            <div className="flex items-center gap-3">
-                              <span className={`text-xs ${textSecondary}`} title="Tiempo transcurrido">
-                                ⏱️ {formatElapsedTime(file.processingStartTime)}
+                          {/* Timer, file size, and estimated time info */}
+                          <div className="grid grid-cols-3 gap-2 mb-2">
+                            <div className={`flex items-center gap-1.5 ${darkMode ? 'bg-zinc-800/50' : 'bg-white'} px-2 py-1.5 rounded`}>
+                              <span className="text-sm" title="Tiempo transcurrido">⏱️</span>
+                              <span className={`text-xs font-medium ${textSecondary}`}>
+                                {formatElapsedTime(file.processingStartTime)}
                               </span>
-                              <span className={`text-xs ${textSecondary}`} title="Tamaño del archivo">
-                                📦 {formatFileSize(file.fileSize)}
+                            </div>
+                            <div className={`flex items-center gap-1.5 ${darkMode ? 'bg-zinc-800/50' : 'bg-white'} px-2 py-1.5 rounded`}>
+                              <span className="text-sm" title="Tamaño del archivo">📦</span>
+                              <span className={`text-xs font-medium ${textSecondary}`}>
+                                {formatFileSize(file.fileSize)}
                               </span>
                             </div>
                             {file.estimatedTimeRemaining !== undefined && file.estimatedTimeRemaining > 0 && (
-                              <span className={`text-xs ${textSecondary}`} title="Tiempo estimado restante">
-                                ⏳ ~{formatTimeRemaining(file.estimatedTimeRemaining)}
-                              </span>
+                              <div className={`flex items-center gap-1.5 ${darkMode ? 'bg-zinc-800/50' : 'bg-white'} px-2 py-1.5 rounded`}>
+                                <span className="text-sm" title="Tiempo restante">⏳</span>
+                                <span className={`text-xs font-medium ${textSecondary}`}>
+                                  ~{formatTimeRemaining(file.estimatedTimeRemaining)}
+                                </span>
+                              </div>
                             )}
                           </div>
 
-                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
-                            <div className="bg-purple-500 h-1 rounded-full transition-all" style={{ width: `${file.processingProgress || 0}%` }} />
+                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-2.5 overflow-hidden`}>
+                            <div className={`h-2.5 rounded-full transition-all duration-300 ease-out ${
+                              (file.processingProgress || 0) >= 90
+                                ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
+                                : 'bg-gradient-to-r from-purple-500 to-indigo-600'
+                            }`}
+                                 style={{ width: `${file.processingProgress || 0}%` }} />
                           </div>
                         </div>
                       )}

@@ -4,6 +4,7 @@
 
 import { useState, useEffect, type ReactNode } from 'react';
 import { Sun, Moon, Users, Euro, Server, PieChart, CheckCircle, AlertTriangle, MoreHorizontal, History, Replace, LogIn, Ban, X, Clock, File, User, Tag } from 'lucide-react';
+import ErrorMonitoringPanel from './ErrorMonitoringPanel';
 
 // --- SUB-COMPONENTES DE UI ---
 
@@ -396,7 +397,12 @@ export function AdminDashboard() {
         <KpiCard title="Costes APIs (Mes)" value={`€${data.kpis.apiCosts}`} icon={<Server size={20} />} trend="-69% (migración)" trendDirection="up" />
         <KpiCard title="Margen Bruto" value={`${data.kpis.grossMargin}%`} icon={<PieChart size={20} />} trend="Objetivo: > 85%" trendDirection="none" />
       </div>
-      
+
+      {/* Error Monitoring Panel */}
+      <div className="mt-8">
+        <ErrorMonitoringPanel />
+      </div>
+
       {/* Beta Testers Management */}
       <div className="mt-8 bg-white dark:bg-gray-800 shadow-md rounded-lg border border-gray-200 dark:border-gray-700">
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
