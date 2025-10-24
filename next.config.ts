@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Enable instrumentation for Sentry
+  experimental: {
+    instrumentationHook: true,
+  },
+
   async headers() {
     return [
       {
@@ -43,7 +48,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com data:",
               "img-src 'self' data: https: blob:",
-              "connect-src 'self' https://api.anthropic.com https://api.assemblyai.com https://vercel.com https://*.vercel.com https://*.vercel-storage.com https://*.blob.vercel-storage.com",
+              "connect-src 'self' https://api.anthropic.com https://api.assemblyai.com https://vercel.com https://*.vercel.com https://*.vercel-storage.com https://*.blob.vercel-storage.com https://*.sentry.io",
               "frame-src 'self'",
               "object-src 'none'",
               "base-uri 'self'",
