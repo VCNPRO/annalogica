@@ -308,8 +308,16 @@ export function AdminDashboard() {
                           <input
                             type="number"
                             value={newQuota}
-                            onChange={(e) => setNewQuota(parseInt(e.target.value))}
-                            className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
+                            onChange={(e) => setNewQuota(parseInt(e.target.value) || 0)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleUpdateQuota(user.id, newQuota);
+                              } else if (e.key === 'Escape') {
+                                setEditingQuota(null);
+                              }
+                            }}
+                            autoFocus
+                            className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                           />
                           <button
                             onClick={() => handleUpdateQuota(user.id, newQuota)}
@@ -319,7 +327,7 @@ export function AdminDashboard() {
                           </button>
                           <button
                             onClick={() => setEditingQuota(null)}
-                            className="px-2 py-1 text-xs bg-gray-300 dark:bg-gray-600 rounded hover:bg-gray-400"
+                            className="px-2 py-1 text-xs bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-400 dark:hover:bg-gray-500"
                           >
                             ✕
                           </button>
