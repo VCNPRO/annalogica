@@ -238,6 +238,58 @@ export function AdminDashboard() {
     }
   };
 
+  const handleDeleteUser = async (userId: string, email: string) => {
+    // Confirmación con el email del usuario
+    const confirmed = window.confirm(
+      `¿Estás SEGURO de que quieres eliminar a este usuario?\n\n` +
+      `Email: ${email}\n` +
+      `ID: ${userId}\n\n` +
+      `Esta acción NO se puede deshacer. Se eliminarán:\n` +
+      `- El usuario y su contraseña\n` +
+      `- Todos sus archivos procesados\n` +
+      `- Todo su historial\n\n` +
+      `Escribe el email para confirmar.`
+    );
+
+    if (!confirmed) return;
+
+    // Segunda confirmación: escribir el email
+    const emailConfirm = window.prompt(
+      `Para confirmar la eliminación, escribe el email del usuario:\n${email}`
+    );
+
+    if (emailConfirm !== email) {
+      alert('El email no coincide. Eliminación cancelada.');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/users/delete', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+
+      if (res.ok) {
+        alert(`Usuario ${email} eliminado correctamente.`);
+        // Refresh data
+        const usersRes = await fetch('/api/admin/users', {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const users = await usersRes.json();
+        setData({ ...data, users: users.users || [] });
+      } else {
+        const error = await res.json();
+        alert(`Error al eliminar usuario: ${error.error || 'Error desconocido'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Error al eliminar usuario. Ver consola para detalles.');
+    }
+  };
+
   useEffect(() => { 
     const savedTheme = localStorage.getItem('theme') || 'light';
     const newIsDark = savedTheme === 'dark';
@@ -281,6 +333,7 @@ export function AdminDashboard() {
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Nombre</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Plan</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Cuota Mensual</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Uso Actual</th>
@@ -296,6 +349,9 @@ export function AdminDashboard() {
                         <span className="font-semibold text-sm">{user.email}</span>
                         <span className="text-xs text-gray-400 font-mono">{user.id}</span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">{user.name || '-'}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
@@ -365,6 +421,12 @@ export function AdminDashboard() {
                           className="px-3 py-1 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded hover:bg-orange-200 dark:hover:bg-orange-900/50"
                         >
                           Reset Uso
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(user.id, user.email)}
+                          className="px-3 py-1 text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-900/50"
+                        >
+                          Eliminar
                         </button>
                       </div>
                     </td>
