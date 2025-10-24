@@ -22,6 +22,7 @@ interface ProcessedJob {
     tags?: string[];
     excelUrl?: string;
     pdfUrl?: string;
+    fileType?: 'audio' | 'document';
   };
 }
 
