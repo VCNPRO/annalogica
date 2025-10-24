@@ -29,9 +29,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the job details
-    const job = await getTranscriptionJob(jobId, auth.userId);
+    const job = await getTranscriptionJob(jobId);
 
-    if (!job) {
+    if (!job || job.user_id !== auth.userId) {
       return NextResponse.json(
         { error: 'Trabajo no encontrado o no autorizado' },
         { status: 404 }
