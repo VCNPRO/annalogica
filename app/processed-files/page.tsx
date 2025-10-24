@@ -505,13 +505,6 @@ export default function ProcessedFilesPage() {
           </div>
 
           <div className="mt-auto">
-            <Link
-              href="/"
-              className="flex items-center justify-center gap-2 p-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium transition-colors mb-4"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Volver al Dashboard</span>
-            </Link>
             <div className="pt-4 border-t border-zinc-800 text-center">
               <p className="text-xs text-zinc-500">
                 annalogica by videoconversion digital lab, S.L.
