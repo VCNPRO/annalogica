@@ -6,7 +6,7 @@ import { ChevronDown, ChevronRight, Download, Home } from 'lucide-react';
 
 export default function GuiaUsuario() {
   const router = useRouter();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['quick-start']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['que-puede-hacer']));
 
   const toggleSection = (sectionId: string) => {
     const newExpanded = new Set(expandedSections);
@@ -31,11 +31,8 @@ export default function GuiaUsuario() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">A</span>
-              </div>
               <div>
-                <h1 className="font-orbitron text-2xl font-bold text-orange-500">
+                <h1 className="font-orbitron text-3xl font-bold text-orange-500">
                   annalogica
                 </h1>
                 <p className="text-sm text-gray-600">
@@ -72,11 +69,295 @@ export default function GuiaUsuario() {
             Guía Completa de Usuario
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Aprende a utilizar annalogica para transcribir, analizar y gestionar tus contenidos de audio y vídeo con inteligencia artificial.
+            Aprende a utilizar <span className="font-orbitron text-orange-500 font-semibold">annalogica</span> para transcribir, analizar y gestionar tus contenidos de audio y vídeo con inteligencia artificial.
           </p>
         </div>
 
-        {/* Quick Start Section */}
+        {/* ⭐ QUÉ PUEDE HACER - Sección destacada al inicio */}
+        <Section
+          id="que-puede-hacer"
+          title="⭐ ¿Qué puede hacer annalogica?"
+          expanded={expandedSections.has('que-puede-hacer')}
+          onToggle={() => toggleSection('que-puede-hacer')}
+        >
+          <div className="space-y-8">
+
+            {/* Funcionalidades Principales */}
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+                Funcionalidades Completas
+              </h3>
+              <div className="grid md:grid-cols-2 gap-6">
+
+                <div className="p-6 bg-gradient-to-br from-orange-50 to-white rounded-lg border-2 border-orange-200">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-3xl">🎙️</span>
+                    <div>
+                      <h4 className="text-lg font-bold text-orange-900">Transcripción de Audio y Vídeo</h4>
+                      <p className="text-sm text-orange-800 mt-2">
+                        Convierte automáticamente archivos de audio y vídeo a texto con 95%+ de precisión.
+                        Soporta 9 idiomas con detección automática.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-orange-800 space-y-1 ml-12">
+                    <li>• MP3, MP4, WAV, M4A, FLAC, WebM, MOV, AVI</li>
+                    <li>• Español, Català, Euskera, Galego, Português, English, Français, Deutsch, Italiano</li>
+                    <li>• Procesa 1 hora de audio en ~3 minutos</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-gradient-to-br from-blue-50 to-white rounded-lg border-2 border-blue-200">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-3xl">👥</span>
+                    <div>
+                      <h4 className="text-lg font-bold text-blue-900">Identificación de Oradores</h4>
+                      <p className="text-sm text-blue-800 mt-2">
+                        Detecta automáticamente quién habla, cuándo y cuánto tiempo. Extrae nombres y cargos mencionados en el audio.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-blue-800 space-y-1 ml-12">
+                    <li>• Diarización automática de hablantes</li>
+                    <li>• Estadísticas por orador (tiempo, palabras, intervenciones)</li>
+                    <li>• Identificación inteligente de nombres y roles</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-gradient-to-br from-green-50 to-white rounded-lg border-2 border-green-200">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-3xl">📋</span>
+                    <div>
+                      <h4 className="text-lg font-bold text-green-900">Resúmenes Inteligentes con IA</h4>
+                      <p className="text-sm text-green-800 mt-2">
+                        Genera resúmenes automáticos del contenido usando GPT-4o-mini. Captura lo esencial en 3-4 párrafos.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-green-800 space-y-1 ml-12">
+                    <li>• Resúmenes cortos (ejecutivos) o detallados</li>
+                    <li>• Mantiene contexto y puntos clave</li>
+                    <li>• Multiidioma (respeta idioma original)</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-gradient-to-br from-purple-50 to-white rounded-lg border-2 border-purple-200">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-3xl">📄</span>
+                    <div>
+                      <h4 className="text-lg font-bold text-purple-900">Subtítulos Profesionales</h4>
+                      <p className="text-sm text-purple-800 mt-2">
+                        Genera archivos de subtítulos SRT y VTT listos para usar en vídeos y plataformas de streaming.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-purple-800 space-y-1 ml-12">
+                    <li>• Formatos SRT (SubRip) y VTT (WebVTT)</li>
+                    <li>• Sincronización precisa al milisegundo</li>
+                    <li>• Compatible con editores de vídeo profesionales</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-gradient-to-br from-pink-50 to-white rounded-lg border-2 border-pink-200">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-3xl">🏷️</span>
+                    <div>
+                      <h4 className="text-lg font-bold text-pink-900">Etiquetas Automáticas</h4>
+                      <p className="text-sm text-pink-800 mt-2">
+                        Extrae automáticamente 5-10 tags o categorías principales del contenido usando IA.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-pink-800 space-y-1 ml-12">
+                    <li>• Tags contextuales y relevantes</li>
+                    <li>• Facilita organización y búsqueda</li>
+                    <li>• Generados por IA avanzada</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-gradient-to-br from-indigo-50 to-white rounded-lg border-2 border-indigo-200">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-3xl">📊</span>
+                    <div>
+                      <h4 className="text-lg font-bold text-indigo-900">Archivos Excel y PDF</h4>
+                      <p className="text-sm text-indigo-800 mt-2">
+                        Exporta todos los resultados en formatos profesionales estructurados con metadatos completos.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-indigo-800 space-y-1 ml-12">
+                    <li>• Excel (.xlsx) con columnas organizadas</li>
+                    <li>• PDF profesional con encabezados</li>
+                    <li>• Código de archivo único para rastreo</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-gradient-to-br from-amber-50 to-white rounded-lg border-2 border-amber-200">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-3xl">📝</span>
+                    <div>
+                      <h4 className="text-lg font-bold text-amber-900">Procesamiento de Documentos</h4>
+                      <p className="text-sm text-amber-800 mt-2">
+                        Extrae texto de PDFs, DOCX y archivos TXT. Genera resúmenes y etiquetas de documentos.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-amber-800 space-y-1 ml-12">
+                    <li>• PDF, DOCX, TXT compatibles</li>
+                    <li>• Extracción de texto multicapa (OCR incluido)</li>
+                    <li>• Resúmenes y análisis de documentos</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-gradient-to-br from-teal-50 to-white rounded-lg border-2 border-teal-200">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="text-3xl">🌍</span>
+                    <div>
+                      <h4 className="text-lg font-bold text-teal-900">Traducción de Contenidos</h4>
+                      <p className="text-sm text-teal-800 mt-2">
+                        Traduce transcripciones a diferentes idiomas usando IA de última generación.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-teal-800 space-y-1 ml-12">
+                    <li>• Traducción a inglés, español, francés, alemán</li>
+                    <li>• Mantiene contexto y significado</li>
+                    <li>• Calidad profesional con GPT-4o-mini</li>
+                  </ul>
+                </div>
+
+              </div>
+            </div>
+
+            {/* Casos de Uso */}
+            <div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+                Casos de Uso Principales
+              </h3>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <h4 className="font-bold text-lg text-gray-900 mb-3">🏢 Empresas</h4>
+                  <ul className="text-sm text-gray-700 space-y-2">
+                    <li>• Transcribir reuniones y llamadas comerciales</li>
+                    <li>• Generar actas automáticas</li>
+                    <li>• Analizar entrevistas de trabajo</li>
+                    <li>• Documentar formaciones internas</li>
+                    <li>• Crear subtítulos para vídeos corporativos</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <h4 className="font-bold text-lg text-gray-900 mb-3">🏛️ Instituciones Públicas</h4>
+                  <ul className="text-sm text-gray-700 space-y-2">
+                    <li>• Transcribir plenos y sesiones parlamentarias</li>
+                    <li>• Documentar conferencias oficiales</li>
+                    <li>• Subtitular actos públicos</li>
+                    <li>• Generar informes de reuniones</li>
+                    <li>• Cumplir normativas de accesibilidad</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <h4 className="font-bold text-lg text-gray-900 mb-3">📰 Medios de Comunicación</h4>
+                  <ul className="text-sm text-gray-700 space-y-2">
+                    <li>• Transcribir podcasts y programas de radio</li>
+                    <li>• Extraer quotes de entrevistas</li>
+                    <li>• Subtitular contenido multimedia</li>
+                    <li>• Generar resúmenes de programas</li>
+                    <li>• Organizar archivo audiovisual</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <h4 className="font-bold text-lg text-gray-900 mb-3">🎓 Educación</h4>
+                  <ul className="text-sm text-gray-700 space-y-2">
+                    <li>• Transcribir clases y conferencias</li>
+                    <li>• Generar apuntes automáticos</li>
+                    <li>• Subtitular vídeos educativos</li>
+                    <li>• Documentar seminarios</li>
+                    <li>• Hacer contenido accesible</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <h4 className="font-bold text-lg text-gray-900 mb-3">⚖️ Legal</h4>
+                  <ul className="text-sm text-gray-700 space-y-2">
+                    <li>• Transcribir deposiciones y testimonios</li>
+                    <li>• Documentar audiencias judiciales</li>
+                    <li>• Generar actas de reuniones legales</li>
+                    <li>• Analizar declaraciones</li>
+                    <li>• Crear registros oficiales</li>
+                  </ul>
+                </div>
+
+                <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                  <h4 className="font-bold text-lg text-gray-900 mb-3">🔬 Investigación</h4>
+                  <ul className="text-sm text-gray-700 space-y-2">
+                    <li>• Transcribir entrevistas cualitativas</li>
+                    <li>• Analizar focus groups</li>
+                    <li>• Documentar experimentos</li>
+                    <li>• Organizar datos de campo</li>
+                    <li>• Extraer insights de conversaciones</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Beneficios Clave */}
+            <div className="bg-gradient-to-r from-orange-100 to-blue-100 rounded-lg p-8">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+                ¿Por qué elegir annalogica?
+              </h3>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="flex gap-3 items-start">
+                  <span className="text-2xl">⚡</span>
+                  <div>
+                    <h4 className="font-bold text-gray-900">Ultra Rápido</h4>
+                    <p className="text-sm text-gray-700">Procesa 1 hora de audio en ~3 minutos. 20x más rápido que transcripción manual.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <span className="text-2xl">🎯</span>
+                  <div>
+                    <h4 className="font-bold text-gray-900">Alta Precisión</h4>
+                    <p className="text-sm text-gray-700">95%+ de exactitud con tecnología OpenAI Whisper V3, la más avanzada del mercado.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <span className="text-2xl">🌍</span>
+                  <div>
+                    <h4 className="font-bold text-gray-900">Multiidioma</h4>
+                    <p className="text-sm text-gray-700">9 idiomas soportados con detección automática. Perfecto para contenido multilingüe.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <span className="text-2xl">🔒</span>
+                  <div>
+                    <h4 className="font-bold text-gray-900">Seguro y Privado</h4>
+                    <p className="text-sm text-gray-700">Cifrado de extremo a extremo. Archivos eliminados tras procesamiento. GDPR compliant.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <span className="text-2xl">💰</span>
+                  <div>
+                    <h4 className="font-bold text-gray-900">Pago por Uso</h4>
+                    <p className="text-sm text-gray-700">Solo pagas por lo que procesas. Sin compromisos ni permanencias.</p>
+                  </div>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <span className="text-2xl">🤖</span>
+                  <div>
+                    <h4 className="font-bold text-gray-900">IA de Última Generación</h4>
+                    <p className="text-sm text-gray-700">Usa OpenAI GPT-4o-mini para resúmenes, tags y análisis inteligente.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </Section>
+
+        {/* 🚀 CÓMO EMPEZAR - Quick Start Section */}
         <Section
           id="quick-start"
           title="🚀 Quick Start - Primeros Pasos"
