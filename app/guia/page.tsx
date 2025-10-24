@@ -34,8 +34,8 @@ export default function GuiaUsuario() {
                 <span className="text-white font-bold text-xl">A</span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  Annalogica
+                <h1 className="font-orbitron text-2xl font-bold text-orange-500">
+                  annalogica
                 </h1>
                 <p className="text-sm text-gray-600">
                   Guía de Usuario
@@ -71,7 +71,7 @@ export default function GuiaUsuario() {
             Guía Completa de Usuario
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Aprende a utilizar Annalogica para transcribir, analizar y gestionar tus contenidos de audio y vídeo con inteligencia artificial.
+            Aprende a utilizar annalogica para transcribir, analizar y gestionar tus contenidos de audio y vídeo con inteligencia artificial.
           </p>
         </div>
 
@@ -155,18 +155,18 @@ export default function GuiaUsuario() {
         {/* Introducción Section */}
         <Section
           id="intro"
-          title="📖 Introducción a Annalogica"
+          title="📖 Introducción a annalogica"
           expanded={expandedSections.has('intro')}
           onToggle={() => toggleSection('intro')}
         >
           <div className="space-y-4 text-gray-700">
             <p>
-              <strong>Annalogica</strong> es una plataforma profesional de transcripción y análisis de contenidos de audio y vídeo
+              <strong>annalogica</strong> es una plataforma profesional de transcripción y análisis de contenidos de audio y vídeo
               impulsada por inteligencia artificial. Diseñada para empresas, instituciones públicas, medios de comunicación y
               profesionales que necesitan convertir y analizar grandes volúmenes de contenido multimedia.
             </p>
 
-            <h3 className="text-xl font-semibold text-gray-900 mt-6 mb-3">¿Qué hace Annalogica?</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mt-6 mb-3">¿Qué hace annalogica?</h3>
             <ul className="list-disc list-inside space-y-2">
               <li><strong>Transcripción automática multiidioma</strong> con 95%+ de precisión</li>
               <li><strong>Identificación de oradores</strong> con análisis estadístico completo</li>
@@ -176,7 +176,7 @@ export default function GuiaUsuario() {
               <li><strong>Gestión centralizada</strong> de todos tus archivos procesados</li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-gray-900 mt-6 mb-3">¿Para quién es Annalogica?</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mt-6 mb-3">¿Para quién es annalogica?</h3>
             <div className="grid md:grid-cols-3 gap-4 mt-4">
               <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="font-semibold text-blue-900 mb-2">🏢 Empresas</h4>
@@ -500,7 +500,7 @@ export default function GuiaUsuario() {
         >
           <div className="space-y-6">
             <p className="text-gray-700">
-              Annalogica ofrece planes flexibles adaptados a diferentes necesidades. Todos los planes se facturan mensualmente
+              annalogica ofrece planes flexibles adaptados a diferentes necesidades. Todos los planes se facturan mensualmente
               y puedes cambiar o cancelar en cualquier momento.
             </p>
 
@@ -586,7 +586,7 @@ export default function GuiaUsuario() {
           <div className="space-y-4">
             <FAQ
               question="¿Qué formatos de archivo son compatibles?"
-              answer="Annalogica soporta los principales formatos de audio y vídeo: MP3, MP4, WAV, M4A, FLAC, OGG, WebM, MOV, AVI, MKV, entre otros. El tamaño máximo por archivo es de 2GB."
+              answer="annalogica soporta los principales formatos de audio y vídeo: MP3, MP4, WAV, M4A, FLAC, OGG, WebM, MOV, AVI, MKV, entre otros. El tamaño máximo por archivo es de 2GB."
             />
 
             <FAQ
@@ -631,7 +631,7 @@ export default function GuiaUsuario() {
 
             <FAQ
               question="¿Ofrecen API para integración?"
-              answer="Sí, en los planes empresariales ofrecemos API REST completa para integrar Annalogica en tus sistemas. Contacta con ventas para más información."
+              answer="Sí, en los planes empresariales ofrecemos API REST completa para integrar annalogica en tus sistemas. Contacta con ventas para más información."
             />
           </div>
         </Section>
@@ -773,7 +773,7 @@ export default function GuiaUsuario() {
       <div className="border-t border-gray-200 bg-white/80 backdrop-blur-sm mt-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-600">
-            <p className="mb-2">© 2025 Annalogica. Todos los derechos reservados.</p>
+            <p className="mb-2">© 2025 annalogica. Todos los derechos reservados.</p>
             <p className="text-sm">Transcripción profesional con inteligencia artificial</p>
           </div>
         </div>

@@ -409,7 +409,7 @@ export default function ProcessedFilesPage() {
               <span className="text-white">trabajando para</span>
             </div>
             {(user?.name || user?.email) && (
-              <p className="text-white -mt-1 ml-1">{user.name || user.email}</p>
+              <p className="font-orbitron text-orange-500 text-xl font-semibold -mt-1 ml-1">{user.name || user.email}</p>
             )}
           </div>
 

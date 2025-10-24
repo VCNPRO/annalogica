@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
-import { TranscriptionJobDB } from '@/lib/db';
+import { getTranscriptionJob } from '@/lib/db/transcriptions';
 import OpenAI from 'openai';
 
 // Inicialización segura de OpenAI
@@ -29,9 +29,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the job details
-    const job = await TranscriptionJobDB.findById(jobId);
+    const job = await getTranscriptionJob(jobId, auth.userId);
 
-    if (!job || job.user_id !== auth.userId) {
+    if (!job) {
       return NextResponse.json(
         { error: 'Trabajo no encontrado o no autorizado' },
         { status: 404 }
