@@ -1,7 +1,7 @@
 // lib/processors/document-processor.ts
 // Direct document processing without Inngest
 import OpenAI from 'openai';
-import { put } from '@vercel/blob';
+import { put, del } from '@vercel/blob';
 import { getTranscriptionJob } from '@/lib/db/transcriptions';
 import { TranscriptionJobDB } from '@/lib/db';
 
@@ -49,6 +49,24 @@ export async function processDocumentFile(
       length: extractedText.length,
       metadata: parseMetadata
     });
+
+    // Validate PDF page count if applicable
+    if (parseMetadata.pages && parseMetadata.method === 'unpdf') {
+      const { validatePdfPages } = await import('@/lib/subscription-guard-v2');
+      const pageValidation = await validatePdfPages(userId, parseMetadata.pages);
+
+      if (!pageValidation.allowed) {
+        throw new Error(
+          pageValidation.message ||
+          `PDF tiene ${parseMetadata.pages} páginas. Límite: ${pageValidation.maxPages} páginas.`
+        );
+      }
+
+      console.log('[DocumentProcessor] PDF page count validated:', {
+        pages: parseMetadata.pages,
+        maxPages: pageValidation.maxPages
+      });
+    }
 
     // Save extracted text to blob
     const timestamp = Date.now();
@@ -121,6 +139,17 @@ export async function processDocumentFile(
     });
 
     await TranscriptionJobDB.updateStatus(jobId, 'completed');
+
+    // Delete original document file to save storage costs
+    console.log('[DocumentProcessor] Deleting original document file to save storage...');
+    try {
+      await del(documentUrl);
+      console.log('[DocumentProcessor] ✅ Original document file deleted:', documentUrl);
+    } catch (deleteError: any) {
+      // Don't fail the whole job if deletion fails, just log it
+      console.error('[DocumentProcessor] ⚠️  Warning: Could not delete original document file:', deleteError.message);
+      console.error('[DocumentProcessor] URL:', documentUrl);
+    }
 
     console.log('[DocumentProcessor] Processing completed successfully:', jobId);
 

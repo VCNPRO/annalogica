@@ -1,7 +1,7 @@
 import { verifyRequestAuth } from '@/lib/auth';
 import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 import { TranscriptionJobDB } from '@/lib/db';
-import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guard';
+import { checkSeparateQuotas, incrementAudioUsage } from '@/lib/subscription-guard-v2';
 import { processAudioFile } from '@/lib/processors/audio-processor';
 import {
   successResponse,
@@ -45,28 +45,28 @@ export async function POST(request: Request) {
       email: user.email
     });
 
-    // QUOTA: Check subscription status and quota
-    logger.info('Process API: Checking subscription quota', { userId: user.userId });
-    const subscriptionStatus = await checkSubscriptionStatus(user.userId);
+    // QUOTA: Check subscription status and quota (separate quotas for audio)
+    logger.info('Process API: Checking audio quota', { userId: user.userId });
+    const quotaStatus = await checkSeparateQuotas(user.userId);
 
-    if (!subscriptionStatus.canUpload) {
-      logger.info('Process API: Quota exceeded', {
+    if (!quotaStatus.canUploadAudio) {
+      logger.info('Process API: Audio quota exceeded', {
         userId: user.userId,
-        usage: subscriptionStatus.usage,
-        quota: subscriptionStatus.quota
+        usageAudioMinutes: quotaStatus.usageAudioMinutes,
+        quotaAudioMinutes: quotaStatus.quotaAudioMinutes
       });
 
       throw new QuotaExceededError(
-        subscriptionStatus.message || 'Has alcanzado el límite de tu plan',
-        subscriptionStatus.quota,
-        subscriptionStatus.usage,
-        subscriptionStatus.resetDate
+        quotaStatus.message || 'Has alcanzado el límite de minutos de audio de tu plan',
+        quotaStatus.quotaAudioMinutes,
+        quotaStatus.usageAudioMinutes,
+        quotaStatus.resetDate
       );
     }
 
-    logger.info('Process API: Quota verified', {
+    logger.info('Process API: Audio quota verified', {
       userId: user.userId,
-      remaining: subscriptionStatus.remaining
+      remainingAudioMinutes: quotaStatus.remainingAudioMinutes
     });
 
     // SECURITY: Rate limiting
@@ -137,27 +137,6 @@ export async function POST(request: Request) {
       audioUrl: audioUrl.substring(0, 50) + '...'
     });
 
-    // QUOTA: Increment usage counter after successful job creation
-    try {
-      await incrementUsage(user.userId);
-      logger.info('Process API: Usage incremented', { userId: user.userId });
-    } catch (error) {
-      // Don't fail the request if usage increment fails
-      // Log error and continue
-      logger.error('Process API: Failed to increment usage (non-fatal)', error, {
-        userId: user.userId,
-        jobId: job.id
-      });
-    }
-
-    // Return immediately - processing will happen and frontend will poll
-    const response: JobCreateResponse = {
-      success: true,
-      message: 'Transcripción en proceso. Esto puede tardar 1-3 minutos.',
-      jobId: job.id,
-      status: 'pending'
-    };
-
     logger.info('Process API: Starting synchronous processing', { jobId: job.id });
 
     // Process audio synchronously (wait for completion before responding)
@@ -166,6 +145,32 @@ export async function POST(request: Request) {
     try {
       await processAudioFile(job.id);
       logger.info('Process API: Processing completed successfully', { jobId: job.id });
+
+      // QUOTA: Increment audio usage based on actual duration
+      try {
+        const { getTranscriptionJob } = await import('@/lib/db/transcriptions');
+        const completedJob = await getTranscriptionJob(job.id);
+
+        if (completedJob && completedJob.audio_duration_seconds) {
+          const durationMinutes = completedJob.audio_duration_seconds / 60;
+          await incrementAudioUsage(user.userId, durationMinutes);
+          logger.info('Process API: Audio usage incremented', {
+            userId: user.userId,
+            durationSeconds: completedJob.audio_duration_seconds,
+            durationMinutes
+          });
+        } else {
+          // Fallback: increment 1 minute if duration unknown
+          await incrementAudioUsage(user.userId, 1);
+          logger.warn('Process API: Audio duration unknown, incremented 1 minute', { userId: user.userId });
+        }
+      } catch (error) {
+        // Don't fail the request if usage increment fails
+        logger.error('Process API: Failed to increment audio usage (non-fatal)', error, {
+          userId: user.userId,
+          jobId: job.id
+        });
+      }
 
       // Return success with completed status
       const completedResponse: JobCreateResponse = {

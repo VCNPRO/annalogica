@@ -1,7 +1,7 @@
 // lib/processors/audio-processor.ts
 // Direct audio processing without Inngest
 import OpenAI from 'openai';
-import { put } from '@vercel/blob';
+import { put, del } from '@vercel/blob';
 import {
   updateTranscriptionProgress,
   saveTranscriptionResults,
@@ -289,6 +289,17 @@ Responde SOLO con JSON:
 
     console.log('[AudioProcessor] Results saved to database');
     await updateTranscriptionProgress(jobId, 100);
+
+    // STEP 9: Delete original audio file to save storage costs
+    console.log('[AudioProcessor] Deleting original audio file to save storage...');
+    try {
+      await del(audioUrl);
+      console.log('[AudioProcessor] ✅ Original audio file deleted:', audioUrl);
+    } catch (deleteError: any) {
+      // Don't fail the whole job if deletion fails, just log it
+      console.error('[AudioProcessor] ⚠️  Warning: Could not delete original audio file:', deleteError.message);
+      console.error('[AudioProcessor] URL:', audioUrl);
+    }
 
     console.log('[AudioProcessor] Processing completed successfully:', jobId);
 

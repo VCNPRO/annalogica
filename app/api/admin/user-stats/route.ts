@@ -32,6 +32,11 @@ export async function GET(request: Request) {
         subscription_plan,
         monthly_quota,
         monthly_usage,
+        COALESCE(monthly_quota_docs, 10) as monthly_quota_docs,
+        COALESCE(monthly_quota_audio_minutes, 10) as monthly_quota_audio_minutes,
+        COALESCE(monthly_usage_docs, 0) as monthly_usage_docs,
+        COALESCE(monthly_usage_audio_minutes, 0) as monthly_usage_audio_minutes,
+        COALESCE(max_pages_per_pdf, 50) as max_pages_per_pdf,
         quota_reset_date,
         created_at
       FROM users
@@ -123,6 +128,11 @@ export async function GET(request: Request) {
         subscriptionTier: user.subscription_plan,
         monthlyQuota: user.monthly_quota,
         monthlyUsage: user.monthly_usage,
+        monthlyQuotaDocs: user.monthly_quota_docs,
+        monthlyQuotaAudioMinutes: user.monthly_quota_audio_minutes,
+        monthlyUsageDocs: user.monthly_usage_docs,
+        monthlyUsageAudioMinutes: user.monthly_usage_audio_minutes,
+        maxPagesPerPdf: user.max_pages_per_pdf,
         quotaResetDate: user.quota_reset_date,
         createdAt: user.created_at
       },

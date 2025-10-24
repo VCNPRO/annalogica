@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
-import { checkSubscriptionStatus, incrementUsage } from '@/lib/subscription-guard';
+import { checkSeparateQuotas, incrementDocUsage, validatePdfPages } from '@/lib/subscription-guard-v2';
 import { processDocumentFile } from '@/lib/processors/document-processor';
 
 // Configure maximum execution time for document processing
@@ -31,15 +31,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check subscription quota
-    const subscriptionStatus = await checkSubscriptionStatus(auth.userId);
-    if (!subscriptionStatus.canUpload) {
+    // Check subscription quota (separate quotas for docs)
+    const quotaStatus = await checkSeparateQuotas(auth.userId);
+    if (!quotaStatus.canUploadDocs) {
       return NextResponse.json(
         {
-          error: subscriptionStatus.message || 'Has alcanzado el límite de tu plan',
-          quota: subscriptionStatus.quota,
-          usage: subscriptionStatus.usage,
-          resetDate: subscriptionStatus.resetDate
+          error: quotaStatus.message || 'Has alcanzado el límite de documentos de tu plan',
+          quotaDocs: quotaStatus.quotaDocs,
+          usageDocs: quotaStatus.usageDocs,
+          remainingDocs: quotaStatus.remainingDocs,
+          resetDate: quotaStatus.resetDate
         },
         { status: 403 }
       );
@@ -70,6 +71,21 @@ export async function POST(request: NextRequest) {
         { error: `Tipo de archivo no soportado: .${ext}. Solo se permiten PDF, DOCX, TXT.` },
         { status: 400 }
       );
+    }
+
+    // Pre-validate PDF page count (if pageCount provided by client)
+    if (ext === 'pdf' && body.pageCount) {
+      const pageValidation = await validatePdfPages(auth.userId, body.pageCount);
+      if (!pageValidation.allowed) {
+        return NextResponse.json(
+          {
+            error: pageValidation.message || 'PDF excede el límite de páginas',
+            maxPages: pageValidation.maxPages,
+            providedPages: body.pageCount
+          },
+          { status: 400 }
+        );
+      }
     }
 
     console.log(`[ProcessDocument] Creating job for ${fileName} (${ext})`);
@@ -107,8 +123,8 @@ export async function POST(request: NextRequest) {
       await processDocumentFile(job.id, blobUrl, fileName, actions, language, summaryType);
       console.log('[ProcessDocument] Processing completed successfully:', job.id);
 
-      // Increment usage after successful processing
-      await incrementUsage(auth.userId);
+      // Increment document usage counter after successful processing
+      await incrementDocUsage(auth.userId, 1);
 
       return NextResponse.json({
         success: true,

@@ -335,8 +335,8 @@ export function AdminDashboard() {
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Nombre</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Plan</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Cuota Mensual</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Uso Actual</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Docs (uso/cuota)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Audio min (uso/cuota)</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Reset</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Acciones</th>
                 </tr>
@@ -359,50 +359,13 @@ export function AdminDashboard() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {editingQuota === user.id ? (
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            value={newQuota}
-                            onChange={(e) => setNewQuota(parseInt(e.target.value) || 0)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                handleUpdateQuota(user.id, newQuota);
-                              } else if (e.key === 'Escape') {
-                                setEditingQuota(null);
-                              }
-                            }}
-                            autoFocus
-                            className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                          />
-                          <button
-                            onClick={() => handleUpdateQuota(user.id, newQuota)}
-                            className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
-                          >
-                            ✓
-                          </button>
-                          <button
-                            onClick={() => setEditingQuota(null)}
-                            className="px-2 py-1 text-xs bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-400 dark:hover:bg-gray-500"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setEditingQuota(user.id);
-                            setNewQuota(user.monthly_quota || 0);
-                          }}
-                          className="text-blue-600 dark:text-blue-400 hover:underline font-mono text-sm"
-                        >
-                          {user.monthly_quota || 0} / mes
-                        </button>
-                      )}
+                      <span className={`font-mono text-sm ${(user.monthly_usage_docs || 0) >= (user.monthly_quota_docs || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {user.monthly_usage_docs || 0} / {user.monthly_quota_docs || 10}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`font-mono text-sm ${(user.monthly_usage || 0) >= (user.monthly_quota || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                        {user.monthly_usage || 0}
+                      <span className={`font-mono text-sm ${(user.monthly_usage_audio_minutes || 0) >= (user.monthly_quota_audio_minutes || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {user.monthly_usage_audio_minutes || 0} / {user.monthly_quota_audio_minutes || 10}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
@@ -462,13 +425,23 @@ export function AdminDashboard() {
                     <span className="font-medium">{selectedUser.user?.subscriptionTier || 'free'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Cuota Mensual:</span>
-                    <span className="font-medium">{selectedUser.user?.monthlyQuota || 0}</span>
+                    <span className="text-gray-500">Cuota Docs:</span>
+                    <span className="font-medium">{selectedUser.user?.monthlyQuotaDocs || 10} docs/mes</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Uso Actual:</span>
-                    <span className={`font-medium ${(selectedUser.user?.monthlyUsage || 0) >= (selectedUser.user?.monthlyQuota || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                      {selectedUser.user?.monthlyUsage || 0}
+                    <span className="text-gray-500">Uso Docs:</span>
+                    <span className={`font-medium ${(selectedUser.user?.monthlyUsageDocs || 0) >= (selectedUser.user?.monthlyQuotaDocs || 10) ? 'text-red-600' : 'text-green-600'}`}>
+                      {selectedUser.user?.monthlyUsageDocs || 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Cuota Audio:</span>
+                    <span className="font-medium">{selectedUser.user?.monthlyQuotaAudioMinutes || 10} min/mes</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Uso Audio:</span>
+                    <span className={`font-medium ${(selectedUser.user?.monthlyUsageAudioMinutes || 0) >= (selectedUser.user?.monthlyQuotaAudioMinutes || 10) ? 'text-red-600' : 'text-green-600'}`}>
+                      {selectedUser.user?.monthlyUsageAudioMinutes || 0} min
                     </span>
                   </div>
                   <div className="flex justify-between">

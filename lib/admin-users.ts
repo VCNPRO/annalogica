@@ -125,6 +125,11 @@ export async function getAllUsersWithMetrics(params?: {
         u.monthly_budget_usd,
         u.monthly_quota,
         u.monthly_usage,
+        COALESCE(u.monthly_quota_docs, 10) as monthly_quota_docs,
+        COALESCE(u.monthly_quota_audio_minutes, 10) as monthly_quota_audio_minutes,
+        COALESCE(u.monthly_usage_docs, 0) as monthly_usage_docs,
+        COALESCE(u.monthly_usage_audio_minutes, 0) as monthly_usage_audio_minutes,
+        COALESCE(u.max_pages_per_pdf, 50) as max_pages_per_pdf,
         u.quota_reset_date,
         u.created_at,
         u.last_activity_at,
@@ -140,8 +145,10 @@ export async function getAllUsersWithMetrics(params?: {
       GROUP BY u.id, u.email, u.name, u.role, u.account_type, u.account_status,
                u.internal_notes, u.tags, u.stripe_customer_id, u.stripe_subscription_id,
                u.subscription_status, u.total_cost_usd,
-               u.monthly_budget_usd, u.monthly_quota, u.monthly_usage, u.quota_reset_date,
-               u.created_at, u.last_activity_at
+               u.monthly_budget_usd, u.monthly_quota, u.monthly_usage,
+               u.monthly_quota_docs, u.monthly_quota_audio_minutes,
+               u.monthly_usage_docs, u.monthly_usage_audio_minutes, u.max_pages_per_pdf,
+               u.quota_reset_date, u.created_at, u.last_activity_at
       ORDER BY ${orderByClause}
       LIMIT ${limitParam}
       OFFSET ${offsetParam}

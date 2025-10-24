@@ -60,7 +60,7 @@ Editar `.env.local` con tus tokens:
 **Stack actual:** OpenAI Whisper V3 + GPT-4o-mini para todas las funcionalidades de IA.
 
 ### Retención de Archivos
-**IMPORTANTE**: Política de almacenamiento actualizada (2025-10-10)
+**IMPORTANTE**: Política de almacenamiento actualizada (2025-10-24)
 
 **Archivos guardados en Vercel Blob (30 días):**
 - ✅ Transcripciones (TXT)
@@ -68,16 +68,21 @@ Editar `.env.local` con tus tokens:
 - ✅ Resúmenes (TXT)
 - ✅ Reportes de hablantes
 - ✅ Tags y metadatos
+- ✅ Texto extraído de documentos (PDFs, DOCX)
 
-**Archivos que NO se guardan:**
-- ❌ **Archivos de audio/video originales** → Eliminados inmediatamente tras transcripción exitosa
-- ⚡ Implementado en: `lib/inngest/functions.ts` (step: 'delete-original-audio')
-- 💰 Ahorro: ~95% de espacio de almacenamiento
+**Archivos que NO se guardan (eliminados automáticamente):**
+- ❌ **Archivos de audio/video originales** → Eliminados tras transcripción exitosa
+- ❌ **Documentos originales (PDF, DOCX, TXT)** → Eliminados tras extracción de texto
+- ⚡ Implementado en:
+  - `lib/processors/audio-processor.ts` (STEP 9: Delete original audio)
+  - `lib/processors/document-processor.ts` (Delete original document)
+- 💰 Ahorro: ~95% de espacio de almacenamiento (solo se guardan los resultados procesados)
 
 **Limpieza automática:**
-- Cron job diario (2:00 AM UTC) → `/api/cron/cleanup`
+- Cron job diario (9:00 AM UTC) → `/api/cron/daily-checks`
 - Configurado en `vercel.json`
 - Requiere `CRON_SECRET` en variables de entorno de Vercel
+- Limpia archivos procesados >30 días
 - Ver detalles completos en `INSTRUCCIONES-ALMACENAMIENTO.md`
 
 ## 📖 Guía de Usuario
