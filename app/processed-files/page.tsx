@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Trash2, Download, ArrowLeft, Settings, Info, Languages } from 'lucide-react';
+import { Trash2, Download, ArrowLeft, Settings, Info, Languages, Search, Filter, X } from 'lucide-react';
 import jsPDF from 'jspdf'; // Assuming jsPDF is used for PDF generation
 import { useNotification } from '@/hooks/useNotification';
 import { Toast } from '@/components/Toast';
@@ -49,6 +49,11 @@ export default function ProcessedFilesPage() {
     errors: number;
     totalHours: string;
   } | null>(null);
+
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'audio' | 'document'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'completed' | 'processing' | 'failed'>('all');
 
   // Load user stats
   const loadUserStats = useCallback(async () => {
@@ -126,6 +131,45 @@ export default function ProcessedFilesPage() {
     }
   }, [user, loadUserStats]);
 
+  // Filter and search jobs
+  const filteredJobs = processedJobs.filter(job => {
+    // Search filter (filename or jobId)
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesFilename = job.filename.toLowerCase().includes(query);
+      const matchesJobId = job.id.toLowerCase().includes(query);
+
+      if (!matchesFilename && !matchesJobId) {
+        return false;
+      }
+    }
+
+    // Type filter (audio vs document)
+    if (filterType !== 'all') {
+      const fileType = job.metadata?.fileType || 'audio'; // default to audio for old jobs
+      if (filterType === 'audio' && fileType !== 'audio') return false;
+      if (filterType === 'document' && fileType !== 'document') return false;
+    }
+
+    // Status filter
+    if (filterStatus !== 'all') {
+      if (filterStatus === 'completed' && job.status !== 'completed') return false;
+      if (filterStatus === 'processing' && !['pending', 'processing', 'transcribed', 'summarized'].includes(job.status)) return false;
+      if (filterStatus === 'failed' && job.status !== 'failed') return false;
+    }
+
+    return true;
+  });
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterType('all');
+    setFilterStatus('all');
+  };
+
+  const hasActiveFilters = searchQuery || filterType !== 'all' || filterStatus !== 'all';
+
   const toggleJobSelection = (jobId: string) => {
     setSelectedJobs(prev => {
       const newSet = new Set(prev);
@@ -139,10 +183,10 @@ export default function ProcessedFilesPage() {
   };
 
   const toggleAllJobs = () => {
-    if (selectedJobs.size === processedJobs.length) {
+    if (selectedJobs.size === filteredJobs.length) {
       setSelectedJobs(new Set());
     } else {
-      setSelectedJobs(new Set(processedJobs.map(j => j.id)));
+      setSelectedJobs(new Set(filteredJobs.map(j => j.id)));
     }
   };
 
@@ -550,15 +594,91 @@ export default function ProcessedFilesPage() {
             </div>
           </div>
 
+          {/* Search and Filter Section */}
+          <div className="mb-6 space-y-4">
+            {/* Search Bar */}
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-zinc-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Buscar por nombre de archivo o código..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-white"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-zinc-400" />
+                <span className="text-sm text-zinc-400">Filtros:</span>
+              </div>
+
+              {/* Type Filter */}
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as any)}
+                className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              >
+                <option value="all">Todos los tipos</option>
+                <option value="audio">🎙️ Solo Audio</option>
+                <option value="document">📄 Solo Documentos</option>
+              </select>
+
+              {/* Status Filter */}
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              >
+                <option value="all">Todos los estados</option>
+                <option value="completed">✅ Completados</option>
+                <option value="processing">⏳ Procesando</option>
+                <option value="failed">❌ Errores</option>
+              </select>
+
+              {/* Clear Filters Button */}
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <X className="h-3 w-3" />
+                  Limpiar filtros
+                </button>
+              )}
+
+              {/* Results Count */}
+              <span className="text-sm text-zinc-400 ml-auto">
+                {filteredJobs.length} de {processedJobs.length} archivos
+              </span>
+            </div>
+          </div>
+
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded p-3">
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
-          {processedJobs.length === 0 ? (
+          {filteredJobs.length === 0 ? (
             <div className="p-6 text-center bg-zinc-900 rounded-lg border border-zinc-800">
-              <p className="text-zinc-400">No hay archivos procesados aún.</p>
+              <p className="text-zinc-400">
+                {hasActiveFilters
+                  ? 'No se encontraron archivos con los filtros seleccionados.'
+                  : 'No hay archivos procesados aún.'}
+              </p>
             </div>
           ) : (
             <>
@@ -584,7 +704,7 @@ export default function ProcessedFilesPage() {
                       <th scope="col" className="px-6 py-3 text-left">
                         <input
                           type="checkbox"
-                          checked={selectedJobs.size === processedJobs.length && processedJobs.length > 0}
+                          checked={selectedJobs.size === filteredJobs.length && filteredJobs.length > 0}
                           onChange={toggleAllJobs}
                           className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer"
                         />
@@ -607,7 +727,7 @@ export default function ProcessedFilesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800">
-                    {processedJobs.map((job) => (
+                    {filteredJobs.map((job) => (
                       <tr key={job.id} className="bg-zinc-900 hover:bg-zinc-800">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <input
