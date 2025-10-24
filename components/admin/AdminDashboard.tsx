@@ -180,15 +180,15 @@ export function AdminDashboard() {
 
   const handleUpdateQuota = async (userId: string, field: 'docs' | 'audio', quota: number) => {
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await fetch('/api/admin/user-quotas-v2', {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          updates: field === 'docs'
-            ? { monthlyQuotaDocs: quota }
-            : { monthlyQuotaAudioMinutes: quota }
+          ...(field === 'docs'
+            ? { quotaDocs: quota }
+            : { quotaAudioMinutes: quota })
         })
       });
 
@@ -202,9 +202,14 @@ export function AdminDashboard() {
         setData({ ...data, users: users.users || [] });
         setEditingQuota(null);
         setEditingField(null);
+        alert('✅ Cuota actualizada correctamente');
+      } else {
+        const error = await res.json();
+        alert(`❌ Error: ${error.error || 'No se pudo actualizar'}`);
       }
     } catch (error) {
       console.error('Error updating quota:', error);
+      alert('❌ Error al actualizar cuota');
     }
   };
 
@@ -216,7 +221,8 @@ export function AdminDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          updates: { subscriptionTier: plan }
+          field: 'accountType',
+          value: plan
         })
       });
 
@@ -230,9 +236,14 @@ export function AdminDashboard() {
         setData({ ...data, users: users.users || [] });
         setEditingQuota(null);
         setEditingField(null);
+        alert('✅ Plan actualizado correctamente');
+      } else {
+        const error = await res.json();
+        alert(`❌ Error: ${error.error || 'No se pudo actualizar'}`);
       }
     } catch (error) {
       console.error('Error updating plan:', error);
+      alert('❌ Error al actualizar plan');
     }
   };
 
@@ -256,8 +267,12 @@ export function AdminDashboard() {
   };
 
   const handleResetUsage = async (userId: string) => {
+    if (!confirm('¿Estás seguro de que quieres resetear el uso de este usuario?\n\nEsto pondrá a 0 los contadores de documentos y minutos de audio usados.')) {
+      return;
+    }
+
     try {
-      const res = await fetch('/api/admin/user-quota', {
+      const res = await fetch('/api/admin/user-quotas-v2', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -272,9 +287,14 @@ export function AdminDashboard() {
         });
         const users = await usersRes.json();
         setData({ ...data, users: users.users || [] });
+        alert('✅ Uso reseteado correctamente');
+      } else {
+        const error = await res.json();
+        alert(`❌ Error: ${error.error || 'No se pudo resetear'}`);
       }
     } catch (error) {
       console.error('Error resetting usage:', error);
+      alert('❌ Error al resetear uso');
     }
   };
 
@@ -389,10 +409,14 @@ export function AdminDashboard() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Nombre</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Plan</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Docs (uso/cuota)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Audio min (uso/cuota)</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Reset</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Tipo Cuenta</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase" title="Documentos procesados (PDFs, DOCX, TXT) vs límite mensual">
+                    📄 Documentos (usado/límite)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase" title="Minutos de audio/vídeo procesados vs límite mensual">
+                    🎙️ Audio Minutos (usado/límite)
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase">Próximo Reset</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Acciones</th>
                 </tr>
               </thead>
@@ -440,11 +464,11 @@ export function AdminDashboard() {
                         </div>
                       ) : (
                         <span
-                          onClick={() => startEditingPlan(user.id, user.subscription_tier)}
+                          onClick={() => startEditingPlan(user.id, user.subscription_plan || user.account_type)}
                           className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900/50"
-                          title="Click para editar plan"
+                          title="Click para editar tipo de cuenta"
                         >
-                          {user.subscription_tier || 'free'}
+                          {user.subscription_plan || user.account_type || 'free'}
                         </span>
                       )}
                     </td>
@@ -475,10 +499,10 @@ export function AdminDashboard() {
                       ) : (
                         <span
                           onClick={() => startEditingQuota(user.id, 'docs', user.monthly_quota_docs || 10)}
-                          className={`font-mono text-sm cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/30 px-2 py-1 rounded ${(user.monthly_usage_docs || 0) >= (user.monthly_quota_docs || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}
-                          title="Click para editar cuota de documentos"
+                          className={`font-mono text-sm cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/30 px-2 py-1 rounded ${(user.monthly_usage_docs || 0) >= (user.monthly_quota_docs || 0) ? 'text-red-600 dark:text-red-400 font-bold' : 'text-gray-700 dark:text-gray-300'}`}
+                          title="Click para editar límite de documentos (PDFs, DOCX, TXT)"
                         >
-                          {user.monthly_usage_docs || 0} / {user.monthly_quota_docs || 10}
+                          {user.monthly_usage_docs || 0} / {user.monthly_quota_docs || 10} docs
                         </span>
                       )}
                     </td>
@@ -509,10 +533,10 @@ export function AdminDashboard() {
                       ) : (
                         <span
                           onClick={() => startEditingQuota(user.id, 'audio', user.monthly_quota_audio_minutes || 10)}
-                          className={`font-mono text-sm cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/30 px-2 py-1 rounded ${(user.monthly_usage_audio_minutes || 0) >= (user.monthly_quota_audio_minutes || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}
-                          title="Click para editar cuota de audio"
+                          className={`font-mono text-sm cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/30 px-2 py-1 rounded ${(user.monthly_usage_audio_minutes || 0) >= (user.monthly_quota_audio_minutes || 0) ? 'text-red-600 dark:text-red-400 font-bold' : 'text-gray-700 dark:text-gray-300'}`}
+                          title="Click para editar límite de minutos de audio/vídeo procesados"
                         >
-                          {user.monthly_usage_audio_minutes || 0} / {user.monthly_quota_audio_minutes || 10}
+                          {user.monthly_usage_audio_minutes || 0} / {user.monthly_quota_audio_minutes || 10} min
                         </span>
                       )}
                     </td>
