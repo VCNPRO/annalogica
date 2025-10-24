@@ -32,6 +32,7 @@ export interface TranscriptionJob {
   audio_url: string;
   audio_size_bytes: number | null;
   audio_duration_seconds: number | null;
+  processing_progress: number | null; // Progress percentage (0-100)
   assemblyai_id: string | null;
   txt_url: string | null;
   srt_url: string | null;
