@@ -214,10 +214,99 @@ export async function generateDocumentPDF(data: DocumentPDFData): Promise<Buffer
 }
 
 /**
+ * Generar PDF para TRADUCCIÓN
+ */
+export interface TranslationPDFData {
+  originalFilename: string;
+  sourceLanguage: string;
+  targetLanguage: string;
+  translatedText: string;
+  translationDate: Date;
+}
+
+export async function generateTranslationPDF(data: TranslationPDFData): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 50, bottom: 50, left: 50, right: 50 }
+    });
+
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    // PORTADA
+    doc.fontSize(24).font('Helvetica-Bold').fillColor('#FF6B35').text('Traducción', { align: 'center' });
+    doc.moveDown();
+    doc.fontSize(12).font('Helvetica').fillColor('#666666');
+    doc.text(`Archivo Original: ${data.originalFilename}`, { align: 'center' });
+    doc.text(`Fecha: ${data.translationDate.toLocaleDateString('es-ES')}`, { align: 'center' });
+    doc.moveDown(2);
+
+    // INFORMACIÓN DE TRADUCCIÓN
+    doc.fillColor('#000000').fontSize(16).font('Helvetica-Bold').text('Información de Traducción');
+    doc.moveDown(0.5);
+    doc.fontSize(11).font('Helvetica');
+    addKeyValue(doc, 'Archivo Original', data.originalFilename);
+    addKeyValue(doc, 'Idioma Original', getLanguageDisplayName(data.sourceLanguage));
+    addKeyValue(doc, 'Idioma Traducido', getLanguageDisplayName(data.targetLanguage));
+    addKeyValue(doc, 'Fecha de Traducción', data.translationDate.toLocaleString('es-ES'));
+    doc.moveDown(2);
+
+    // TEXTO TRADUCIDO
+    doc.addPage();
+    doc.fontSize(16).font('Helvetica-Bold').fillColor('#FF6B35').text('Texto Traducido');
+    doc.moveDown(0.5);
+    doc.fontSize(10).font('Helvetica').fillColor('#000000');
+
+    // Split long text into lines and handle page breaks
+    const lines = data.translatedText.split('\n');
+    lines.forEach(line => {
+      doc.text(line || ' ', { align: 'justify' });
+    });
+
+    // FOOTER
+    doc.moveDown(2);
+    doc.fontSize(8).fillColor('#999999').text(
+      'Generado por annalogica - Transcripción y traducción con IA',
+      { align: 'center' }
+    );
+
+    // Finalizar documento
+    doc.end();
+  });
+}
+
+/**
  * Helper para agregar pares clave-valor formateados
  */
 function addKeyValue(doc: PDFKit.PDFDocument, key: string, value: string) {
   doc.font('Helvetica-Bold').text(key + ': ', { continued: true });
   doc.font('Helvetica').text(value);
   doc.moveDown(0.3);
+}
+
+/**
+ * Helper para nombres de idiomas en español
+ */
+function getLanguageDisplayName(code: string): string {
+  const languages: Record<string, string> = {
+    'en': 'Inglés',
+    'es': 'Español',
+    'ca': 'Catalán',
+    'eu': 'Euskera',
+    'gl': 'Gallego',
+    'pt': 'Portugués',
+    'fr': 'Francés',
+    'de': 'Alemán',
+    'it': 'Italiano',
+    'zh': 'Chino',
+    'ja': 'Japonés',
+    'ko': 'Coreano',
+    'ar': 'Árabe',
+    'ru': 'Ruso',
+    'auto': 'Detección Automática'
+  };
+  return languages[code] || code.toUpperCase();
 }

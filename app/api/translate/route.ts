@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRequestAuth } from '@/lib/auth';
 import { getTranscriptionJob } from '@/lib/db/transcriptions';
+import { put } from '@vercel/blob';
+import { generateTranslationPDF } from '@/lib/results-pdf-generator';
 import OpenAI from 'openai';
 
 // Inicialización segura de OpenAI
@@ -76,10 +78,34 @@ export async function POST(request: NextRequest) {
 
     const translatedText = completion.choices[0].message.content || '';
 
+    // Generar PDF con la traducción
+    console.log('[Translate] Generating translation PDF...');
+    const pdfBuffer = await generateTranslationPDF({
+      originalFilename: job.filename,
+      sourceLanguage: job.language || 'auto',
+      targetLanguage,
+      translatedText,
+      translationDate: new Date()
+    });
+
+    // Subir PDF a Vercel Blob
+    const timestamp = Date.now();
+    const pdfFilename = `translations/${jobId}-${targetLanguage}-${timestamp}.pdf`;
+
+    const pdfBlob = await put(pdfFilename, pdfBuffer, {
+      access: 'public',
+      contentType: 'application/pdf',
+      addRandomSuffix: true
+    });
+
+    console.log('[Translate] Translation PDF generated and uploaded:', pdfBlob.url);
+
     return NextResponse.json({
       success: true,
       translatedText,
-      targetLanguage
+      pdfUrl: pdfBlob.url,
+      targetLanguage,
+      filename: `${job.filename.replace(/\.[^/.]+$/, '')}-traduccion-${targetLanguage}.pdf`
     });
 
   } catch (error) {

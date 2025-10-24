@@ -309,14 +309,13 @@ export default function ProcessedFilesPage() {
       }
 
       const data = await res.json();
-      showNotification(`Traducción a ${targetLanguage} completada. Descargando...`, 'success');
+      showNotification(`Traducción a ${targetLanguage} completada. Descargando PDF...`, 'success');
 
-      // Download translated file
-      if (data.translatedText) {
-        const job = processedJobs.find(j => j.id === jobId);
-        const filename = job?.filename.replace(/\.[^/.]+$/, '') || 'traduccion';
-        const txtBlob = new Blob([data.translatedText], { type: 'text/plain' });
-        triggerDownload(txtBlob, `${filename}-traduccion-${targetLanguage}.txt`);
+      // Download translated PDF file
+      if (data.pdfUrl) {
+        const pdfResponse = await fetch(data.pdfUrl);
+        const pdfBlob = await pdfResponse.blob();
+        triggerDownload(pdfBlob, data.filename);
       }
     } catch (err: any) {
       console.error('Error translating:', err);
