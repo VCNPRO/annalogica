@@ -75,15 +75,17 @@ const transcribeFile = inngest.createFunction(
 
     try {
       // ============================================
-      // PASO 1: Descargar audio y preparar para Whisper
+      // PASO 1: Actualizar progreso inicial
       // ============================================
       await step.run('update-progress-10', async () => {
         await updateTranscriptionProgress(jobId, 10);
       });
 
-      let audioFileForWhisper;
-
-      await step.run('download-audio', async () => {
+      // ============================================
+      // PASO 2: Transcribir con Whisper (descarga + transcripción en un solo step)
+      // ============================================
+      // 🔥 FIX: Descargar Y transcribir en el MISMO step para evitar problemas de scope
+      const whisperResult = await step.run('whisper-transcribe', async () => {
         console.log('[transcribe] Descargando audio:', fileName);
 
         const response = await fetch(audioUrl);
@@ -95,10 +97,17 @@ const transcribeFile = inngest.createFunction(
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = Buffer.from(arrayBuffer);
 
+        console.log('[transcribe] Audio descargado:', {
+          size: `${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB`
+        });
+
+        // Actualizar progreso a 20% después de descargar
+        await updateTranscriptionProgress(jobId, 20);
+
         // Usar File de Node.js 18+ (compatible con OpenAI SDK)
         const { File } = await import('node:buffer');
 
-        audioFileForWhisper = new File(
+        const audioFile = new File(
           [audioBuffer],
           fileName,
           {
@@ -106,32 +115,10 @@ const transcribeFile = inngest.createFunction(
           }
         );
 
-        console.log('[transcribe] Audio descargado:', {
-          size: `${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB`,
-          type: audioFileForWhisper.type,
-          name: audioFileForWhisper.name
-        });
-
-        // Return minimal data to avoid output_too_large
-        return { success: true, size: audioBuffer.length };
-      });
-
-      await step.run('update-progress-20', async () => {
-        await updateTranscriptionProgress(jobId, 20);
-      });
-
-      // ============================================
-      // PASO 2: Transcribir con Whisper
-      // ============================================
-      let transcriptionText;
-      let transcriptionDuration;
-      let transcriptionSegments;
-
-      await step.run('whisper-transcribe', async () => {
         console.log('[transcribe] Iniciando transcripcion con Whisper...');
 
-        const response = await openai.audio.transcriptions.create({
-          file: audioFileForWhisper,
+        const transcriptionResponse = await openai.audio.transcriptions.create({
+          file: audioFile,
           model: "whisper-1",
           language: "es",
           response_format: "verbose_json",
@@ -139,22 +126,22 @@ const transcribeFile = inngest.createFunction(
         });
 
         console.log('[transcribe] Transcripcion completada:', {
-          duration: `${response.duration}s`,
-          segments: response.segments?.length || 0
+          duration: `${transcriptionResponse.duration}s`,
+          segments: transcriptionResponse.segments?.length || 0
         });
 
-        // Store in function scope, not step output
-        transcriptionText = response.text;
-        transcriptionDuration = response.duration;
-        transcriptionSegments = response.segments;
-
-        // Return minimal data
+        // Return data needed for next steps
         return {
-          success: true,
-          duration: response.duration,
-          segments: response.segments?.length || 0
+          text: transcriptionResponse.text,
+          duration: transcriptionResponse.duration,
+          segments: transcriptionResponse.segments
         };
       });
+
+      // Extract data from whisper result
+      const transcriptionText = whisperResult.text;
+      const transcriptionDuration = whisperResult.duration;
+      const transcriptionSegments = whisperResult.segments;
 
       await step.run('update-progress-50', async () => {
         await updateTranscriptionProgress(jobId, 50);
@@ -163,9 +150,7 @@ const transcribeFile = inngest.createFunction(
       // ============================================
       // PASO 3: Identificar speakers
       // ============================================
-      let speakers;
-
-      await step.run('identify-speakers', async () => {
+      const speakersResult = await step.run('identify-speakers', async () => {
         console.log('[transcribe] Identificando intervinientes...');
 
         const completion = await openai.chat.completions.create({
@@ -199,11 +184,13 @@ Si no hay indicadores claros de speakers, devuelve array vacio.`
         });
 
         const result = JSON.parse(completion.choices[0].message.content);
-        speakers = result.speakers || [];
+        const speakers = result.speakers || [];
 
         console.log('[transcribe] Intervinientes identificados:', speakers.length);
-        return { success: true, count: speakers.length };
+        return { speakers }; // 🔥 FIX: Retornar speakers
       });
+
+      const speakers = speakersResult.speakers;
 
       await step.run('update-progress-65', async () => {
         await updateTranscriptionProgress(jobId, 65);
@@ -212,9 +199,7 @@ Si no hay indicadores claros de speakers, devuelve array vacio.`
       // ============================================
       // PASO 4: Generar resumen
       // ============================================
-      let summary;
-
-      await step.run('generate-summary', async () => {
+      const summaryResult = await step.run('generate-summary', async () => {
         console.log('[transcribe] Generando resumen...');
 
         const summaryPrompt = summaryType === 'short'
@@ -244,11 +229,13 @@ El resumen debe:
           max_tokens: summaryType === 'short' ? 500 : 2000
         });
 
-        summary = completion.choices[0].message.content;
+        const summary = completion.choices[0].message.content;
 
         console.log('[transcribe] Resumen generado');
-        return { success: true, length: summary.length };
+        return { summary }; // 🔥 FIX: Retornar summary
       });
+
+      const summary = summaryResult.summary;
 
       await step.run('update-progress-75', async () => {
         await updateTranscriptionProgress(jobId, 75);
@@ -257,9 +244,7 @@ El resumen debe:
       // ============================================
       // PASO 5: Generar tags
       // ============================================
-      let tags;
-
-      await step.run('generate-tags', async () => {
+      const tagsResult = await step.run('generate-tags', async () => {
         console.log('[transcribe] Generando tags...');
 
         const completion = await openai.chat.completions.create({
@@ -289,11 +274,13 @@ Responde SOLO con JSON:
         });
 
         const result = JSON.parse(completion.choices[0].message.content);
-        tags = result.tags || [];
+        const tags = result.tags || [];
 
         console.log('[transcribe] Tags generados:', tags);
-        return { success: true, count: tags.length };
+        return { tags }; // 🔥 FIX: Retornar tags
       });
+
+      const tags = tagsResult.tags;
 
       await step.run('update-progress-85', async () => {
         await updateTranscriptionProgress(jobId, 85);
@@ -302,9 +289,7 @@ Responde SOLO con JSON:
       // ============================================
       // PASO 6: Generar subtitulos SRT y VTT
       // ============================================
-      let subtitles;
-
-      await step.run('generate-subtitles', async () => {
+      const subtitlesResult = await step.run('generate-subtitles', async () => {
         console.log('[transcribe] Generando subtitulos...');
 
         const segments = transcriptionSegments || [];
@@ -336,13 +321,15 @@ Responde SOLO con JSON:
 
         console.log('[transcribe] Subtitulos generados');
 
-        subtitles = {
+        const subtitles = {
           srt: srtBlob.url,
           vtt: vttBlob.url
         };
 
-        return { success: true };
+        return { subtitles }; // 🔥 FIX: Retornar subtitles
       });
+
+      const subtitles = subtitlesResult.subtitles;
 
       await step.run('update-progress-90', async () => {
         await updateTranscriptionProgress(jobId, 90);
@@ -351,9 +338,7 @@ Responde SOLO con JSON:
       // ============================================
       // PASO 7: Guardar archivos de texto
       // ============================================
-      let textFiles;
-
-      await step.run('save-text-files', async () => {
+      const textFilesResult = await step.run('save-text-files', async () => {
         console.log('[transcribe] Guardando archivos de texto...');
 
         // Guardar transcripcion completa
@@ -379,14 +364,16 @@ Responde SOLO con JSON:
 
         console.log('[transcribe] Archivos de texto guardados');
 
-        textFiles = {
+        const textFiles = {
           txt: txtBlob.url,
           summary: summaryBlob.url,
           speakers: speakersBlob.url
         };
 
-        return { success: true };
+        return { textFiles }; // 🔥 FIX: Retornar textFiles
       });
+
+      const textFiles = textFilesResult.textFiles;
 
       await step.run('update-progress-95', async () => {
         await updateTranscriptionProgress(jobId, 95);
