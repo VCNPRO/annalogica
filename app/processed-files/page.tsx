@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Trash2, Download, ArrowLeft, Settings, Info, Languages } from 'lucide-react';
@@ -42,6 +42,29 @@ export default function ProcessedFilesPage() {
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
   const [translatingJob, setTranslatingJob] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState('en');
+  const [userStats, setUserStats] = useState<{
+    total: number;
+    completed: number;
+    processing: number;
+    errors: number;
+    totalHours: string;
+  } | null>(null);
+
+  // Load user stats
+  const loadUserStats = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch('/api/user/stats', {
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserStats(data);
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+    }
+  }, [user]);
 
   // Load user from localStorage and check auth
   useEffect(() => {
@@ -92,6 +115,16 @@ export default function ProcessedFilesPage() {
       fetchJobs();
     }
   }, [user]);
+
+  // Load user stats when user is ready
+  useEffect(() => {
+    if (user) {
+      loadUserStats();
+      // Reload stats every 30 seconds
+      const interval = setInterval(loadUserStats, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user, loadUserStats]);
 
   const toggleJobSelection = (jobId: string) => {
     setSelectedJobs(prev => {
@@ -409,7 +442,7 @@ export default function ProcessedFilesPage() {
               <span className="text-white">trabajando para</span>
             </div>
             {(user?.name || user?.email) && (
-              <p className="font-orbitron text-orange-500 text-xl font-semibold -mt-1 ml-1">{user.name || user.email}</p>
+              <p className="font-orbitron text-white text-xl font-semibold -mt-1 ml-1">{user.name || user.email}</p>
             )}
           </div>
 
@@ -427,6 +460,37 @@ export default function ProcessedFilesPage() {
               <span>Ajustes</span>
             </Link>
           </nav>
+
+          {/* User Stats Widget */}
+          {userStats && (
+            <div className="bg-zinc-800 rounded-lg p-4 mb-4">
+              <h3 className="text-sm font-medium text-zinc-400 mb-3">
+                📊 Resumen de Archivos
+              </h3>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-300">Total procesados:</span>
+                  <span className="text-orange-500 font-semibold">{userStats.completed}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-300">En proceso:</span>
+                  <span className="text-blue-400 font-semibold">{userStats.processing}</span>
+                </div>
+                {userStats.errors > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-300">Errores:</span>
+                    <span className="text-red-400 font-semibold">{userStats.errors}</span>
+                  </div>
+                )}
+                <div className="border-t border-zinc-700 pt-2 mt-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-300">Horas transcritas:</span>
+                    <span className="text-green-400 font-semibold">{userStats.totalHours}h</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* File retention policy info */}
           <div className="bg-zinc-800 rounded-lg p-4 mb-4">
