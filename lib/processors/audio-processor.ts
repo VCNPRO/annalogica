@@ -243,17 +243,61 @@ Responde SOLO con JSON:
     console.log('[AudioProcessor] Subtitles generated');
     await updateTranscriptionProgress(jobId, 90);
 
-    // STEP 7: Save text files
-    console.log('[AudioProcessor] Saving text files...');
+    // STEP 7: Generate and save output files
+    console.log('[AudioProcessor] Generating output files (Excel, PDF, TXT)...');
 
-    // Save full transcription
+    // Generate Excel file with all data
+    const { generateAudioExcel } = await import('@/lib/excel-generator');
+    const excelBuffer = await generateAudioExcel({
+      filename: fileName,
+      duration: transcriptionDuration,
+      transcription: transcriptionText,
+      summary,
+      speakers,
+      tags,
+      hasSRT: true,
+      hasVTT: true,
+      language: 'es',
+      processingDate: new Date()
+    });
+
+    const excelBlob = await put(
+      `transcriptions/${jobId}.xlsx`,
+      excelBuffer,
+      { access: 'public', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+    );
+
+    console.log('[AudioProcessor] Excel generated');
+
+    // Generate PDF with all data
+    const { generateAudioPDF } = await import('@/lib/results-pdf-generator');
+    const pdfBuffer = await generateAudioPDF({
+      filename: fileName,
+      duration: transcriptionDuration,
+      transcription: transcriptionText,
+      summary,
+      speakers,
+      tags,
+      language: 'es',
+      processingDate: new Date()
+    });
+
+    const pdfBlob = await put(
+      `transcriptions/${jobId}.pdf`,
+      pdfBuffer,
+      { access: 'public', contentType: 'application/pdf' }
+    );
+
+    console.log('[AudioProcessor] PDF generated');
+
+    // Save full transcription (TXT)
     const txtBlob = await put(
       `transcriptions/${jobId}.txt`,
       transcriptionText,
       { access: 'public', contentType: 'text/plain' }
     );
 
-    // Save summary
+    // Save summary (TXT)
     const summaryBlob = await put(
       `transcriptions/${jobId}-summary.txt`,
       summary,
@@ -267,7 +311,7 @@ Responde SOLO con JSON:
       { access: 'public', contentType: 'application/json' }
     );
 
-    console.log('[AudioProcessor] Text files saved');
+    console.log('[AudioProcessor] All output files saved');
     await updateTranscriptionProgress(jobId, 95);
 
     // STEP 8: Save results to database
@@ -283,7 +327,9 @@ Responde SOLO con JSON:
       metadata: {
         speakers: speakers,
         segments: transcriptionSegments?.length || 0,
-        language: 'es'
+        language: 'es',
+        excelUrl: excelBlob.url,
+        pdfUrl: pdfBlob.url
       }
     });
 

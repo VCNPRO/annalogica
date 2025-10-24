@@ -68,29 +68,10 @@ export async function processDocumentFile(
       });
     }
 
-    // Save extracted text to blob
+    // Prepare for output files
     const timestamp = Date.now();
-    const txtFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-extracted.txt`;
-    const txtBlob = await put(txtFilename, extractedText, {
-      access: 'public',
-      contentType: 'text/plain; charset=utf-8',
-      addRandomSuffix: true
-    });
-
-    // Update job with extracted text
-    await TranscriptionJobDB.updateResults(jobId, {
-      txtUrl: txtBlob.url,
-      metadata: {
-        ...metadata,
-        ...parseMetadata,
-        actions,
-        summaryType,
-        isDocument: true
-      }
-    });
-    await TranscriptionJobDB.updateStatus(jobId, 'transcribed');
-
     let summaryUrl: string | undefined;
+    let summary: string | undefined;
     let tags: string[] | undefined;
 
     // Generate summary and tags if requested
@@ -115,27 +96,94 @@ export async function processDocumentFile(
       });
 
       const aiResult = JSON.parse(completion.choices[0].message.content || '{}');
-      const summary = aiResult.summary || '';
+      summary = aiResult.summary || '';
       tags = aiResult.tags || [];
-
-      // Save summary if generated
-      if (actions.includes('Resumir') && summary) {
-        const summaryFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-summary.txt`;
-        const summaryBlob = await put(summaryFilename, summary, {
-          access: 'public',
-          contentType: 'text/plain; charset=utf-8',
-          addRandomSuffix: true
-        });
-        summaryUrl = summaryBlob.url;
-      }
 
       console.log('[DocumentProcessor] Summary and tags generated');
     }
 
+    // Generate output files (Excel, PDF, TXT)
+    console.log('[DocumentProcessor] Generating output files (Excel, PDF, TXT)...');
+
+    // Generate Excel file with all data
+    const { generateDocumentExcel } = await import('@/lib/excel-generator');
+    const excelBuffer = await generateDocumentExcel({
+      filename,
+      title: undefined, // Could extract from first lines of text
+      documentType: parseMetadata.method === 'unpdf' ? 'PDF' : parseMetadata.method === 'mammoth' ? 'DOCX' : 'TXT',
+      pageCount: parseMetadata.pages,
+      extractedText,
+      summary,
+      tags,
+      language,
+      processingDate: new Date()
+    });
+
+    const excelBlob = await put(
+      `documents/${jobId}.xlsx`,
+      excelBuffer,
+      { access: 'public', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', addRandomSuffix: true }
+    );
+
+    console.log('[DocumentProcessor] Excel generated');
+
+    // Generate PDF with all data
+    const { generateDocumentPDF } = await import('@/lib/results-pdf-generator');
+    const pdfBuffer = await generateDocumentPDF({
+      filename,
+      title: undefined,
+      documentType: parseMetadata.method === 'unpdf' ? 'PDF' : parseMetadata.method === 'mammoth' ? 'DOCX' : 'TXT',
+      pageCount: parseMetadata.pages,
+      extractedText,
+      summary,
+      tags,
+      language,
+      processingDate: new Date()
+    });
+
+    const pdfBlob = await put(
+      `documents/${jobId}.pdf`,
+      pdfBuffer,
+      { access: 'public', contentType: 'application/pdf', addRandomSuffix: true }
+    );
+
+    console.log('[DocumentProcessor] PDF generated');
+
+    // Save extracted text (TXT)
+    const txtFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-extracted.txt`;
+    const txtBlob = await put(txtFilename, extractedText, {
+      access: 'public',
+      contentType: 'text/plain; charset=utf-8',
+      addRandomSuffix: true
+    });
+
+    // Save summary if generated
+    if (summary) {
+      const summaryFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-summary.txt`;
+      const summaryBlob = await put(summaryFilename, summary, {
+        access: 'public',
+        contentType: 'text/plain; charset=utf-8',
+        addRandomSuffix: true
+      });
+      summaryUrl = summaryBlob.url;
+    }
+
+    console.log('[DocumentProcessor] All output files saved');
+
     // Update job with final results
     await TranscriptionJobDB.updateResults(jobId, {
-      metadata: { ...metadata, tags },
-      summaryUrl
+      txtUrl: txtBlob.url,
+      summaryUrl,
+      metadata: {
+        ...metadata,
+        ...parseMetadata,
+        actions,
+        summaryType,
+        isDocument: true,
+        tags,
+        excelUrl: excelBlob.url,
+        pdfUrl: pdfBlob.url
+      }
     });
 
     await TranscriptionJobDB.updateStatus(jobId, 'completed');

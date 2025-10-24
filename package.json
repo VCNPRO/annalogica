@@ -22,6 +22,7 @@
     "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.2",
     "cookie": "^1.0.2",
+    "exceljs": "^4.4.0",
     "inngest": "^3.44.3",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.3",
