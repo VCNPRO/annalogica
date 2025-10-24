@@ -408,6 +408,9 @@ export function AdminDashboard() {
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Usuario</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase" title="ID corto de 4 cifras para identificación rápida">
+                    🔢 ID Cliente
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Nombre</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase">Tipo Cuenta</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase" title="Documentos procesados (PDFs, DOCX, TXT) vs límite mensual">
@@ -428,6 +431,11 @@ export function AdminDashboard() {
                         <span className="font-semibold text-sm">{user.email}</span>
                         <span className="text-xs text-gray-400 font-mono">{user.id}</span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-lg font-bold text-orange-500 font-mono">
+                        {user.client_id || '-'}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-700 dark:text-gray-300">{user.name || '-'}</span>

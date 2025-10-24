@@ -10,6 +10,7 @@ export interface UserWithMetrics {
   email: string;
   name: string | null;
   role: string;
+  client_id: number | null; // ID corto de 4 cifras
   account_type: AccountType;
   account_status: AccountStatus;
   internal_notes: string | null;
@@ -113,6 +114,7 @@ export async function getAllUsersWithMetrics(params?: {
         u.email,
         u.name,
         u.role,
+        u.client_id,
         COALESCE(u.account_type, 'production') as account_type,
         COALESCE(u.account_status, 'active') as account_status,
         u.internal_notes,
@@ -142,7 +144,7 @@ export async function getAllUsersWithMetrics(params?: {
       FROM users u
       LEFT JOIN transcription_jobs tj ON u.id = tj.user_id
       WHERE ${whereClause}
-      GROUP BY u.id, u.email, u.name, u.role, u.account_type, u.account_status,
+      GROUP BY u.id, u.email, u.name, u.role, u.client_id, u.account_type, u.account_status,
                u.internal_notes, u.tags, u.stripe_customer_id, u.stripe_subscription_id,
                u.subscription_status, u.total_cost_usd,
                u.monthly_budget_usd, u.monthly_quota, u.monthly_usage,

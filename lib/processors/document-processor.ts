@@ -2,6 +2,7 @@
 // Direct document processing without Inngest
 import OpenAI from 'openai';
 import { put, del } from '@vercel/blob';
+import { sql } from '@vercel/postgres';
 import { getTranscriptionJob } from '@/lib/db/transcriptions';
 import { TranscriptionJobDB } from '@/lib/db';
 
@@ -33,6 +34,19 @@ export async function processDocumentFile(
     }
 
     const { user_id: userId, metadata } = job;
+
+    // Get user's client_id
+    let clientId: number | undefined;
+    try {
+      const userResult = await sql`SELECT client_id FROM users WHERE id = ${userId}`;
+      if (userResult.rows.length > 0) {
+        clientId = userResult.rows[0].client_id;
+        console.log('[DocumentProcessor] User client_id:', clientId);
+      }
+    } catch (error) {
+      console.error('[DocumentProcessor] Error fetching user client_id:', error);
+      // Continue without client_id
+    }
 
     // Update status to processing
     await TranscriptionJobDB.updateStatus(jobId, 'processing');
@@ -108,7 +122,7 @@ export async function processDocumentFile(
     // Generate Excel file with all data
     const { generateDocumentExcel } = await import('@/lib/excel-generator');
     const excelBuffer = await generateDocumentExcel({
-      jobId,
+      clientId,
       filename,
       title: undefined, // Could extract from first lines of text
       documentType: parseMetadata.method === 'unpdf' ? 'PDF' : parseMetadata.method === 'mammoth' ? 'DOCX' : 'TXT',
@@ -133,6 +147,7 @@ export async function processDocumentFile(
     try {
       const { generateDocumentPDF } = await import('@/lib/results-pdf-generator');
       const pdfBuffer = await generateDocumentPDF({
+        clientId,
         filename,
         title: undefined,
         documentType: parseMetadata.method === 'unpdf' ? 'PDF' : parseMetadata.method === 'mammoth' ? 'DOCX' : 'TXT',

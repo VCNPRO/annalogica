@@ -8,6 +8,7 @@ if (typeof Buffer === 'undefined') {
 }
 
 export interface AudioPDFData {
+  clientId?: number; // ID corto de 4 cifras del cliente
   filename: string;
   duration?: number;
   transcription: string;
@@ -19,6 +20,7 @@ export interface AudioPDFData {
 }
 
 export interface DocumentPDFData {
+  clientId?: number; // ID corto de 4 cifras del cliente
   filename: string;
   title?: string;
   documentType: string;
@@ -57,6 +59,9 @@ export async function generateAudioPDF(data: AudioPDFData): Promise<Buffer> {
     doc.fillColor('#000000').fontSize(16).font('Helvetica-Bold').text('Información General');
     doc.moveDown(0.5);
     doc.fontSize(11).font('Helvetica');
+    if (data.clientId) {
+      addKeyValue(doc, 'ID Cliente', data.clientId.toString());
+    }
     addKeyValue(doc, 'Nombre de Archivo', data.filename);
     if (data.duration) {
       addKeyValue(doc, 'Duración', `${(data.duration / 60).toFixed(2)} minutos (${data.duration} segundos)`);
@@ -157,6 +162,9 @@ export async function generateDocumentPDF(data: DocumentPDFData): Promise<Buffer
     doc.fillColor('#000000').fontSize(16).font('Helvetica-Bold').text('Información General');
     doc.moveDown(0.5);
     doc.fontSize(11).font('Helvetica');
+    if (data.clientId) {
+      addKeyValue(doc, 'ID Cliente', data.clientId.toString());
+    }
     addKeyValue(doc, 'Nombre de Archivo', data.filename);
     addKeyValue(doc, 'Tipo de Documento', data.documentType.toUpperCase());
     if (data.pageCount) {

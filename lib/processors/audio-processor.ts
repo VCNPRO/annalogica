@@ -2,6 +2,7 @@
 // Direct audio processing without Inngest
 import OpenAI from 'openai';
 import { put, del } from '@vercel/blob';
+import { sql } from '@vercel/postgres';
 import {
   updateTranscriptionProgress,
   saveTranscriptionResults,
@@ -49,9 +50,22 @@ export async function processAudioFile(jobId: string): Promise<void> {
       throw new Error(`Job ${jobId} not found in database`);
     }
 
-    const { audio_url: audioUrl, filename: fileName, language: jobLanguage } = job;
+    const { audio_url: audioUrl, filename: fileName, language: jobLanguage, user_id: userId } = job;
 
     console.log('[AudioProcessor] Job found:', { jobId, fileName, language: jobLanguage });
+
+    // Get user's client_id
+    let clientId: number | undefined;
+    try {
+      const userResult = await sql`SELECT client_id FROM users WHERE id = ${userId}`;
+      if (userResult.rows.length > 0) {
+        clientId = userResult.rows[0].client_id;
+        console.log('[AudioProcessor] User client_id:', clientId);
+      }
+    } catch (error) {
+      console.error('[AudioProcessor] Error fetching user client_id:', error);
+      // Continue without client_id
+    }
 
     // Update progress: 10%
     await updateTranscriptionProgress(jobId, 10);
@@ -260,7 +274,7 @@ Responde SOLO con JSON:
     // Generate Excel file with all data
     const { generateAudioExcel } = await import('@/lib/excel-generator');
     const excelBuffer = await generateAudioExcel({
-      jobId,
+      clientId,
       filename: fileName,
       duration: transcriptionDuration,
       transcription: transcriptionText,
@@ -286,6 +300,7 @@ Responde SOLO con JSON:
     try {
       const { generateAudioPDF } = await import('@/lib/results-pdf-generator');
       const pdfBuffer = await generateAudioPDF({
+        clientId,
         filename: fileName,
         duration: transcriptionDuration,
         transcription: transcriptionText,
