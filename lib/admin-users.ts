@@ -120,9 +120,12 @@ export async function getAllUsersWithMetrics(params?: {
         u.stripe_customer_id,
         u.stripe_subscription_id,
         u.subscription_status,
-        u.subscription_tier as subscription_plan,
+        'free' as subscription_plan,
         COALESCE(u.total_cost_usd, 0) as total_cost_usd,
         u.monthly_budget_usd,
+        u.monthly_quota,
+        u.monthly_usage,
+        u.quota_reset_date,
         u.created_at,
         u.last_activity_at,
         COUNT(DISTINCT tj.id) as total_operations,
@@ -136,8 +139,9 @@ export async function getAllUsersWithMetrics(params?: {
       WHERE ${whereClause}
       GROUP BY u.id, u.email, u.name, u.role, u.account_type, u.account_status,
                u.internal_notes, u.tags, u.stripe_customer_id, u.stripe_subscription_id,
-               u.subscription_status, u.subscription_tier, u.total_cost_usd,
-               u.monthly_budget_usd, u.created_at, u.last_activity_at
+               u.subscription_status, u.total_cost_usd,
+               u.monthly_budget_usd, u.monthly_quota, u.monthly_usage, u.quota_reset_date,
+               u.created_at, u.last_activity_at
       ORDER BY ${orderByClause}
       LIMIT ${limitParam}
       OFFSET ${offsetParam}
