@@ -114,14 +114,41 @@ export function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch stats and users
+        // Fetch stats and users with credentials
         const [statsRes, usersRes] = await Promise.all([
-          fetch('/api/admin/stats'),
-          fetch('/api/admin/users')
+          fetch('/api/admin/stats', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          }),
+          fetch('/api/admin/users', {
+            method: 'GET',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          })
         ]);
 
-        if (!statsRes.ok || !usersRes.ok) {
-          console.error('Failed to fetch admin data');
+        // Check for errors
+        if (!statsRes.ok) {
+          const errorText = await statsRes.text();
+          console.error('Failed to fetch stats:', {
+            status: statsRes.status,
+            error: errorText
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        if (!usersRes.ok) {
+          const errorText = await usersRes.text();
+          console.error('Failed to fetch users:', {
+            status: usersRes.status,
+            error: errorText
+          });
           setIsLoading(false);
           return;
         }
@@ -153,13 +180,17 @@ export function AdminDashboard() {
     try {
       const res = await fetch('/api/admin/user-quota', {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, monthlyQuota: quota })
       });
 
       if (res.ok) {
         // Refresh data
-        const usersRes = await fetch('/api/admin/users');
+        const usersRes = await fetch('/api/admin/users', {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
         const users = await usersRes.json();
         setData({ ...data, users: users.users || [] });
         setEditingQuota(null);
@@ -173,13 +204,17 @@ export function AdminDashboard() {
     try {
       const res = await fetch('/api/admin/user-quota/reset', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId })
       });
 
       if (res.ok) {
         // Refresh data
-        const usersRes = await fetch('/api/admin/users');
+        const usersRes = await fetch('/api/admin/users', {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
         const users = await usersRes.json();
         setData({ ...data, users: users.users || [] });
       }
@@ -190,7 +225,10 @@ export function AdminDashboard() {
 
   const handleViewUserStats = async (userId: string) => {
     try {
-      const res = await fetch(`/api/admin/user-stats?userId=${userId}`);
+      const res = await fetch(`/api/admin/user-stats?userId=${userId}`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
       if (res.ok) {
         const stats = await res.json();
         setSelectedUser(stats);

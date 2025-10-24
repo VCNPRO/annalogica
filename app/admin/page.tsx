@@ -2,28 +2,30 @@
 // MISIÓN: Proteger la ruta y renderizar el panel de control.
 
 import { redirect } from 'next/navigation';
-// import { auth } from '@/auth'; // Asume que tienes un sistema de autenticación, ajusta si es necesario
+import { cookies } from 'next/headers';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
-import { getUserIsAdmin } from '@/lib/data'; // Usamos nuestro nuevo archivo de datos
-
-// Simulación de una función auth para que el código funcione
-async function auth() {
-    // En tu app real, esto vendrá de tu librería de autenticación (ej. NextAuth.js)
-    // Para la prueba, asegúrate que este ID corresponde a un usuario que sea admin en tu DB
-    return { user: { id: 'd4f39938-7756-4f83-82f0-feb7dfd498d0' } }; // ID del usuario test@test.com que es admin
-}
-
+import { verifyToken } from '@/lib/auth';
+import { UserDB } from '@/lib/db';
 
 export default async function AdminPage() {
-  const session = await auth();
-  if (!session?.user?.id) {
+  // Get auth token from cookies
+  const cookieStore = await cookies();
+  const authToken = cookieStore.get('auth-token');
+
+  if (!authToken) {
     redirect('/login'); // Si no está logueado, fuera
   }
 
-  // ¡GUARDIA DE SEGURIDAD ACTIVADO!
-  const isAdmin = await getUserIsAdmin(session.user.id);
-  if (!isAdmin) {
-    redirect('/dashboard'); // Si no es admin, a su dashboard normal
+  // Verify token and get user info
+  const payload = verifyToken(authToken.value);
+  if (!payload) {
+    redirect('/login'); // Token inválido
+  }
+
+  // Verify admin role
+  const user = await UserDB.findById(payload.userId);
+  if (!user || user.role !== 'admin') {
+    redirect('/'); // Si no es admin, a la página principal
   }
 
   return (
