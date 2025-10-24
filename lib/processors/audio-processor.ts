@@ -269,26 +269,32 @@ Responde SOLO con JSON:
 
     console.log('[AudioProcessor] Excel generated');
 
-    // Generate PDF with all data
-    const { generateAudioPDF } = await import('@/lib/results-pdf-generator');
-    const pdfBuffer = await generateAudioPDF({
-      filename: fileName,
-      duration: transcriptionDuration,
-      transcription: transcriptionText,
-      summary,
-      speakers,
-      tags,
-      language: 'es',
-      processingDate: new Date()
-    });
+    // Generate PDF with all data (with error handling)
+    let pdfBlob: any = null;
+    try {
+      const { generateAudioPDF } = await import('@/lib/results-pdf-generator');
+      const pdfBuffer = await generateAudioPDF({
+        filename: fileName,
+        duration: transcriptionDuration,
+        transcription: transcriptionText,
+        summary,
+        speakers,
+        tags,
+        language: 'es',
+        processingDate: new Date()
+      });
 
-    const pdfBlob = await put(
-      `transcriptions/${jobId}.pdf`,
-      pdfBuffer,
-      { access: 'public', contentType: 'application/pdf' }
-    );
+      pdfBlob = await put(
+        `transcriptions/${jobId}.pdf`,
+        pdfBuffer,
+        { access: 'public', contentType: 'application/pdf' }
+      );
 
-    console.log('[AudioProcessor] PDF generated');
+      console.log('[AudioProcessor] PDF generated');
+    } catch (pdfError: any) {
+      console.error('[AudioProcessor] PDF generation failed (non-fatal):', pdfError.message);
+      // PDF generation is not critical, continue without it
+    }
 
     // Save full transcription (TXT)
     const txtBlob = await put(
@@ -329,7 +335,7 @@ Responde SOLO con JSON:
         segments: transcriptionSegments?.length || 0,
         language: 'es',
         excelUrl: excelBlob.url,
-        pdfUrl: pdfBlob.url
+        pdfUrl: pdfBlob?.url || null
       }
     });
 

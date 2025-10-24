@@ -127,27 +127,33 @@ export async function processDocumentFile(
 
     console.log('[DocumentProcessor] Excel generated');
 
-    // Generate PDF with all data
-    const { generateDocumentPDF } = await import('@/lib/results-pdf-generator');
-    const pdfBuffer = await generateDocumentPDF({
-      filename,
-      title: undefined,
-      documentType: parseMetadata.method === 'unpdf' ? 'PDF' : parseMetadata.method === 'mammoth' ? 'DOCX' : 'TXT',
-      pageCount: parseMetadata.pages,
-      extractedText,
-      summary,
-      tags,
-      language,
-      processingDate: new Date()
-    });
+    // Generate PDF with all data (with error handling)
+    let pdfBlob: any = null;
+    try {
+      const { generateDocumentPDF } = await import('@/lib/results-pdf-generator');
+      const pdfBuffer = await generateDocumentPDF({
+        filename,
+        title: undefined,
+        documentType: parseMetadata.method === 'unpdf' ? 'PDF' : parseMetadata.method === 'mammoth' ? 'DOCX' : 'TXT',
+        pageCount: parseMetadata.pages,
+        extractedText,
+        summary,
+        tags,
+        language,
+        processingDate: new Date()
+      });
 
-    const pdfBlob = await put(
-      `documents/${jobId}.pdf`,
-      pdfBuffer,
-      { access: 'public', contentType: 'application/pdf', addRandomSuffix: true }
-    );
+      pdfBlob = await put(
+        `documents/${jobId}.pdf`,
+        pdfBuffer,
+        { access: 'public', contentType: 'application/pdf', addRandomSuffix: true }
+      );
 
-    console.log('[DocumentProcessor] PDF generated');
+      console.log('[DocumentProcessor] PDF generated');
+    } catch (pdfError: any) {
+      console.error('[DocumentProcessor] PDF generation failed (non-fatal):', pdfError.message);
+      // PDF generation is not critical, continue without it
+    }
 
     // Save extracted text (TXT)
     const txtFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-extracted.txt`;

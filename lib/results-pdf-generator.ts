@@ -2,6 +2,11 @@
 // Generador de PDFs para resultados de procesamiento
 import PDFDocument from 'pdfkit';
 
+// PDFKit puede requerir buffer en entorno Node.js
+if (typeof Buffer === 'undefined') {
+  globalThis.Buffer = require('buffer').Buffer;
+}
+
 export interface AudioPDFData {
   filename: string;
   duration?: number;
