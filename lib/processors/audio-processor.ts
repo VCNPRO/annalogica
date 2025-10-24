@@ -260,6 +260,7 @@ Responde SOLO con JSON:
     // Generate Excel file with all data
     const { generateAudioExcel } = await import('@/lib/excel-generator');
     const excelBuffer = await generateAudioExcel({
+      jobId,
       filename: fileName,
       duration: transcriptionDuration,
       transcription: transcriptionText,
@@ -268,7 +269,7 @@ Responde SOLO con JSON:
       tags,
       hasSRT: true,
       hasVTT: true,
-      language: 'es',
+      language: jobLanguage || 'auto',
       processingDate: new Date()
     });
 

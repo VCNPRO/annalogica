@@ -2,7 +2,16 @@
 // Generador de archivos Excel estructurados con columnas de datos
 import ExcelJS from 'exceljs';
 
+/**
+ * Generate short file code from jobId (last 8 characters)
+ */
+function generateShortCode(jobId?: string): string {
+  if (!jobId) return 'N/A';
+  return jobId.slice(-8).toUpperCase();
+}
+
 export interface AudioExcelData {
+  jobId?: string; // Add jobId for generating short code
   filename: string;
   duration?: number;
   transcription: string;
@@ -16,6 +25,7 @@ export interface AudioExcelData {
 }
 
 export interface DocumentExcelData {
+  jobId?: string; // Add jobId for generating short code
   filename: string;
   title?: string;
   documentType: string; // PDF, DOCX, TXT
@@ -51,6 +61,7 @@ export async function generateAudioExcel(data: AudioExcelData): Promise<Buffer> 
 
   // Agregar datos
   const rows = [
+    ['Código de Archivo', generateShortCode(data.jobId)],
     ['Nombre de Archivo', data.filename],
     ['Duración (segundos)', data.duration?.toString() || 'N/A'],
     ['Duración (minutos)', data.duration ? `${(data.duration / 60).toFixed(2)} min` : 'N/A'],
@@ -138,20 +149,15 @@ export async function generateDocumentExcel(data: DocumentExcelData): Promise<Bu
 
   // Agregar datos
   const rows = [
+    ['Código de Archivo', generateShortCode(data.jobId)],
     ['Nombre de Archivo', data.filename],
+    ['Título del Documento', data.title || 'N/A'],
     ['Tipo de Documento', data.documentType.toUpperCase()],
     ['Número de Páginas', data.pageCount?.toString() || 'N/A'],
     ['Idioma', data.language || 'Español'],
     ['Fecha de Procesamiento', data.processingDate.toLocaleString('es-ES')],
     ['', ''], // Separador
   ];
-
-  // Título si existe
-  if (data.title) {
-    rows.push(['TÍTULO DEL DOCUMENTO', '']);
-    rows.push(['Título', data.title]);
-    rows.push(['', '']); // Separador
-  }
 
   // Texto extraído
   rows.push(['TEXTO EXTRAÍDO', '']);

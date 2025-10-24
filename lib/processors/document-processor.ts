@@ -108,6 +108,7 @@ export async function processDocumentFile(
     // Generate Excel file with all data
     const { generateDocumentExcel } = await import('@/lib/excel-generator');
     const excelBuffer = await generateDocumentExcel({
+      jobId,
       filename,
       title: undefined, // Could extract from first lines of text
       documentType: parseMetadata.method === 'unpdf' ? 'PDF' : parseMetadata.method === 'mammoth' ? 'DOCX' : 'TXT',
