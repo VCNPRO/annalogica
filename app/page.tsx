@@ -85,7 +85,7 @@ export default function Dashboard() {
   const [selectedUploadedFileIds, setSelectedUploadedFileIds] = useState<Set<string>>(new Set());
   const [selectedCompletedFileIds, setSelectedCompletedFileIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [language, setLanguage] = useState('es');
+  const [language, setLanguage] = useState('auto'); // Detección automática por defecto
   const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
   const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf' | 'both'>('pdf');

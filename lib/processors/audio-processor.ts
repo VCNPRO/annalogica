@@ -49,9 +49,9 @@ export async function processAudioFile(jobId: string): Promise<void> {
       throw new Error(`Job ${jobId} not found in database`);
     }
 
-    const { audio_url: audioUrl, filename: fileName } = job;
+    const { audio_url: audioUrl, filename: fileName, language: jobLanguage } = job;
 
-    console.log('[AudioProcessor] Job found:', { jobId, fileName });
+    console.log('[AudioProcessor] Job found:', { jobId, fileName, language: jobLanguage });
 
     // Update progress: 10%
     await updateTranscriptionProgress(jobId, 10);
@@ -85,13 +85,24 @@ export async function processAudioFile(jobId: string): Promise<void> {
 
     // STEP 2: Transcribe with Whisper
     console.log('[AudioProcessor] Starting Whisper transcription...');
-    const transcriptionResponse = await openai.audio.transcriptions.create({
+
+    // Build transcription params
+    const transcriptionParams: any = {
       file: audioFileForWhisper,
       model: "whisper-1",
-      language: "es",
       response_format: "verbose_json",
       timestamp_granularities: ["segment", "word"]
-    });
+    };
+
+    // Only add language if not auto-detection
+    if (jobLanguage && jobLanguage !== 'auto') {
+      transcriptionParams.language = jobLanguage;
+      console.log('[AudioProcessor] Using specified language:', jobLanguage);
+    } else {
+      console.log('[AudioProcessor] Using automatic language detection');
+    }
+
+    const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams);
 
     const transcriptionText = transcriptionResponse.text;
     const transcriptionDuration = transcriptionResponse.duration;
