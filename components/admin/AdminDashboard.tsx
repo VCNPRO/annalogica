@@ -108,7 +108,9 @@ export function AdminDashboard() {
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [editingQuota, setEditingQuota] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<'docs' | 'audio' | 'plan' | null>(null);
   const [newQuota, setNewQuota] = useState<number>(0);
+  const [newPlan, setNewPlan] = useState<string>('');
 
   // Fetch real data from APIs
   useEffect(() => {
@@ -176,13 +178,18 @@ export function AdminDashboard() {
     fetchData();
   }, []);
 
-  const handleUpdateQuota = async (userId: string, quota: number) => {
+  const handleUpdateQuota = async (userId: string, field: 'docs' | 'audio', quota: number) => {
     try {
-      const res = await fetch('/api/admin/user-quota', {
+      const res = await fetch('/api/admin/users', {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, monthlyQuota: quota })
+        body: JSON.stringify({
+          userId,
+          updates: field === 'docs'
+            ? { monthlyQuotaDocs: quota }
+            : { monthlyQuotaAudioMinutes: quota }
+        })
       });
 
       if (res.ok) {
@@ -194,10 +201,58 @@ export function AdminDashboard() {
         const users = await usersRes.json();
         setData({ ...data, users: users.users || [] });
         setEditingQuota(null);
+        setEditingField(null);
       }
     } catch (error) {
       console.error('Error updating quota:', error);
     }
+  };
+
+  const handleUpdatePlan = async (userId: string, plan: string) => {
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          updates: { subscriptionTier: plan }
+        })
+      });
+
+      if (res.ok) {
+        // Refresh data
+        const usersRes = await fetch('/api/admin/users', {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const users = await usersRes.json();
+        setData({ ...data, users: users.users || [] });
+        setEditingQuota(null);
+        setEditingField(null);
+      }
+    } catch (error) {
+      console.error('Error updating plan:', error);
+    }
+  };
+
+  const startEditingQuota = (userId: string, field: 'docs' | 'audio', currentValue: number) => {
+    setEditingQuota(userId);
+    setEditingField(field);
+    setNewQuota(currentValue);
+  };
+
+  const startEditingPlan = (userId: string, currentPlan: string) => {
+    setEditingQuota(userId);
+    setEditingField('plan');
+    setNewPlan(currentPlan || 'free');
+  };
+
+  const cancelEditing = () => {
+    setEditingQuota(null);
+    setEditingField(null);
+    setNewQuota(0);
+    setNewPlan('');
   };
 
   const handleResetUsage = async (userId: string) => {
@@ -354,19 +409,112 @@ export function AdminDashboard() {
                       <span className="text-sm text-gray-700 dark:text-gray-300">{user.name || '-'}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
-                        {user.subscription_tier || 'free'}
-                      </span>
+                      {editingQuota === user.id && editingField === 'plan' ? (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={newPlan}
+                            onChange={(e) => setNewPlan(e.target.value)}
+                            className="px-2 py-1 text-xs border border-blue-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            autoFocus
+                          >
+                            <option value="free">Free</option>
+                            <option value="basic">Basic</option>
+                            <option value="pro">Pro</option>
+                            <option value="business">Business</option>
+                            <option value="universidad">Universidad</option>
+                            <option value="medios">Medios</option>
+                            <option value="empresarial">Empresarial</option>
+                          </select>
+                          <button
+                            onClick={() => handleUpdatePlan(user.id, newPlan)}
+                            className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            className="px-2 py-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs rounded hover:bg-gray-400 dark:hover:bg-gray-500"
+                          >
+                            ✗
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          onClick={() => startEditingPlan(user.id, user.subscription_tier)}
+                          className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-900/50"
+                          title="Click para editar plan"
+                        >
+                          {user.subscription_tier || 'free'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`font-mono text-sm ${(user.monthly_usage_docs || 0) >= (user.monthly_quota_docs || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                        {user.monthly_usage_docs || 0} / {user.monthly_quota_docs || 10}
-                      </span>
+                      {editingQuota === user.id && editingField === 'docs' ? (
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm text-gray-500">{user.monthly_usage_docs || 0} /</span>
+                          <input
+                            type="number"
+                            value={newQuota}
+                            onChange={(e) => setNewQuota(parseInt(e.target.value) || 0)}
+                            className="w-20 px-2 py-1 text-sm border border-blue-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleUpdateQuota(user.id, 'docs', newQuota)}
+                            className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            className="px-2 py-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs rounded hover:bg-gray-400 dark:hover:bg-gray-500"
+                          >
+                            ✗
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          onClick={() => startEditingQuota(user.id, 'docs', user.monthly_quota_docs || 10)}
+                          className={`font-mono text-sm cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/30 px-2 py-1 rounded ${(user.monthly_usage_docs || 0) >= (user.monthly_quota_docs || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}
+                          title="Click para editar cuota de documentos"
+                        >
+                          {user.monthly_usage_docs || 0} / {user.monthly_quota_docs || 10}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`font-mono text-sm ${(user.monthly_usage_audio_minutes || 0) >= (user.monthly_quota_audio_minutes || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                        {user.monthly_usage_audio_minutes || 0} / {user.monthly_quota_audio_minutes || 10}
-                      </span>
+                      {editingQuota === user.id && editingField === 'audio' ? (
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm text-gray-500">{user.monthly_usage_audio_minutes || 0} /</span>
+                          <input
+                            type="number"
+                            value={newQuota}
+                            onChange={(e) => setNewQuota(parseInt(e.target.value) || 0)}
+                            className="w-20 px-2 py-1 text-sm border border-blue-300 rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleUpdateQuota(user.id, 'audio', newQuota)}
+                            className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={cancelEditing}
+                            className="px-2 py-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs rounded hover:bg-gray-400 dark:hover:bg-gray-500"
+                          >
+                            ✗
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          onClick={() => startEditingQuota(user.id, 'audio', user.monthly_quota_audio_minutes || 10)}
+                          className={`font-mono text-sm cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/30 px-2 py-1 rounded ${(user.monthly_usage_audio_minutes || 0) >= (user.monthly_quota_audio_minutes || 0) ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}
+                          title="Click para editar cuota de audio"
+                        >
+                          {user.monthly_usage_audio_minutes || 0} / {user.monthly_quota_audio_minutes || 10}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
                       {user.quota_reset_date ? new Date(user.quota_reset_date).toLocaleDateString('es-ES') : '-'}
