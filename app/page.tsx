@@ -18,6 +18,7 @@ interface UploadedFile {
   status: FileStatus;
   date: string;
   fileType: 'audio' | 'video' | 'text'; // New: Store file type
+  mimeType?: string; // Store MIME type for API calls
   actions: string[]; // New: Store selected actions for the file
   jobId?: string; // Add jobId to link to details page
   blobUrl?: string; // Store blob URL for processing
@@ -397,6 +398,7 @@ export default function Dashboard() {
           status: 'uploading',
           date: new Date().toISOString(),
           fileType: detectedType,
+          mimeType: file.type, // Store MIME type for API calls
           actions: [],
           fileSize: file.size // Capture file size in bytes
         };
@@ -641,8 +643,8 @@ export default function Dashboard() {
 
 
         } else {
-          // Procesar como audio/video (la transcripción se hace siempre internamente)
-          console.log('[Process] 🎵 Processing as AUDIO/VIDEO');
+          // Procesar como audio/video con Inngest (ASÍNCRONO - timeout 15 minutos)
+          console.log('[Process] 🎵 Processing as AUDIO/VIDEO with Inngest');
 
           // 🔥 CAMBIO: Poner el archivo en estado "processing" ANTES de llamar al API
           // para que el usuario vea la barra de progreso inmediatamente
@@ -656,15 +658,18 @@ export default function Dashboard() {
           ));
 
           // SECURITY: Cookie httpOnly se envía automáticamente
-          const processRes = await fetch('/api/process', {
+          // Usar endpoint asíncrono con Inngest (15min timeout vs 5min síncrono)
+          const processRes = await fetch(`/api/jobs/${file.id}`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
             credentials: 'include',
             body: JSON.stringify({
-              audioUrl: file.blobUrl,
+              url: file.blobUrl,
               filename: file.name,
+              mime: file.mimeType || 'audio/mpeg',
+              size: file.fileSize || 0,
               language: language,
               actions: file.actions,
               summaryType: summaryType
@@ -676,18 +681,18 @@ export default function Dashboard() {
           if (!processRes.ok) {
             const errorData = await processRes.json();
             console.error('[Process] API Error:', errorData);
-            throw new Error(errorData.error || 'Error al procesar');
+            throw new Error(errorData.message || 'Error al procesar');
           }
 
           const responseData = await processRes.json();
           console.log('[Process] API Response data:', responseData);
 
-          // API wraps response in { success, data: { jobId, status, message } }
+          // API response: { success, message, data: { jobId, mime, queuedAt } }
           const jobId = responseData.data?.jobId || responseData.jobId;
-          console.log('[Process] ✅ Job created:', jobId, file.name);
+          console.log('[Process] ✅ Job enqueued with Inngest:', jobId, file.name);
           processedCount++;
 
-          // Update file with jobId
+          // Update file with jobId and set to pending (Inngest will process it)
           setUploadedFiles(prev => {
             const updated = prev.map(f => {
               if (f.id === file.id) {

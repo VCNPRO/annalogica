@@ -45,8 +45,10 @@ export async function GET(_req: Request, context: any) {
     }
 
     const metadata = job.metadata ?? {};
-    const progress =
-      typeof metadata.progress === 'number' ? metadata.progress : undefined;
+    // 🔥 FIX: Usar processing_progress de la columna de BD, no de metadata
+    const progress = job.processing_progress !== null && job.processing_progress !== undefined
+      ? job.processing_progress
+      : (typeof metadata.progress === 'number' ? metadata.progress : undefined);
 
     return NextResponse.json({
       id: jobId,
