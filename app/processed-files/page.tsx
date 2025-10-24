@@ -20,6 +20,8 @@ interface ProcessedJob {
   speakers_url?: string;
   metadata?: {
     tags?: string[];
+    excelUrl?: string;
+    pdfUrl?: string;
   };
 }
 
@@ -570,6 +572,28 @@ export default function ProcessedFilesPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           <div className="flex flex-wrap gap-2">
+                            {/* Excel download - PRIORITY */}
+                            {job.metadata?.excelUrl && (
+                              <a
+                                href={job.metadata.excelUrl}
+                                download
+                                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                                title="Archivo Excel con todos los datos estructurados"
+                              >
+                                <Download className="h-3 w-3 mr-1" /> EXCEL
+                              </a>
+                            )}
+                            {/* PDF Complete download - PRIORITY */}
+                            {job.metadata?.pdfUrl && (
+                              <a
+                                href={job.metadata.pdfUrl}
+                                download
+                                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500"
+                                title="PDF completo con todos los resultados"
+                              >
+                                <Download className="h-3 w-3 mr-1" /> PDF Completo
+                              </a>
+                            )}
                             {job.txt_url && (
                               <>
                                 <button
