@@ -19,8 +19,9 @@ export default function GuiaUsuario() {
   };
 
   const handleDownloadPDF = () => {
-    // PDF will be available at /docs/guia-usuario-annalogica.pdf
-    window.open('/docs/guia-usuario-annalogica.pdf', '_blank');
+    // Usar la función de impresión del navegador
+    // El usuario puede elegir "Guardar como PDF" en el diálogo de impresión
+    window.print();
   };
 
   return (
@@ -85,7 +86,7 @@ export default function GuiaUsuario() {
           <div className="space-y-6">
             <Step number={1} title="Registro y Acceso">
               <p className="text-gray-700 mb-3">
-                Accede a <a href="https://annalogica.vercel.app" className="text-orange-500 hover:underline">annalogica.vercel.app</a> y crea tu cuenta:
+                Accede a <a href="https://annalogica.eu" className="text-orange-500 hover:underline">annalogica.eu</a> y crea tu cuenta:
               </p>
               <ul className="list-disc list-inside space-y-2 text-gray-700">
                 <li>Introduce tu email y contraseña</li>
@@ -749,7 +750,7 @@ export default function GuiaUsuario() {
                 <li>• <a href="/pricing" className="text-orange-500 hover:underline">Ver Planes y Precios</a></li>
                 <li>• <a href="/privacy" className="text-orange-500 hover:underline">Política de Privacidad</a></li>
                 <li>• <a href="/terms" className="text-orange-500 hover:underline">Términos de Servicio</a></li>
-                <li>• <strong>Dashboard:</strong> <a href="/" className="text-orange-500 hover:underline">https://annalogica.vercel.app</a></li>
+                <li>• <strong>Dashboard:</strong> <a href="/" className="text-orange-500 hover:underline">https://annalogica.eu</a></li>
               </ul>
             </div>
 

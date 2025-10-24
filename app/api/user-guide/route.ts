@@ -10,7 +10,11 @@ export async function GET() {
     // Verificar que existe el archivo
     if (!fs.existsSync(pdfPath)) {
       return NextResponse.json(
-        { error: 'La guía de usuario no está disponible. Ejecuta: node scripts/generate-user-guide.js' },
+        {
+          error: 'PDF no disponible',
+          message: 'La guía de usuario está disponible en formato web en /guia. Usa la función "Imprimir a PDF" de tu navegador para descargarla.',
+          webGuideUrl: '/guia'
+        },
         { status: 404 }
       );
     }
@@ -32,7 +36,11 @@ export async function GET() {
   } catch (error) {
     console.error('Error sirviendo guía de usuario:', error);
     return NextResponse.json(
-      { error: 'Error al servir la guía de usuario' },
+      {
+        error: 'Error al servir la guía de usuario',
+        message: 'Visita /guia para la versión web',
+        webGuideUrl: '/guia'
+      },
       { status: 500 }
     );
   }

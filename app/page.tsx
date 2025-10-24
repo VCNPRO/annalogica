@@ -1092,40 +1092,9 @@ export default function Dashboard() {
               <span className={textSecondary}>trabajando para</span>
             </div>
             {(user?.name || user?.email) && (
-              <p className={`font-orbitron text-orange-500 text-xl font-semibold -mt-1 ml-1`}>{user.name || user.email}</p>
+              <p className={`font-orbitron text-white text-xl font-semibold -mt-1 ml-1`}>{user.name || user.email}</p>
             )}
           </div>
-
-          {/* User Stats Widget */}
-          {userStats && (
-            <div className={`${darkMode ? 'bg-zinc-800' : 'bg-gray-100'} rounded-lg p-4 mb-6`}>
-              <h3 className={`text-sm font-medium ${textSecondary} mb-3`}>
-                📊 Resumen de Archivos
-              </h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className={textSecondary}>Total procesados:</span>
-                  <span className="text-orange-500 font-semibold">{userStats.completed}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className={textSecondary}>En proceso:</span>
-                  <span className="text-blue-400 font-semibold">{userStats.processing}</span>
-                </div>
-                {userStats.errors > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className={textSecondary}>Errores:</span>
-                    <span className="text-red-400 font-semibold">{userStats.errors}</span>
-                  </div>
-                )}
-                <div className={`border-t ${border} pt-2 mt-2`}>
-                  <div className="flex justify-between text-sm">
-                    <span className={textSecondary}>Horas transcritas:</span>
-                    <span className="text-green-400 font-semibold">{userStats.totalHours}h</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="mb-6">
             <div
