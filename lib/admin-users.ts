@@ -120,7 +120,7 @@ export async function getAllUsersWithMetrics(params?: {
         u.stripe_customer_id,
         u.stripe_subscription_id,
         u.subscription_status,
-        'free' as subscription_plan,
+        COALESCE(u.subscription_plan, 'free') as subscription_plan,
         COALESCE(u.total_cost_usd, 0) as total_cost_usd,
         u.monthly_budget_usd,
         u.monthly_quota,
