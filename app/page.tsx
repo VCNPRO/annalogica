@@ -1829,9 +1829,9 @@ export default function Dashboard() {
               ) : (
                 uploadedFiles.filter(f => f.status === 'completed').map((file) => {
                   // Estado local para cada archivo (TTS URL)
-                  const [ttsUrl, setTtsUrl] = React.useState<string | null>(null);
-                  const [showPlayer, setShowPlayer] = React.useState(false);
-                  const [loading, setLoading] = React.useState(false);
+                  const [ttsUrl, setTtsUrl] = useState<string | null>(null);
+                  const [showPlayer, setShowPlayer] = useState(false);
+                  const [loading, setLoading] = useState(false);
 
                   // Fetch job data para obtener ttsUrl
                   const fetchTtsUrl = async () => {
@@ -1854,7 +1854,7 @@ export default function Dashboard() {
                   };
 
                   // Fetch TTS URL on mount (solo si es documento)
-                  React.useEffect(() => {
+                  useEffect(() => {
                     if (file.fileType === 'text') {
                       fetchTtsUrl();
                     }
