@@ -42,6 +42,7 @@ interface Job {
   speakers_url?: string;
   metadata?: {
     tags?: string[];
+    ttsUrl?: string; // 🎤 TTS audio URL
   };
 }
 
