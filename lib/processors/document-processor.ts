@@ -127,26 +127,68 @@ export async function processDocumentFile(
           ? summary
           : extractedText.substring(0, 4000);
 
-        // Call TTS API
-        const ttsResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/text-to-speech`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: textToNarrate,
-            voice: 'nova', // Default voice (female, clear)
-            model: 'tts-1', // Standard quality
-            jobId,
-            filename: filename.replace(/\.[^/.]+$/, '')
-          })
+        // Validate text length (OpenAI limit: 4096 chars)
+        if (textToNarrate.length > 4096) {
+          console.warn('[DocumentProcessor] Text too long for TTS, truncating to 4096 chars');
+        }
+
+        const textForTTS = textToNarrate.substring(0, 4096);
+
+        // Call OpenAI TTS directly (server-side, no auth needed)
+        const mp3 = await openai.audio.speech.create({
+          model: 'tts-1',
+          voice: 'nova',
+          input: textForTTS,
+          response_format: 'mp3',
+          speed: 1.0
         });
 
-        if (ttsResponse.ok) {
-          const ttsData = await ttsResponse.json();
-          ttsUrl = ttsData.audioUrl;
-          console.log('[DocumentProcessor] TTS audio generated:', ttsUrl);
-        } else {
-          console.error('[DocumentProcessor] TTS generation failed (non-fatal):', await ttsResponse.text());
+        // Convert to buffer
+        const buffer = Buffer.from(await mp3.arrayBuffer());
+
+        console.log('[DocumentProcessor] TTS audio generated:', {
+          sizeBytes: buffer.length,
+          sizeMB: (buffer.length / 1024 / 1024).toFixed(2)
+        });
+
+        // Upload to Vercel Blob
+        const timestamp = Date.now();
+        const audioFilename = `tts/${timestamp}-${filename.replace(/\.[^/.]+$/, '')}.mp3`;
+
+        const ttsBlob = await put(audioFilename, buffer, {
+          access: 'public',
+          contentType: 'audio/mpeg',
+          addRandomSuffix: true
+        });
+
+        ttsUrl = ttsBlob.url;
+        console.log('[DocumentProcessor] TTS audio uploaded:', ttsUrl);
+
+        // Log usage for analytics
+        try {
+          await sql`
+            INSERT INTO ai_usage_log (
+              user_id,
+              service,
+              model,
+              input_tokens,
+              output_tokens,
+              cost_usd,
+              metadata
+            ) VALUES (
+              ${userId},
+              'openai-tts',
+              'tts-1',
+              ${textForTTS.length},
+              0,
+              ${(textForTTS.length / 1_000_000) * 15},
+              ${JSON.stringify({ voice: 'nova', textLength: textForTTS.length, audioSize: buffer.length })}
+            )
+          `;
+        } catch (logError) {
+          console.error('[DocumentProcessor] Failed to log TTS usage (non-fatal):', logError);
         }
+
       } catch (ttsError: any) {
         console.error('[DocumentProcessor] TTS generation failed (non-fatal):', ttsError.message);
         // Continue processing even if TTS fails
