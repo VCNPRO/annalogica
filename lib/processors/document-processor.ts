@@ -204,7 +204,7 @@ export async function processDocumentFile(
         isDocument: true,
         tags,
         excelUrl: excelBlob.url,
-        pdfUrl: pdfBlob.url
+        pdfUrl: pdfBlob?.url || null // 🔥 FIX: pdfBlob puede ser null si la generación falla
       }
     });
 
