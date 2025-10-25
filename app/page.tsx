@@ -52,6 +52,146 @@ interface User {
   email: string;
 }
 
+// 🎤 Componente separado para archivos completados con TTS
+function CompletedFileItem({
+  file,
+  selectedCompletedFileIds,
+  handleFileSelect,
+  textPrimary,
+  border,
+  hover,
+  getStatusColor,
+  downloadDirHandle,
+  showNotification,
+  downloadFilesOrganized,
+  downloadFilesIndividually,
+  downloadFormat
+}: {
+  file: UploadedFile;
+  selectedCompletedFileIds: Set<string>;
+  handleFileSelect: (id: string, type: 'completed') => void;
+  textPrimary: string;
+  border: string;
+  hover: string;
+  getStatusColor: (status: string) => string;
+  downloadDirHandle: any;
+  showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
+  downloadFilesOrganized: (file: UploadedFile, job: Job, dirHandle: any, format: 'txt' | 'pdf' | 'both') => Promise<void>;
+  downloadFilesIndividually: (file: UploadedFile, job: Job, format: 'txt' | 'pdf' | 'both') => Promise<void>;
+  downloadFormat: 'txt' | 'pdf' | 'both';
+}) {
+  const [ttsUrl, setTtsUrl] = useState<string | null>(null);
+  const [showPlayer, setShowPlayer] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch job data para obtener ttsUrl
+  const fetchTtsUrl = useCallback(async () => {
+    if (!file.jobId || loading || ttsUrl) return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
+      if (res.ok) {
+        const job = await res.json();
+        if (job.metadata?.ttsUrl) {
+          setTtsUrl(job.metadata.ttsUrl);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching TTS URL:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [file.jobId, loading, ttsUrl]);
+
+  // Fetch TTS URL on mount (solo si es documento)
+  useEffect(() => {
+    if (file.fileType === 'text') {
+      fetchTtsUrl();
+    }
+  }, [file.fileType, fetchTtsUrl]);
+
+  return (
+    <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
+      <div className="flex items-center gap-4">
+        <input
+          type="checkbox"
+          checked={selectedCompletedFileIds.has(file.id)}
+          onChange={() => handleFileSelect(file.id, 'completed')}
+          className="form-checkbox h-4 w-4 text-orange-500 rounded"
+        />
+        <div className="flex-1 flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className={`text-xs ${textPrimary} truncate`}>{file.name}</span>
+            {/* 🎤 Indicador visual si tiene TTS */}
+            {ttsUrl && (
+              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 rounded-full text-[10px] font-medium">
+                🎤 Audio
+              </span>
+            )}
+          </div>
+          {/* 🔊 Player de audio si tiene TTS y está visible */}
+          {ttsUrl && showPlayer && (
+            <div className="mt-2">
+              <audio
+                controls
+                className="w-full h-8"
+                style={{ maxWidth: '300px' }}
+                src={ttsUrl}
+                preload="metadata"
+              >
+                Tu navegador no soporta el reproductor de audio.
+              </audio>
+            </div>
+          )}
+        </div>
+        <span className={`text-xs font-medium ${getStatusColor(file.status)}`}>
+          ✓ Completado
+        </span>
+        {/* Botón para mostrar/ocultar player */}
+        {ttsUrl && (
+          <button
+            onClick={() => setShowPlayer(!showPlayer)}
+            className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-xs font-medium transition-colors"
+            title={showPlayer ? 'Ocultar reproductor' : 'Reproducir audio narrado'}
+          >
+            {showPlayer ? '🔇' : '🔊'}
+          </button>
+        )}
+        <button
+          onClick={async () => {
+            if (!file.jobId) return;
+
+            if (!downloadDirHandle && 'showDirectoryPicker' in window) {
+              showNotification('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".', 'info');
+              return;
+            }
+
+            try {
+              const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
+              if (res.ok) {
+                const data = await res.json();
+                const job = data;
+                if (downloadDirHandle) {
+                  await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
+                } else {
+                  await downloadFilesIndividually(file, job, downloadFormat);
+                }
+              }
+            } catch (err) {
+              console.error('Error downloading file:', err);
+              showNotification(`Error al descargar ${file.name}.`, 'error');
+            }
+          }}
+          className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
+        >
+          📥 Descargar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -1827,120 +1967,23 @@ export default function Dashboard() {
                   <p className={`text-xs ${textSecondary}`}>No hay archivos completados aún.</p>
                 </div>
               ) : (
-                uploadedFiles.filter(f => f.status === 'completed').map((file) => {
-                  // Estado local para cada archivo (TTS URL)
-                  const [ttsUrl, setTtsUrl] = useState<string | null>(null);
-                  const [showPlayer, setShowPlayer] = useState(false);
-                  const [loading, setLoading] = useState(false);
-
-                  // Fetch job data para obtener ttsUrl
-                  const fetchTtsUrl = async () => {
-                    if (!file.jobId || loading || ttsUrl) return;
-
-                    setLoading(true);
-                    try {
-                      const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
-                      if (res.ok) {
-                        const job = await res.json();
-                        if (job.metadata?.ttsUrl) {
-                          setTtsUrl(job.metadata.ttsUrl);
-                        }
-                      }
-                    } catch (err) {
-                      console.error('Error fetching TTS URL:', err);
-                    } finally {
-                      setLoading(false);
-                    }
-                  };
-
-                  // Fetch TTS URL on mount (solo si es documento)
-                  useEffect(() => {
-                    if (file.fileType === 'text') {
-                      fetchTtsUrl();
-                    }
-                  }, [file.jobId]);
-
-                  return (
-                    <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedCompletedFileIds.has(file.id)}
-                          onChange={() => handleFileSelect(file.id, 'completed')}
-                          className="form-checkbox h-4 w-4 text-orange-500 rounded"
-                        />
-                        <div className="flex-1 flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs ${textPrimary} truncate`}>{file.name}</span>
-                            {/* 🎤 Indicador visual si tiene TTS */}
-                            {ttsUrl && (
-                              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 rounded-full text-[10px] font-medium">
-                                🎤 Audio
-                              </span>
-                            )}
-                          </div>
-                          {/* 🔊 Player de audio si tiene TTS y está visible */}
-                          {ttsUrl && showPlayer && (
-                            <div className="mt-2">
-                              <audio
-                                controls
-                                className="w-full h-8"
-                                style={{ maxWidth: '300px' }}
-                                src={ttsUrl}
-                                preload="metadata"
-                              >
-                                Tu navegador no soporta el reproductor de audio.
-                              </audio>
-                            </div>
-                          )}
-                        </div>
-                        <span className={`text-xs font-medium ${getStatusColor(file.status)}`}>
-                          ✓ Completado
-                        </span>
-                        {/* Botón para mostrar/ocultar player */}
-                        {ttsUrl && (
-                          <button
-                            onClick={() => setShowPlayer(!showPlayer)}
-                            className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-xs font-medium transition-colors"
-                            title={showPlayer ? 'Ocultar reproductor' : 'Reproducir audio narrado'}
-                          >
-                            {showPlayer ? '🔇' : '🔊'}
-                          </button>
-                        )}
-                        <button
-                          onClick={async () => {
-                            if (!file.jobId) return;
-
-                            if (!downloadDirHandle && 'showDirectoryPicker' in window) {
-                              showNotification('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".', 'info');
-                              return;
-                            }
-
-                            try {
-                              const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
-                              if (res.ok) {
-                                const data = await res.json();
-                                // La API devuelve directamente el objeto job
-                                const job = data;
-                                if (downloadDirHandle) {
-                                  await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
-                                } else {
-                                  await downloadFilesIndividually(file, job, downloadFormat);
-                                }
-                              }
-                            } catch (err) {
-                              console.error('Error downloading file:', err);
-                              showNotification(`Error al descargar ${file.name}.`, 'error');
-                            }
-                          }}
-                          className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
-                        >
-                          📥 Descargar
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
+                uploadedFiles.filter(f => f.status === 'completed').map((file) => (
+                  <CompletedFileItem
+                    key={file.id}
+                    file={file}
+                    selectedCompletedFileIds={selectedCompletedFileIds}
+                    handleFileSelect={handleFileSelect}
+                    textPrimary={textPrimary}
+                    border={border}
+                    hover={hover}
+                    getStatusColor={getStatusColor}
+                    downloadDirHandle={downloadDirHandle}
+                    showNotification={showNotification}
+                    downloadFilesOrganized={downloadFilesOrganized}
+                    downloadFilesIndividually={downloadFilesIndividually}
+                    downloadFormat={downloadFormat}
+                  />
+                ))
               )}
             </div>
           </div>
