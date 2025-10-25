@@ -116,6 +116,43 @@ export async function processDocumentFile(
       console.log('[DocumentProcessor] Summary and tags generated');
     }
 
+    // 🎤 TTS: Generate audio narration if requested
+    let ttsUrl: string | undefined;
+    if (actions.includes('GenerarAudio') || actions.includes('TTS')) {
+      console.log('[DocumentProcessor] Generating audio with TTS...');
+
+      try {
+        // Use summary if available, otherwise use first 4000 chars of text
+        const textToNarrate = summary
+          ? summary
+          : extractedText.substring(0, 4000);
+
+        // Call TTS API
+        const ttsResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/text-to-speech`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: textToNarrate,
+            voice: 'nova', // Default voice (female, clear)
+            model: 'tts-1', // Standard quality
+            jobId,
+            filename: filename.replace(/\.[^/.]+$/, '')
+          })
+        });
+
+        if (ttsResponse.ok) {
+          const ttsData = await ttsResponse.json();
+          ttsUrl = ttsData.audioUrl;
+          console.log('[DocumentProcessor] TTS audio generated:', ttsUrl);
+        } else {
+          console.error('[DocumentProcessor] TTS generation failed (non-fatal):', await ttsResponse.text());
+        }
+      } catch (ttsError: any) {
+        console.error('[DocumentProcessor] TTS generation failed (non-fatal):', ttsError.message);
+        // Continue processing even if TTS fails
+      }
+    }
+
     // Generate output files (Excel, PDF, TXT)
     console.log('[DocumentProcessor] Generating output files (Excel, PDF, TXT)...');
 
@@ -204,7 +241,8 @@ export async function processDocumentFile(
         isDocument: true,
         tags,
         excelUrl: excelBlob.url,
-        pdfUrl: pdfBlob?.url || null // 🔥 FIX: pdfBlob puede ser null si la generación falla
+        pdfUrl: pdfBlob?.url || null, // 🔥 FIX: pdfBlob puede ser null si la generación falla
+        ttsUrl: ttsUrl || null // 🎤 URL del audio narrado (si se generó)
       }
     });
 

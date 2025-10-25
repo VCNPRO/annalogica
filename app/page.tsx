@@ -1009,6 +1009,14 @@ export default function Dashboard() {
         await saveBlob(fileHandle, vttBlob);
       }
 
+      // 🎤 Download TTS Audio (always as .mp3)
+      if (job.metadata?.ttsUrl) {
+        const ttsRes = await fetch(job.metadata.ttsUrl);
+        const ttsBlob = await ttsRes.blob();
+        const fileHandle = await folderHandle.getFileHandle(`${baseName}-audio-narrado.mp3`, { create: true });
+        await saveBlob(fileHandle, ttsBlob);
+      }
+
       showNotification(`✅ Archivos para "${file.name}" guardados en la carpeta: ${baseName}`, 'success');
 
     } catch (error) {
@@ -1090,6 +1098,9 @@ export default function Dashboard() {
     // Always download other formats as-is
     if (job.srt_url) window.open(job.srt_url, '_blank');
     if (job.vtt_url) window.open(job.vtt_url, '_blank');
+
+    // 🎤 Download TTS Audio
+    if (job.metadata?.ttsUrl) window.open(job.metadata.ttsUrl, '_blank');
   };
 
   const getStatusText = (status: FileStatus) => {
@@ -1352,7 +1363,24 @@ export default function Dashboard() {
                 </Link>
               </div>
 
-              {/* Fila 5: Procesar Archivos - ancho completo */}
+              {/* Fila 5: Generar Audio (TTS) - Solo para documentos */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => hasDocuments && handleApplyAction('GenerarAudio')}
+                  className={`p-2 ${hasDocuments ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
+                  disabled={!hasDocuments}
+                  title={hasDocuments ? 'Generar audio narrado del texto (TTS)' : 'Solo disponible para documentos'}
+                >
+                  🎤 Generar Audio
+                </button>
+                <div className="flex items-center justify-center text-xs">
+                  <span className={`${textSecondary} text-[10px]`}>
+                    {hasDocuments ? '🔊 Voz natural AI' : 'Solo para PDFs/Docs'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Fila 6: Procesar Archivos - ancho completo */}
               <button
                 onClick={handleProcessSelectedFiles}
                 className="w-full p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors mt-2"
