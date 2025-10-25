@@ -181,9 +181,13 @@ export default function Dashboard() {
 
   // Polling para actualizar estado de jobs activos
   useEffect(() => {
-    // Filtrar archivos que necesitan polling (tienen jobId y están pending o processing)
+    // Filtrar archivos que necesitan polling (tienen jobId y están pending, processing, o error con retry)
     const activeJobs = uploadedFiles.filter(
-      f => f.jobId && (f.status === 'pending' || f.status === 'processing')
+      f => f.jobId && (
+        f.status === 'pending' ||
+        f.status === 'processing' ||
+        (f.status === 'error' && f.canRetry === true) // 🔥 FIX: Continuar polling para jobs con retry
+      )
     );
 
     console.log('[Polling] useEffect triggered:', {
@@ -242,23 +246,27 @@ export default function Dashboard() {
           const MAX_NO_PROGRESS_CRITICAL_MS = 30 * 60 * 1000; // 30 minutos
 
           // Inicializar tracking de progreso si no existe
-          if (file.lastProgressValue === undefined) {
-            file.lastProgressValue = currentProgress;
-            file.lastProgressTime = now;
-          }
+          const lastProgressValue = file.lastProgressValue ?? currentProgress;
+          const lastProgressTime = file.lastProgressTime ?? now;
 
           // Detectar si el progreso cambió
-          const progressChanged = currentProgress > (file.lastProgressValue || 0);
+          const progressChanged = currentProgress > lastProgressValue;
+
+          // Variables para actualizar el estado
+          let updatedLastProgressValue = lastProgressValue;
+          let updatedLastProgressTime = lastProgressTime;
+          let updatedStuckWarningShown = file.stuckWarningShown ?? false;
+
           if (progressChanged) {
-            console.log(`[Watchdog] Progress cambió de ${file.lastProgressValue}% → ${currentProgress}%`);
-            file.lastProgressValue = currentProgress;
-            file.lastProgressTime = now;
-            file.stuckWarningShown = false; // Reset warning
+            console.log(`[Watchdog] Progress cambió de ${lastProgressValue}% → ${currentProgress}%`);
+            updatedLastProgressValue = currentProgress;
+            updatedLastProgressTime = now;
+            updatedStuckWarningShown = false; // Reset warning
           }
 
           // Verificar si está clavado (sin progreso)
-          if (file.lastProgressTime && (job.status === 'processing' || job.status === 'pending')) {
-            const timeSinceLastProgress = (now - file.lastProgressTime) / 1000; // segundos
+          if (lastProgressTime && (job.status === 'processing' || job.status === 'pending')) {
+            const timeSinceLastProgress = (now - lastProgressTime) / 1000; // segundos
 
             // NIVEL CRÍTICO: 30 min sin progreso → AUTO-FAIL + RETRY
             if (timeSinceLastProgress > (MAX_NO_PROGRESS_CRITICAL_MS / 1000)) {
@@ -269,7 +277,10 @@ export default function Dashboard() {
                 f.id === file.id ? {
                   ...f,
                   status: 'error' as const,
-                  canRetry: true
+                  canRetry: true,
+                  lastProgressValue: updatedLastProgressValue,
+                  lastProgressTime: updatedLastProgressTime,
+                  stuckWarningShown: updatedStuckWarningShown
                 } : f
               ));
 
@@ -278,11 +289,11 @@ export default function Dashboard() {
             }
 
             // NIVEL ALERTA: 20 min sin progreso → WARNING
-            else if (timeSinceLastProgress > (MAX_NO_PROGRESS_MS / 1000) && !file.stuckWarningShown) {
+            else if (timeSinceLastProgress > (MAX_NO_PROGRESS_MS / 1000) && !updatedStuckWarningShown) {
               console.warn(`[Watchdog] Job ${file.jobId} posiblemente clavado (${Math.floor(timeSinceLastProgress / 60)} min sin progreso)`);
 
               // Mostrar alerta solo una vez
-              file.stuckWarningShown = true;
+              updatedStuckWarningShown = true;
               showNotification(
                 `⚠️ "${file.name}" lleva ${Math.floor(timeSinceLastProgress / 60)} min sin progreso. Monitoreando...`,
                 'info'
@@ -360,7 +371,11 @@ export default function Dashboard() {
                 processingProgress,
                 audioDuration: job.audio_duration_seconds,
                 processingStartTime,
-                estimatedTimeRemaining
+                estimatedTimeRemaining,
+                // 🔥 FIX: Actualizar valores del watchdog
+                lastProgressValue: updatedLastProgressValue,
+                lastProgressTime: updatedLastProgressTime,
+                stuckWarningShown: updatedStuckWarningShown
               } : f
             ));
           }
@@ -675,7 +690,15 @@ export default function Dashboard() {
           setUploadedFiles(prev => prev.map(f => {
             if (f.id === file.id) {
               console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
-              return { ...f, jobId, status: 'processing' as const };
+              return {
+                ...f,
+                jobId,
+                status: 'processing' as const,
+                // 🔥 FIX: Inicializar watchdog al crear el job
+                lastProgressValue: 0,
+                lastProgressTime: Date.now(),
+                stuckWarningShown: false
+              };
             }
             return f;
           }));
@@ -741,7 +764,15 @@ export default function Dashboard() {
             const updated = prev.map(f => {
               if (f.id === file.id) {
                 console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
-                const updatedFile = { ...f, jobId, status: 'pending' as const };
+                const updatedFile = {
+                  ...f,
+                  jobId,
+                  status: 'pending' as const,
+                  // 🔥 FIX: Inicializar watchdog al crear el job
+                  lastProgressValue: 0,
+                  lastProgressTime: Date.now(),
+                  stuckWarningShown: false
+                };
                 console.log('[Process] Updated file object:', updatedFile);
                 return updatedFile;
               }
@@ -1608,8 +1639,9 @@ export default function Dashboard() {
                                       ...f,
                                       status: 'pending' as const,
                                       processingProgress: 0,
-                                      lastProgressValue: undefined,
-                                      lastProgressTime: undefined,
+                                      // 🔥 FIX: Inicializar watchdog correctamente al reintentar
+                                      lastProgressValue: 0,
+                                      lastProgressTime: Date.now(),
                                       stuckWarningShown: false,
                                       canRetry: false
                                     } : f
