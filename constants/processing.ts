@@ -49,19 +49,51 @@ export const PROCESSING_CONSTANTS = {
    * Estimated seconds for summary generation
    */
   SUMMARY_GENERATION_SECONDS: 5,
+
+  /**
+   * 🔥 WATCHDOG ANTI-CLAVADO: Detecta jobs sin progreso
+   */
+
+  /**
+   * Tiempo máximo sin progreso antes de alerta (minutos)
+   * Si un job lleva >20 min sin cambiar de progreso → ALERTA
+   */
+  MAX_NO_PROGRESS_MINUTES: 20,
+
+  /**
+   * Tiempo máximo sin progreso antes de auto-fail (minutos)
+   * Si un job lleva >30 min sin cambiar → MARCAR COMO FAILED
+   */
+  MAX_NO_PROGRESS_CRITICAL_MINUTES: 30,
+
+  /**
+   * Intervalo de chequeo del watchdog (segundos)
+   * Cada cuánto tiempo verificar si hay jobs clavados
+   */
+  WATCHDOG_CHECK_INTERVAL_SECONDS: 30,
 } as const;
 
 export const FILE_CONSTANTS = {
   /**
-   * Maximum file size (bytes)
-   * 500MB default limit
+   * Maximum file size (bytes) - OPTIMIZADO PARA BETA
+   * Audio: 100MB (~100 min), Video: 200MB (~200 min)
    */
-  MAX_FILE_SIZE_BYTES: 500 * 1024 * 1024,
+  MAX_FILE_SIZE_AUDIO_BYTES: 100 * 1024 * 1024,
+  MAX_FILE_SIZE_VIDEO_BYTES: 200 * 1024 * 1024,
+  MAX_FILE_SIZE_DOCUMENT_BYTES: 50 * 1024 * 1024,
 
   /**
    * Maximum file size (MB) for display
    */
-  MAX_FILE_SIZE_MB: 500,
+  MAX_FILE_SIZE_AUDIO_MB: 100,
+  MAX_FILE_SIZE_VIDEO_MB: 200,
+  MAX_FILE_SIZE_DOCUMENT_MB: 50,
+
+  /**
+   * @deprecated Use specific size constants instead
+   */
+  MAX_FILE_SIZE_BYTES: 100 * 1024 * 1024,
+  MAX_FILE_SIZE_MB: 100,
 
   /**
    * Supported audio MIME types

@@ -8,9 +8,10 @@ import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client'; // 👈 CORREGIDO (singular)
 
 // Tamaños máximos (bytes)
-const MAX_FILE_SIZE_AUDIO = 500 * 1024 * 1024;      // 500 MB
-const MAX_FILE_SIZE_VIDEO = 2 * 1024 * 1024 * 1024; // 2 GB
-const MAX_FILE_SIZE_DOCUMENT = 50 * 1024 * 1024;    // 50 MB
+// 🔥 LÍMITES OPTIMIZADOS PARA BETA: Garantizan procesamiento <15 min
+const MAX_FILE_SIZE_AUDIO = 100 * 1024 * 1024;      // 100 MB (~100 min audio)
+const MAX_FILE_SIZE_VIDEO = 200 * 1024 * 1024;      // 200 MB (~200 min video)
+const MAX_FILE_SIZE_DOCUMENT = 50 * 1024 * 1024;    // 50 MB (sin cambios)
 
 // Tipos permitidos
 const ALLOWED_AUDIO_TYPES = [

@@ -26,6 +26,12 @@ interface UploadedFile {
   fileSize?: number; // Store original file size in bytes
   processingStartTime?: number; // Store when processing started (timestamp)
   estimatedTimeRemaining?: number; // Estimated seconds remaining
+
+  // 🔥 WATCHDOG ANTI-CLAVADO
+  lastProgressValue?: number; // Último progreso detectado
+  lastProgressTime?: number; // Cuándo cambió el progreso (timestamp)
+  stuckWarningShown?: boolean; // Si ya se mostró alerta de clavado
+  canRetry?: boolean; // Si el usuario puede reintentar
 }
 
 interface Job {
@@ -229,20 +235,58 @@ export default function Dashboard() {
 
           console.log('[Polling] Job status:', job.status, 'Progress:', job.progress || 0);
 
-          // Auto-restart logic: Check if job is stuck (no progress for too long)
-          if (file.processingStartTime) {
-            const timeSinceStart = (Date.now() - file.processingStartTime) / 1000; // seconds
-            const audioDuration = job.audio_duration_seconds || 60;
-            const maxExpectedTime = audioDuration * 0.5; // 0.5x multiplier (very generous timeout)
-            const timeoutThreshold = Math.max(maxExpectedTime, 1200); // At least 20 minutes
+          // 🔥 WATCHDOG ANTI-CLAVADO: Detecta jobs sin progreso real
+          const currentProgress = job.progress || 0;
+          const now = Date.now();
+          const MAX_NO_PROGRESS_MS = 20 * 60 * 1000; // 20 minutos
+          const MAX_NO_PROGRESS_CRITICAL_MS = 30 * 60 * 1000; // 30 minutos
 
-            // If job is stuck for too long (beyond reasonable processing time)
-            if (timeSinceStart > timeoutThreshold && (job.status === 'processing' || job.status === 'pending')) {
-              console.warn(`[Auto-restart] Job ${file.jobId} appears stuck (${Math.floor(timeSinceStart)}s elapsed, expected ~${Math.floor(maxExpectedTime)}s)`);
+          // Inicializar tracking de progreso si no existe
+          if (file.lastProgressValue === undefined) {
+            file.lastProgressValue = currentProgress;
+            file.lastProgressTime = now;
+          }
 
-              // TODO: Implement retry/restart API endpoint
-              // For now, just log it
-              setError(`Archivo "${file.name}" parece estar bloqueado. Por favor, intenta procesarlo de nuevo.`);
+          // Detectar si el progreso cambió
+          const progressChanged = currentProgress > (file.lastProgressValue || 0);
+          if (progressChanged) {
+            console.log(`[Watchdog] Progress cambió de ${file.lastProgressValue}% → ${currentProgress}%`);
+            file.lastProgressValue = currentProgress;
+            file.lastProgressTime = now;
+            file.stuckWarningShown = false; // Reset warning
+          }
+
+          // Verificar si está clavado (sin progreso)
+          if (file.lastProgressTime && (job.status === 'processing' || job.status === 'pending')) {
+            const timeSinceLastProgress = (now - file.lastProgressTime) / 1000; // segundos
+
+            // NIVEL CRÍTICO: 30 min sin progreso → AUTO-FAIL + RETRY
+            if (timeSinceLastProgress > (MAX_NO_PROGRESS_CRITICAL_MS / 1000)) {
+              console.error(`[Watchdog] Job ${file.jobId} CLAVADO CRÍTICO (${Math.floor(timeSinceLastProgress / 60)} min sin progreso)`);
+
+              // Marcar como error con opción de retry
+              setUploadedFiles(prev => prev.map(f =>
+                f.id === file.id ? {
+                  ...f,
+                  status: 'error' as const,
+                  canRetry: true
+                } : f
+              ));
+
+              setError(`⚠️ "${file.name}" está clavado (${Math.floor(timeSinceLastProgress / 60)} min sin progreso). Puedes reintentarlo.`);
+              continue; // Skip to next file
+            }
+
+            // NIVEL ALERTA: 20 min sin progreso → WARNING
+            else if (timeSinceLastProgress > (MAX_NO_PROGRESS_MS / 1000) && !file.stuckWarningShown) {
+              console.warn(`[Watchdog] Job ${file.jobId} posiblemente clavado (${Math.floor(timeSinceLastProgress / 60)} min sin progreso)`);
+
+              // Mostrar alerta solo una vez
+              file.stuckWarningShown = true;
+              showNotification(
+                `⚠️ "${file.name}" lleva ${Math.floor(timeSinceLastProgress / 60)} min sin progreso. Monitoreando...`,
+                'info'
+              );
             }
           }
 
@@ -1536,6 +1580,56 @@ export default function Dashboard() {
                             }`}
                                  style={{ width: `${file.processingProgress || 0}%` }} />
                           </div>
+                        </div>
+                      )}
+                      {file.status === 'error' && (
+                        <div className={`${darkMode ? 'bg-red-950/30' : 'bg-red-50'} p-3 rounded-lg border ${darkMode ? 'border-red-800' : 'border-red-200'}`}>
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="relative flex h-3 w-3">
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                              </span>
+                              <span className={`text-sm font-medium ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                                {file.canRetry ? '⚠️ Job clavado - Sin progreso' : '❌ Error en procesamiento'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {file.canRetry && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <button
+                                onClick={async () => {
+                                  // TODO: Implementar endpoint de retry
+                                  console.log('[Retry] Reintentando job:', file.jobId);
+
+                                  // Por ahora, resetear estado del archivo para que el usuario pueda reprocesar
+                                  setUploadedFiles(prev => prev.map(f =>
+                                    f.id === file.id ? {
+                                      ...f,
+                                      status: 'pending' as const,
+                                      processingProgress: 0,
+                                      lastProgressValue: undefined,
+                                      lastProgressTime: undefined,
+                                      stuckWarningShown: false,
+                                      canRetry: false
+                                    } : f
+                                  ));
+
+                                  showNotification(`Reintentando "${file.name}"...`, 'info');
+                                }}
+                                className={`flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2`}
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                Reintentar Procesamiento
+                              </button>
+                            </div>
+                          )}
+
+                          <p className={`text-xs ${darkMode ? 'text-red-400' : 'text-red-600'} mt-2`}>
+                            {file.canRetry
+                              ? `El procesamiento se detuvo. Puedes reintentar o contactar soporte si el problema persiste.`
+                              : 'Hubo un error. Por favor, intenta de nuevo o contacta soporte.'}
+                          </p>
                         </div>
                       )}
                     </div>
