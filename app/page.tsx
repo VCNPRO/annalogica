@@ -73,7 +73,7 @@ function CompletedFileItem({
   textPrimary: string;
   border: string;
   hover: string;
-  getStatusColor: (status: string) => string;
+  getStatusColor: (status: FileStatus) => string;
   downloadDirHandle: any;
   showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
   downloadFilesOrganized: (file: UploadedFile, job: Job, dirHandle: any, format: 'txt' | 'pdf' | 'both') => Promise<void>;
