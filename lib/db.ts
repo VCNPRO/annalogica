@@ -301,6 +301,9 @@ export const TranscriptionJobDB = {
       metadata?: any;
     }
   ): Promise<boolean> => {
+    // 🔥 FIX: Convertir audioDuration a integer (columna es INTEGER en BD)
+    const durationInteger = results.audioDuration ? Math.floor(results.audioDuration) : null;
+
     const result = await sql`
       UPDATE transcription_jobs
       SET
@@ -310,7 +313,7 @@ export const TranscriptionJobDB = {
         vtt_url = COALESCE(${results.vttUrl || null}, vtt_url),
         speakers_url = COALESCE(${results.speakersUrl || null}, speakers_url),
         summary_url = COALESCE(${results.summaryUrl || null}, summary_url),
-        audio_duration_seconds = COALESCE(${results.audioDuration || null}, audio_duration_seconds),
+        audio_duration_seconds = COALESCE(${durationInteger}, audio_duration_seconds),
         metadata = COALESCE(${results.metadata || null}, metadata)
       WHERE id = ${id}
     `;
