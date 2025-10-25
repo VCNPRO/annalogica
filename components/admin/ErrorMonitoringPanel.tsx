@@ -26,6 +26,26 @@ interface ErrorStats {
   last_occurrence: string;
 }
 
+// Helper para formatear error_age que puede venir como objeto de Postgres
+const formatErrorAge = (errorAge: any): string => {
+  // Si ya es string, devolverlo
+  if (typeof errorAge === 'string') return errorAge;
+
+  // Si es objeto {seconds, milliseconds} de Postgres
+  if (errorAge && typeof errorAge === 'object' && 'seconds' in errorAge) {
+    const totalSeconds = Math.floor(errorAge.seconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) return `${hours}h ${minutes}m ago`;
+    if (minutes > 0) return `${minutes}m ${seconds}s ago`;
+    return `${seconds}s ago`;
+  }
+
+  return 'unknown';
+};
+
 export default function ErrorMonitoringPanel() {
   const [errors, setErrors] = useState<SystemError[]>([]);
   const [stats, setStats] = useState<ErrorStats[]>([]);
@@ -207,7 +227,7 @@ export default function ErrorMonitoringPanel() {
                         </span>
                       )}
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {error.error_age}
+                        {formatErrorAge(error.error_age)}
                       </span>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
@@ -289,7 +309,7 @@ export default function ErrorMonitoringPanel() {
               <div>
                 <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Fecha</label>
                 <p className="text-gray-900 dark:text-gray-100">
-                  {new Date(selectedError.created_at).toLocaleString('es-ES')} ({selectedError.error_age})
+                  {new Date(selectedError.created_at).toLocaleString('es-ES')} ({formatErrorAge(selectedError.error_age)})
                 </p>
               </div>
 
