@@ -557,7 +557,7 @@ export default function ProcessedFilesPage() {
 
       <div className="flex pt-16" style={{ height: '100vh' }}>
         {/* Sidebar - similar to app/page.tsx */}
-        <div className="bg-zinc-900 border-r border-zinc-800 p-6 flex flex-col" style={{ width: '33.333%', minWidth: '33.333%', maxWidth: '33.333%', height: '100%' }}>
+        <div className="bg-zinc-900 border-r border-zinc-800 p-6 flex flex-col" style={{ width: '280px', height: '100%' }}>
           <div className="flex flex-col mb-6">
             <div className="flex items-baseline gap-x-3">
               <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>

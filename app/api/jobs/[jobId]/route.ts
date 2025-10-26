@@ -63,6 +63,7 @@ export async function GET(_req: Request, context: any) {
       vtt_url: job.vtt_url,
       speakers_url: job.speakers_url,
       summary_url: job.summary_url,
+      audio_url: job.audio_url, // 🔥 FIX: Add original audio URL to response
       audio_duration_seconds: job.audio_duration_seconds,
       created_at: job.created_at ? new Date(job.created_at).toISOString() : undefined,
     });
