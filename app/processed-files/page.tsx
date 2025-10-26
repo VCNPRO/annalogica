@@ -11,72 +11,37 @@ import { Toast } from '@/components/Toast';
 // 🎤 Componente para el reproductor de audio de un job
 function JobAudioPlayer({ jobId }: { jobId: string }) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [showPlayer, setShowPlayer] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-
-  const handlePlay = async () => {
-    // Si ya tenemos la URL, solo mostramos/ocultamos el player
-    if (audioUrl) {
-      setShowPlayer(!showPlayer);
-      return;
-    }
-
-    // Si no, la buscamos
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/jobs/${jobId}`, { credentials: 'include' });
-      if (!res.ok) {
-        throw new Error('No se pudo cargar la información del audio.');
-      }
-      const job = await res.json();
-      const url = job.metadata?.ttsUrl || job.audio_url;
-
-      if (url) {
-        setAudioUrl(url);
-        setShowPlayer(true);
-      } else {
-        setError('No hay audio disponible para este archivo.');
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (showPlayer && audioRef.current) {
-      audioRef.current.play().catch(e => console.error("Audio play failed:", e));
-    }
-  }, [showPlayer, audioUrl]); // Depend on audioUrl to ensure it's set
+    const fetchAudioUrl = async () => {
+      try {
+        const res = await fetch(`/api/jobs/${jobId}`, { credentials: 'include' });
+        if (res.ok) {
+          const job = await res.json();
+          const url = job.metadata?.ttsUrl || job.audio_url;
+          if (url) {
+            setAudioUrl(url);
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to fetch audio URL for job ${jobId}:`, err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  if (error) {
-    return <span className="text-xs text-red-400">{error}</span>;
-  }
+    fetchAudioUrl();
+  }, [jobId]);
 
-  if (showPlayer && audioUrl) {
-    return (
-      <div className="flex flex-col items-center gap-2">
-         <audio ref={audioRef} controls className="w-full h-8 max-w-[250px]" src={audioUrl} preload="metadata">
-          Tu navegador no soporta el reproductor de audio.
-        </audio>
-        <button onClick={() => setShowPlayer(false)} className="text-xs text-zinc-400 hover:text-white">Ocultar</button>
-      </div>
-    );
+  if (isLoading || !audioUrl) {
+    return null; // No renderizar nada mientras carga o si no hay URL
   }
 
   return (
-    <button
-      onClick={handlePlay}
-      disabled={isLoading}
-      className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-xs font-medium transition-colors disabled:bg-gray-400"
-      title="Reproducir audio"
-    >
-      {isLoading ? 'Cargando...' : '🔊 Reproducir'}
-    </button>
+    <audio controls className="w-full h-8 max-w-[250px]" src={audioUrl} preload="metadata">
+      Tu navegador no soporta el reproductor de audio.
+    </audio>
   );
 }
 
@@ -555,7 +520,7 @@ export default function ProcessedFilesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-black border-t-8 border-red-500">
       <Toast notification={notification} />
 
       <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
