@@ -236,7 +236,8 @@ export default function Dashboard() {
     const data = await ffmpeg.readFile('output.mp3');
     let audioBlob: Blob;
     if (data instanceof Uint8Array) {
-      audioBlob = new Blob([data.buffer], { type: 'audio/mpeg' });
+      const arrayBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+      audioBlob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
     } else {
       // This case should ideally not happen for binary output like MP3
       throw new Error('FFmpeg returned string data for MP3 output, expected Uint8Array.');
