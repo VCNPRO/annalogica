@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       text,
-      voice = 'alloy', // alloy, echo, fable, onyx, nova, shimmer
+      voice = 'nova', // alloy, echo, fable, onyx, nova, shimmer
       model = 'tts-1', // tts-1 (rápido) o tts-1-hd (calidad)
       jobId, // ID del job asociado (opcional)
       filename = 'audio-narrado' // Nombre del archivo
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validar voz
-    const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+    const validVoices = ['nova', 'echo', 'fable', 'onyx', 'alloy', 'shimmer'];
     if (!validVoices.includes(voice)) {
       return NextResponse.json(
         { error: `Voz inválida. Opciones: ${validVoices.join(', ')}` },
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
     // Generar audio con OpenAI TTS
     const mp3 = await openai.audio.speech.create({
       model: model as 'tts-1' | 'tts-1-hd',
-      voice: voice as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer',
+      voice: voice as 'nova' | 'echo' | 'fable' | 'onyx' | 'alloy' | 'shimmer',
       input: text,
       response_format: 'mp3',
       speed: 1.0 // Velocidad normal (0.25 - 4.0)
