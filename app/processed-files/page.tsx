@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Trash2, Download, ArrowLeft, Settings, Info, Languages, Search, Filter, X } from 'lucide-react';
@@ -14,6 +14,7 @@ function JobAudioPlayer({ jobId }: { jobId: string }) {
   const [showPlayer, setShowPlayer] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const handlePlay = async () => {
     // Si ya tenemos la URL, solo mostramos/ocultamos el player
@@ -46,6 +47,12 @@ function JobAudioPlayer({ jobId }: { jobId: string }) {
     }
   };
 
+  useEffect(() => {
+    if (showPlayer && audioRef.current) {
+      audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+    }
+  }, [showPlayer, audioUrl]); // Depend on audioUrl to ensure it's set
+
   if (error) {
     return <span className="text-xs text-red-400">{error}</span>;
   }
@@ -53,7 +60,7 @@ function JobAudioPlayer({ jobId }: { jobId: string }) {
   if (showPlayer && audioUrl) {
     return (
       <div className="flex flex-col items-center gap-2">
-         <audio controls autoPlay className="w-full h-8 max-w-[250px]" src={audioUrl} preload="metadata">
+         <audio ref={audioRef} controls className="w-full h-8 max-w-[250px]" src={audioUrl} preload="metadata">
           Tu navegador no soporta el reproductor de audio.
         </audio>
         <button onClick={() => setShowPlayer(false)} className="text-xs text-zinc-400 hover:text-white">Ocultar</button>
@@ -559,13 +566,7 @@ export default function ProcessedFilesPage() {
         {/* Sidebar - similar to app/page.tsx */}
         <div className="bg-zinc-900 border-r border-zinc-800 p-6 flex flex-col" style={{ width: '280px', height: '100%' }}>
           <div className="flex flex-col mb-6">
-            <div className="flex items-baseline gap-x-3">
-              <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>
-              <span className="text-white">trabajando para</span>
-            </div>
-            {(user?.name || user?.email) && (
-              <p className="font-orbitron text-white text-xl font-semibold -mt-1 ml-1">{user.name || user.email}</p>
-            )}
+            <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>
           </div>
 
           <nav className="flex flex-col space-y-2 mb-6">
