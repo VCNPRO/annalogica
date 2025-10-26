@@ -598,7 +598,6 @@ export default function ProcessedFilesPage() {
             </div>
           </div>
 
-          {/* Search and Filter Section */}
           <div className="mb-6 space-y-4">
             {/* Search Bar */}
             <div className="relative">
@@ -670,6 +669,7 @@ export default function ProcessedFilesPage() {
             </div>
           </div>
 
+          {/* Bulk Download Controls */}
           {filteredJobs.length > 0 && (
             <div className="mb-4 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -842,7 +842,6 @@ export default function ProcessedFilesPage() {
                                                 )}
                                                 {job.txt_url && (
                                                   <button
-                                                    onClick={() => handleDownload(job, 'txt', 'txt')}
                                                     className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                                                   >
                                                     <Download className="h-3 w-3 mr-1" /> TXT
@@ -850,7 +849,6 @@ export default function ProcessedFilesPage() {
                                                 )}
                                                 {job.srt_url && (
                                                   <button
-                                                    onClick={() => handleDownload(job, 'srt', 'original')}
                                                     className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                                                   >
                                                     <Download className="h-3 w-3 mr-1" /> SRT
@@ -858,7 +856,6 @@ export default function ProcessedFilesPage() {
                                                 )}
                                                 {job.vtt_url && (
                                                   <button
-                                                    onClick={() => handleDownload(job, 'vtt', 'original')}
                                                     className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
                                                   >
                                                     <Download className="h-3 w-3 mr-1" /> VTT
@@ -866,7 +863,6 @@ export default function ProcessedFilesPage() {
                                                 )}
                                                 {job.summary_url && (
                                                   <button
-                                                    onClick={() => handleDownload(job, 'summary', 'txt')}
                                                     className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                                                   >
                                                     <Download className="h-3 w-3 mr-1" /> Resumen
