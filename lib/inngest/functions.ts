@@ -2,7 +2,7 @@
 // Exporta solo las funciones activas con Whisper y OpenAI
 
 // Importa la función de transcripción con Whisper
-export { default as transcribeFile } from '@/app/api/inngest/transcribe-audio';
+export { default as transcribeFile } from '@/app/api/inngest/transcribe-audio.js';
 
 // Mantén las funciones de documentos con OpenAI
 import { inngest } from './client';

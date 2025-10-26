@@ -8,7 +8,8 @@
     "start": "next start",
     "generate-guide": "node scripts/generate-user-guide.js",
     "migrate:admin": "node scripts/apply-admin-migration.js",
-    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'public/pdf.worker.min.mjs')\""
+    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'public/pdf.worker.min.mjs')\"",
+    "test": "jest --ci --coverage --silent"
   },
   "dependencies": {
     "@sentry/nextjs": "^8.48.0",

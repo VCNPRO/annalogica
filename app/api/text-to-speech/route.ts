@@ -168,10 +168,20 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error('[TTS] Error:', error);
+    console.error('[TTS] Detailed Error:', JSON.stringify(error, null, 2));
+    
+    // Extraer información más detallada si es un error de la API de OpenAI
+    const errorMessage = error.error?.message || error.message || 'Error generando audio';
+    const errorCode = error.error?.code || 'unknown_error';
+    const errorStatus = error.status || 500;
+
     return NextResponse.json(
-      { error: error.message || 'Error generando audio' },
-      { status: 500 }
+      { 
+        error: errorMessage,
+        errorCode: errorCode,
+        details: 'La solicitud a la API de OpenAI para generar el audio falló.'
+      },
+      { status: errorStatus }
     );
   }
 }
