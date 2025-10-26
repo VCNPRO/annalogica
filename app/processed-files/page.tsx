@@ -9,47 +9,6 @@ import { useNotification } from '@/hooks/useNotification';
 import { Toast } from '@/components/Toast';
 
 // 🎤 Componente para el reproductor de audio de un job
-function JobAudioPlayer({ jobId }: { jobId: string }) {
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchAudioUrl = async () => {
-      if (!jobId) {
-        setIsLoading(false);
-        return;
-      }
-      try {
-        const res = await fetch(`/api/jobs/${jobId}`, { credentials: 'include' });
-        if (res.ok) {
-          const job = await res.json();
-          const url = job.metadata?.ttsUrl || job.audio_url;
-          // 🔥 FIX: Ensure URL is a non-empty string
-          if (url && url !== '') {
-            setAudioUrl(url);
-          }
-        }
-      } catch (err) {
-        console.error(`Failed to fetch audio URL for job ${jobId}:`, err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAudioUrl();
-  }, [jobId]);
-
-  if (isLoading || !audioUrl) {
-    return null; // Render nothing while loading or if no valid URL is found
-  }
-
-  return (
-    <audio controls className="w-full h-8 max-w-[250px]" src={audioUrl} preload="metadata">
-      Tu navegador no soporta el reproductor de audio.
-    </audio>
-  );
-}
-
 interface ProcessedJob {
   id: string;
   filename: string;
@@ -60,11 +19,13 @@ interface ProcessedJob {
   vtt_url?: string;
   summary_url?: string;
   speakers_url?: string;
+  audio_url?: string; // 🔥 Add audio_url
   metadata?: {
     tags?: string[];
     excelUrl?: string;
     pdfUrl?: string;
     fileType?: 'audio' | 'document';
+    ttsUrl?: string; // 🔥 Add ttsUrl
   };
 }
 
@@ -779,168 +740,117 @@ export default function ProcessedFilesPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800">
-                    {filteredJobs.map((job) => (
-                      <tr key={job.id} className="bg-zinc-900 hover:bg-zinc-800">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <input
-                            type="checkbox"
-                            checked={selectedJobs.has(job.id)}
-                            onChange={() => toggleJobSelection(job.id)}
-                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer"
-                          />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                          {job.filename}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
-                          {job.status}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
-                          {new Date(job.created_at).toLocaleDateString('es-ES')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <div className="flex flex-wrap gap-2">
-                            {/* Excel download - PRIORITY */}
-                            {job.metadata?.excelUrl && (
-                              <a
-                                href={job.metadata.excelUrl}
-                                download
-                                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-                                title="Archivo Excel con todos los datos estructurados"
-                              >
-                                <Download className="h-3 w-3 mr-1" /> EXCEL
-                              </a>
-                            )}
-                            {/* PDF Complete download - PRIORITY */}
-                            {job.metadata?.pdfUrl && (
-                              <a
-                                href={job.metadata.pdfUrl}
-                                download
-                                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500"
-                                title="PDF completo con todos los resultados"
-                              >
-                                <Download className="h-3 w-3 mr-1" /> PDF Completo
-                              </a>
-                            )}
-                            {job.txt_url && (
-                              <>
-                                <button
-                                  onClick={() => handleDownload(job, 'txt', 'txt')}
-                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                >
-                                  <Download className="h-3 w-3 mr-1" /> TXT
-                                </button>
-                                <button
-                                  onClick={() => handleDownload(job, 'txt', 'pdf')}
-                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                                >
-                                  <Download className="h-3 w-3 mr-1" /> PDF
-                                </button>
-                              </>
-                            )}
-                            {job.srt_url && (
-                              <button
-                                onClick={() => handleDownload(job, 'srt', 'original')}
-                                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                              >
-                                <Download className="h-3 w-3 mr-1" /> SRT
-                              </button>
-                            )}
-                            {job.vtt_url && (
-                              <button
-                                onClick={() => handleDownload(job, 'vtt', 'original')}
-                                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-                              >
-                                <Download className="h-3 w-3 mr-1" /> VTT
-                              </button>
-                            )}
-                            {job.summary_url && (
-                              <>
-                                <button
-                                  onClick={() => handleDownload(job, 'summary', 'txt')}
-                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                >
-                                  <Download className="h-3 w-3 mr-1" /> Resumen TXT
-                                </button>
-                                <button
-                                  onClick={() => handleDownload(job, 'summary', 'pdf')}
-                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500"
-                                >
-                                  <Download className="h-3 w-3 mr-1" /> Resumen PDF
-                                </button>
-                              </>
-                            )}
-                            {job.speakers_url && (
-                              <>
-                                <button
-                                  onClick={() => handleDownload(job, 'speakers', 'txt')}
-                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
-                                >
-                                  <Download className="h-3 w-3 mr-1" /> Oradores TXT
-                                </button>
-                                <button
-                                  onClick={() => handleDownload(job, 'speakers', 'pdf')}
-                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                                >
-                                  <Download className="h-3 w-3 mr-1" /> Oradores PDF
-                                </button>
-                              </>
-                            )}
-                            {job.metadata?.tags && job.metadata.tags.length > 0 && (
-                              <>
-                                <button
-                                  onClick={() => handleDownload(job, 'tags', 'txt')}
-                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-                                >
-                                  <Download className="h-3 w-3 mr-1" /> Tags TXT
-                                </button>
-                                <button
-                                  onClick={() => handleDownload(job, 'tags', 'pdf')}
-                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-800 hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-700"
-                                >
-                                  <Download className="h-3 w-3 mr-1" /> Tags PDF
-                                </button>
-                              </>
-                            )}
-                            {/* Translation button */}
-                            {job.txt_url && (
-                              <button
-                                onClick={() => handleTranslate(job.id)}
-                                disabled={translatingJob === job.id}
-                                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-                                title="Traducir transcripción al idioma seleccionado"
-                              >
-                                {translatingJob === job.id ? (
-                                  <>
-                                    <div className="animate-spin h-3 w-3 mr-1 border-2 border-white border-t-transparent rounded-full"></div>
-                                    Traduciendo...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Languages className="h-3 w-3 mr-1" /> Traducir
-                                  </>
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <JobAudioPlayer jobId={job.id} />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button
-                            onClick={() => handleDeleteJob(job.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Eliminar archivo procesado"
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                                    <tbody className="divide-y divide-zinc-800">
+                                      {filteredJobs.map((job) => {
+                                        const audioUrl = job.metadata?.ttsUrl || job.audio_url;
+                                        return (
+                                          <tr key={job.id} className="bg-zinc-900 hover:bg-zinc-800">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                              <input
+                                                type="checkbox"
+                                                checked={selectedJobs.has(job.id)}
+                                                onChange={() => toggleJobSelection(job.id)}
+                                                className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer"
+                                              />
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                                              {job.filename}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
+                                              {job.status}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
+                                              {new Date(job.created_at).toLocaleDateString('es-ES')}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                              <div className="flex flex-wrap gap-2">
+                                                {/* TTS Audio Download Button */}
+                                                {job.metadata?.ttsUrl && (
+                                                  <a
+                                                    href={job.metadata.ttsUrl}
+                                                    download={`${job.filename.replace(/\.[^/.]+$/, '')}-narrado.mp3`}
+                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                                    title="Descargar audio narrado (TTS)"
+                                                  >
+                                                    <Download className="h-3 w-3 mr-1" /> Audio MP3
+                                                  </a>
+                                                )}
+                                                {/* Excel download - PRIORITY */}
+                                                {job.metadata?.excelUrl && (
+                                                  <a
+                                                    href={job.metadata.excelUrl}
+                                                    download
+                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                                                    title="Archivo Excel con todos los datos estructurados"
+                                                  >
+                                                    <Download className="h-3 w-3 mr-1" /> EXCEL
+                                                  </a>
+                                                )}
+                                                {/* PDF Complete download - PRIORITY */}
+                                                {job.metadata?.pdfUrl && (
+                                                  <a
+                                                    href={job.metadata.pdfUrl}
+                                                    download
+                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500"
+                                                    title="PDF completo con todos los resultados"
+                                                  >
+                                                    <Download className="h-3 w-3 mr-1" /> PDF Completo
+                                                  </a>
+                                                )}
+                                                {job.txt_url && (
+                                                  <button
+                                                    onClick={() => handleDownload(job, 'txt', 'txt')}
+                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                                  >
+                                                    <Download className="h-3 w-3 mr-1" /> TXT
+                                                  </button>
+                                                )}
+                                                {job.srt_url && (
+                                                  <button
+                                                    onClick={() => handleDownload(job, 'srt', 'original')}
+                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                                  >
+                                                    <Download className="h-3 w-3 mr-1" /> SRT
+                                                  </button>
+                                                )}
+                                                {job.vtt_url && (
+                                                  <button
+                                                    onClick={() => handleDownload(job, 'vtt', 'original')}
+                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                                                  >
+                                                    <Download className="h-3 w-3 mr-1" /> VTT
+                                                  </button>
+                                                )}
+                                                {job.summary_url && (
+                                                  <button
+                                                    onClick={() => handleDownload(job, 'summary', 'txt')}
+                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                                  >
+                                                    <Download className="h-3 w-3 mr-1" /> Resumen
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                              {audioUrl ? (
+                                                <audio controls className="w-full h-8 max-w-[250px]" src={audioUrl} preload="metadata">
+                                                  Tu navegador no soporta el reproductor de audio.
+                                                </audio>
+                                              ) : null}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                              <button
+                                                onClick={() => handleDeleteJob(job.id)}
+                                                className="text-red-600 hover:text-red-900"
+                                                title="Eliminar archivo procesado"
+                                              >
+                                                <Trash2 className="h-5 w-5" />
+                                              </button>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>                </table>
               </div>
             </div>
             </>
