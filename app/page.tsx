@@ -229,7 +229,9 @@ export default function Dashboard() {
   const extractAudio = async (videoFile: File): Promise<File> => {
     const ffmpeg = ffmpegRef.current;
     setLoadingMessage(`Extrayendo audio de ${videoFile.name}...`);
-    await ffmpeg.writeFile(videoFile.name, await new Response(videoFile.stream()).arrayBuffer());
+    const arrayBuffer = await new Response(videoFile.stream()).arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    await ffmpeg.writeFile(videoFile.name, uint8Array);
     await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmp3lame', 'output.mp3']);
     const data = await ffmpeg.readFile('output.mp3');
     const audioFile = new File([data], `${videoFile.name.replace(/\.[^/.]+$/, '')}.mp3`, { type: 'audio/mpeg' });
