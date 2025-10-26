@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Trash2, Download, ArrowLeft, Settings, Info, Languages, Search, Filter, X } from 'lucide-react';
+import { Trash2, Download, ArrowLeft, Settings, Info, Languages, Search, Filter, X, Play } from 'lucide-react';
 import jsPDF from 'jspdf'; // Assuming jsPDF is used for PDF generation
 import { useNotification } from '@/hooks/useNotification';
 import { Toast } from '@/components/Toast';
@@ -775,9 +775,6 @@ export default function ProcessedFilesPage() {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
                         Descargas
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                        Reproductor
-                      </th>
                       <th scope="col" className="relative px-6 py-3">
                         <span className="sr-only">Acciones</span>
                       </th>
@@ -807,18 +804,18 @@ export default function ProcessedFilesPage() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                               <div className="flex flex-wrap gap-2">
-                                                {/* TTS Audio Download Button */}
-                                                {job.metadata?.ttsUrl && (
-                                                  <a
-                                                    href={job.metadata.ttsUrl}
-                                                    download={`${job.filename.replace(/\.[^/.]+$/, '')}-narrado.mp3`}
-                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                                                    title="Descargar audio narrado (TTS)"
-                                                  >
-                                                    <Download className="h-3 w-3 mr-1" /> Audio MP3
-                                                  </a>
-                                                )}
-                                                {/* Excel download - PRIORITY */}
+                                                                              {/* TTS Audio Play Button */}
+                                                                              {job.metadata?.ttsUrl && (
+                                                                                <a
+                                                                                  href={job.metadata.ttsUrl}
+                                                                                  target="_blank"
+                                                                                  rel="noopener noreferrer"
+                                                                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                                                                  title="Reproducir audio en nueva pestaña"
+                                                                                >
+                                                                                  <Play className="h-3 w-3 mr-1" /> Reproducir Audio
+                                                                                </a>
+                                                                              )}                                                {/* Excel download - PRIORITY */}
                                                 {job.metadata?.excelUrl && (
                                                   <a
                                                     href={job.metadata.excelUrl}
@@ -870,13 +867,7 @@ export default function ProcessedFilesPage() {
                                                 )}
                                               </div>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                              {audioUrl ? (
-                                                <audio controls className="w-full h-8 max-w-[250px]" src={audioUrl} preload="metadata">
-                                                  Tu navegador no soporta el reproductor de audio.
-                                                </audio>
-                                              ) : null}
-                                            </td>
+                                            
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                               <button
                                                 onClick={() => handleDeleteJob(job.id)}
