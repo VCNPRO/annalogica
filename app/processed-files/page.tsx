@@ -15,12 +15,17 @@ function JobAudioPlayer({ jobId }: { jobId: string }) {
 
   useEffect(() => {
     const fetchAudioUrl = async () => {
+      if (!jobId) {
+        setIsLoading(false);
+        return;
+      }
       try {
         const res = await fetch(`/api/jobs/${jobId}`, { credentials: 'include' });
         if (res.ok) {
           const job = await res.json();
           const url = job.metadata?.ttsUrl || job.audio_url;
-          if (url) {
+          // 🔥 FIX: Ensure URL is a non-empty string
+          if (url && url !== '') {
             setAudioUrl(url);
           }
         }
@@ -35,7 +40,7 @@ function JobAudioPlayer({ jobId }: { jobId: string }) {
   }, [jobId]);
 
   if (isLoading || !audioUrl) {
-    return null; // No renderizar nada mientras carga o si no hay URL
+    return null; // Render nothing while loading or if no valid URL is found
   }
 
   return (
@@ -529,7 +534,7 @@ export default function ProcessedFilesPage() {
 
       <div className="flex pt-16" style={{ height: '100vh' }}>
         {/* Sidebar - similar to app/page.tsx */}
-        <div className="bg-zinc-900 border-r border-zinc-800 p-6 flex flex-col" style={{ width: '280px', height: '100%' }}>
+        <div className="bg-zinc-900 border-r border-zinc-800 p-6 flex flex-col w-[280px]">
           <div className="flex flex-col mb-6">
             <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>
           </div>
