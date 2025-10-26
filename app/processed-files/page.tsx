@@ -8,6 +8,71 @@ import jsPDF from 'jspdf'; // Assuming jsPDF is used for PDF generation
 import { useNotification } from '@/hooks/useNotification';
 import { Toast } from '@/components/Toast';
 
+// 🎤 Componente para el reproductor de audio de un job
+function JobAudioPlayer({ jobId }: { jobId: string }) {
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [showPlayer, setShowPlayer] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handlePlay = async () => {
+    // Si ya tenemos la URL, solo mostramos/ocultamos el player
+    if (audioUrl) {
+      setShowPlayer(!showPlayer);
+      return;
+    }
+
+    // Si no, la buscamos
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}`, { credentials: 'include' });
+      if (!res.ok) {
+        throw new Error('No se pudo cargar la información del audio.');
+      }
+      const job = await res.json();
+      const url = job.metadata?.ttsUrl || job.audio_url;
+
+      if (url) {
+        setAudioUrl(url);
+        setShowPlayer(true);
+      } else {
+        setError('No hay audio disponible para este archivo.');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (error) {
+    return <span className="text-xs text-red-400">{error}</span>;
+  }
+
+  if (showPlayer && audioUrl) {
+    return (
+      <div className="flex flex-col items-center gap-2">
+         <audio controls autoPlay className="w-full h-8 max-w-[250px]" src={audioUrl} preload="metadata">
+          Tu navegador no soporta el reproductor de audio.
+        </audio>
+        <button onClick={() => setShowPlayer(false)} className="text-xs text-zinc-400 hover:text-white">Ocultar</button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={handlePlay}
+      disabled={isLoading}
+      className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-xs font-medium transition-colors disabled:bg-gray-400"
+      title="Reproducir audio"
+    >
+      {isLoading ? 'Cargando...' : '🔊 Reproducir'}
+    </button>
+  );
+}
+
 interface ProcessedJob {
   id: string;
   filename: string;
@@ -97,29 +162,42 @@ export default function ProcessedFilesPage() {
     checkAuth();
   }, [router]);
 
-  // Fetch processed jobs
+  // Fetch processed jobs with polling
   useEffect(() => {
-    if (user) {
-      const fetchJobs = async () => {
-        try {
-          const res = await fetch('/api/processed-files', {
-            credentials: 'include'
-          });
+    if (!user) return;
 
-          if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(errorData.error || 'Error fetching processed files');
-          }
+    let isMounted = true;
 
-          const data = await res.json();
+    const fetchJobs = async () => {
+      try {
+        const res = await fetch('/api/processed-files', {
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Error fetching processed files');
+        }
+
+        const data = await res.json();
+        if (isMounted) {
           setProcessedJobs(data.jobs);
-        } catch (err: any) {
+        }
+      } catch (err: any) {
+        if (isMounted) {
           console.error('Error fetching processed jobs:', err);
           setError(err.message);
         }
-      };
-      fetchJobs();
-    }
+      }
+    };
+
+    fetchJobs(); // Initial fetch
+    const interval = setInterval(fetchJobs, 10000); // Poll every 10 seconds
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [user]);
 
   // Load user stats when user is ready
@@ -722,6 +800,9 @@ export default function ProcessedFilesPage() {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
                         Descargas
                       </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
+                        Reproductor
+                      </th>
                       <th scope="col" className="relative px-6 py-3">
                         <span className="sr-only">Acciones</span>
                       </th>
@@ -872,6 +953,9 @@ export default function ProcessedFilesPage() {
                               </button>
                             )}
                           </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <JobAudioPlayer jobId={job.id} />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <button

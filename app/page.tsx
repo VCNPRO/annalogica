@@ -52,145 +52,6 @@ interface User {
   email: string;
 }
 
-// 🎤 Componente separado para archivos completados con TTS
-function CompletedFileItem({
-  file,
-  selectedCompletedFileIds,
-  handleFileSelect,
-  textPrimary,
-  border,
-  hover,
-  getStatusColor,
-  downloadDirHandle,
-  showNotification,
-  downloadFilesOrganized,
-  downloadFilesIndividually,
-  downloadFormat
-}: {
-  file: UploadedFile;
-  selectedCompletedFileIds: Set<string>;
-  handleFileSelect: (id: string, type: 'completed') => void;
-  textPrimary: string;
-  border: string;
-  hover: string;
-  getStatusColor: (status: FileStatus) => string;
-  downloadDirHandle: any;
-  showNotification: (message: string, type: 'success' | 'error' | 'info') => void;
-  downloadFilesOrganized: (file: UploadedFile, job: Job, dirHandle: any, format: 'txt' | 'pdf' | 'both') => Promise<void>;
-  downloadFilesIndividually: (file: UploadedFile, job: Job, format: 'txt' | 'pdf' | 'both') => Promise<void>;
-  downloadFormat: 'txt' | 'pdf' | 'both';
-}) {
-  const [ttsUrl, setTtsUrl] = useState<string | null>(null);
-  const [showPlayer, setShowPlayer] = useState(false);
-  const [loading, setLoading] = useState(false);
-
-  // Fetch job data para obtener ttsUrl
-  const fetchTtsUrl = useCallback(async () => {
-    if (!file.jobId || loading || ttsUrl) return;
-
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
-      if (res.ok) {
-        const job = await res.json();
-        if (job.metadata?.ttsUrl) {
-          setTtsUrl(job.metadata.ttsUrl);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching TTS URL:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [file.jobId, loading, ttsUrl]);
-
-  // Fetch TTS URL on mount (solo si es documento)
-  useEffect(() => {
-    if (file.fileType === 'text') {
-      fetchTtsUrl();
-    }
-  }, [file.fileType, fetchTtsUrl]);
-
-  return (
-    <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
-      <div className="flex items-center gap-4">
-        <input
-          type="checkbox"
-          checked={selectedCompletedFileIds.has(file.id)}
-          onChange={() => handleFileSelect(file.id, 'completed')}
-          className="form-checkbox h-4 w-4 text-orange-500 rounded"
-        />
-        <div className="flex-1 flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className={`text-xs ${textPrimary} truncate`}>{file.name}</span>
-            {/* 🎤 Indicador visual si tiene TTS */}
-            {ttsUrl && (
-              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 rounded-full text-[10px] font-medium">
-                🎤 Audio
-              </span>
-            )}
-          </div>
-          {/* 🔊 Player de audio si tiene TTS y está visible */}
-          {ttsUrl && showPlayer && (
-            <div className="mt-2">
-              <audio
-                controls
-                className="w-full h-8"
-                style={{ maxWidth: '300px' }}
-                src={ttsUrl}
-                preload="metadata"
-              >
-                Tu navegador no soporta el reproductor de audio.
-              </audio>
-            </div>
-          )}
-        </div>
-        <span className={`text-xs font-medium ${getStatusColor(file.status)}`}>
-          ✓ Completado
-        </span>
-        {/* Botón para mostrar/ocultar player */}
-        {ttsUrl && (
-          <button
-            onClick={() => setShowPlayer(!showPlayer)}
-            className="px-2 py-1 bg-purple-500 hover:bg-purple-600 text-white rounded text-xs font-medium transition-colors"
-            title={showPlayer ? 'Ocultar reproductor' : 'Reproducir audio narrado'}
-          >
-            {showPlayer ? '🔇' : '🔊'}
-          </button>
-        )}
-        <button
-          onClick={async () => {
-            if (!file.jobId) return;
-
-            if (!downloadDirHandle && 'showDirectoryPicker' in window) {
-              showNotification('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".', 'info');
-              return;
-            }
-
-            try {
-              const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
-              if (res.ok) {
-                const data = await res.json();
-                const job = data;
-                if (downloadDirHandle) {
-                  await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
-                } else {
-                  await downloadFilesIndividually(file, job, downloadFormat);
-                }
-              }
-            } catch (err) {
-              console.error('Error downloading file:', err);
-              showNotification(`Error al descargar ${file.name}.`, 'error');
-            }
-          }}
-          className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
-        >
-          📥 Descargar
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const router = useRouter();
@@ -1702,6 +1563,20 @@ export default function Dashboard() {
                       </div>
                     </div>
 
+                    {/* Video Player Preview */}
+                    {file.fileType === 'video' && file.blobUrl && (
+                      <div className="mt-2 mb-2 ml-6">
+                        <video
+                          src={file.blobUrl}
+                          controls
+                          preload="metadata"
+                          className="w-full max-w-sm rounded-lg border border-zinc-700"
+                        >
+                          Tu navegador no soporta el reproductor de video.
+                        </video>
+                      </div>
+                    )}
+
                     <div className="ml-6 space-y-2">
                       {file.status === 'uploading' && (
                         <div className={`${darkMode ? 'bg-blue-950/30' : 'bg-blue-50'} p-3 rounded-lg border ${darkMode ? 'border-blue-800' : 'border-blue-200'}`}>
@@ -1840,153 +1715,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden`} style={{ flex: '1 1 40%', minHeight: '300px' }}>
-            <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedCompletedFileIds.size === uploadedFiles.filter(f => f.status === 'completed').length && uploadedFiles.filter(f => f.status === 'completed').length > 0}
-                    onChange={handleSelectAllCompleted}
-                    className="form-checkbox h-4 w-4 text-orange-500 rounded"
-                  />
-                  <span className="text-green-500 text-sm">✅</span>
-                  <h2 className={`text-sm font-medium ${textPrimary}`}>Todos los Archivos Completados</h2>
-                </div>
 
-
-                <div className="flex items-center gap-2 mt-2">
-                  <span className={`text-xs ${textSecondary}`}>Formato:</span>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="radio"
-                      className="accent-orange-500 scale-75"
-                      name="downloadFormat"
-                      checked={downloadFormat === 'pdf'}
-                      onChange={() => setDownloadFormat('pdf')}
-                    />
-                    <span className={`text-xs ${textSecondary}`}>PDF</span>
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="radio"
-                      className="accent-orange-500 scale-75"
-                      name="downloadFormat"
-                      checked={downloadFormat === 'txt'}
-                      onChange={() => setDownloadFormat('txt')}
-                    />
-                    <span className={`text-xs ${textSecondary}`}>TXT</span>
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="radio"
-                      className="accent-orange-500 scale-75"
-                      name="downloadFormat"
-                      checked={downloadFormat === 'both'}
-                      onChange={() => setDownloadFormat('both')}
-                    />
-                    <span className={`text-xs ${textSecondary}`}>Ambos</span>
-                  </label>
-                </div>
-
-
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    const completedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id));
-                    if (completedFiles.length === 0) {
-                      showNotification('Selecciona al menos un archivo completado para descargar.', 'info');
-                      return;
-                    }
-
-                    if (!downloadDirHandle && 'showDirectoryPicker' in window) {
-                      showNotification('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".', 'info');
-                      return;
-                    }
-
-                    for (const file of completedFiles) {
-                      if (file.jobId) {
-                        try {
-                          const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
-                          if (res.ok) {
-                            const data = await res.json();
-                            // La API devuelve directamente el objeto job
-                            const job = data;
-                            if (downloadDirHandle) {
-                              await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
-                            } else {
-                              await downloadFilesIndividually(file, job, downloadFormat);
-                            }
-                          }
-                        } catch (err) {
-                          console.error('Error downloading files:', err);
-                          showNotification(`Error al descargar ${file.name}.`, 'error');
-                        }
-                      }
-                    }
-                  }}
-                  disabled={uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id)).length === 0}
-                  className="px-3 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
-                >
-                  📥 Descargar Seleccionados
-                </button>
-                <button
-                  onClick={async () => {
-                    if (!('showDirectoryPicker' in window)) {
-                      showNotification('Tu navegador no soporta la selección de carpetas. Las descargas se realizarán individualmente.', 'info');
-                      return;
-                    }
-                    try {
-                      const handle = await (window as any).showDirectoryPicker();
-                      setDownloadDirHandle(handle);
-                      showNotification(`Carpeta de descarga seleccionada: "${handle.name}". Las próximas descargas se guardarán aquí.`, 'success');
-                    } catch (err) {
-                      console.error('Error al seleccionar la carpeta:', err);
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
-                  title="Elegir carpeta de descarga"
-                >
-                  📁 Carpeta Descarga
-                </button>
-                <button
-                  onClick={handleDeleteSelectedCompletedFiles}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
-                  title="Eliminar archivos procesados seleccionados"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Eliminar
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(40vh - 200px)' }}>
-              {uploadedFiles.filter(f => f.status === 'completed').length === 0 ? (
-                <div className="px-4 py-8 text-center">
-                  <p className={`text-xs ${textSecondary}`}>No hay archivos completados aún.</p>
-                </div>
-              ) : (
-                uploadedFiles.filter(f => f.status === 'completed').map((file) => (
-                  <CompletedFileItem
-                    key={file.id}
-                    file={file}
-                    selectedCompletedFileIds={selectedCompletedFileIds}
-                    handleFileSelect={handleFileSelect}
-                    textPrimary={textPrimary}
-                    border={border}
-                    hover={hover}
-                    getStatusColor={getStatusColor}
-                    downloadDirHandle={downloadDirHandle}
-                    showNotification={showNotification}
-                    downloadFilesOrganized={downloadFilesOrganized}
-                    downloadFilesIndividually={downloadFilesIndividually}
-                    downloadFormat={downloadFormat}
-                  />
-                ))
-              )}
-            </div>
-          </div>
 
         </div>
       </div>
