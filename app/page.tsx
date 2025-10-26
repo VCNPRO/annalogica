@@ -234,7 +234,7 @@ export default function Dashboard() {
     await ffmpeg.writeFile(videoFile.name, uint8Array);
     await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmp3lame', 'output.mp3']);
     const data = await ffmpeg.readFile('output.mp3');
-    const audioBlob = new Blob([data as Uint8Array], { type: 'audio/mpeg' });
+    const audioBlob = new Blob([new Uint8Array(data.buffer)], { type: 'audio/mpeg' });
     const audioFile = new File([audioBlob], `${videoFile.name.replace(/\.[^/.]+$/, '')}.mp3`, { type: 'audio/mpeg' });
     setLoadingMessage('');
     return audioFile;
