@@ -234,7 +234,13 @@ export default function Dashboard() {
     await ffmpeg.writeFile(videoFile.name, uint8Array);
     await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmp3lame', 'output.mp3']);
     const data = await ffmpeg.readFile('output.mp3');
-    const audioBlob = new Blob([new Uint8Array(data.buffer)], { type: 'audio/mpeg' });
+    let audioBlob: Blob;
+    if (data instanceof Uint8Array) {
+      audioBlob = new Blob([data.buffer], { type: 'audio/mpeg' });
+    } else {
+      // This case should ideally not happen for binary output like MP3
+      throw new Error('FFmpeg returned string data for MP3 output, expected Uint8Array.');
+    }
     const audioFile = new File([audioBlob], `${videoFile.name.replace(/\.[^/.]+$/, '')}.mp3`, { type: 'audio/mpeg' });
     setLoadingMessage('');
     return audioFile;
