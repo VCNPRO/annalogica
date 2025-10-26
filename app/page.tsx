@@ -132,6 +132,44 @@ export default function Dashboard() {
     totalHours: string;
   } | null>(null);
 
+  const getFileType = (mimeType: string, filename: string): 'audio' | 'video' | 'text' => {
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('text/') || mimeType === 'application/pdf' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'text';
+    const ext = filename.toLowerCase().split('.').pop();
+    if (ext === 'pdf' || ext === 'txt' || ext === 'docx') return 'text';
+    if (['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'].includes(ext || '')) return 'audio';
+    if (['mp4', 'avi', 'mov', 'mkv', 'webm'].includes(ext || '')) return 'video';
+    return 'text';
+  };
+
+  const formatFileSize = (bytes?: number): string => {
+    if (!bytes) return '0 KB';
+    const kb = bytes / 1024;
+    const mb = kb / 1024;
+    const gb = mb / 1024;
+    if (gb >= 1) return `${gb.toFixed(2)} GB`;
+    if (mb >= 1) return `${mb.toFixed(2)} MB`;
+    return `${kb.toFixed(2)} KB`;
+  };
+
+  const formatElapsedTime = (startTime?: number): string => {
+    if (!startTime) return '0:00';
+    const elapsed = Math.floor((Date.now() - startTime) / 1000); // seconds
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const formatTimeRemaining = (seconds?: number): string => {
+    if (!seconds || seconds <= 0) return '0:00';
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const loadFfmpeg = useCallback(async () => {
+
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
