@@ -463,6 +463,22 @@ export default function ProcessedFilesPage() {
   };
 
 
+  const handleIndividualDownload = async (url: string | undefined, downloadFilename: string) => {
+    if (!url) {
+      showNotification('No hay archivo disponible para este tipo de descarga.', 'error');
+      return;
+    }
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Error al obtener el archivo para descargar.');
+      const blob = await res.blob();
+      triggerDownload(blob, downloadFilename);
+    } catch (err: any) {
+      console.error(`Error al descargar ${downloadFilename}:`, err);
+      showNotification(`Error al descargar: ${err.message}`, 'error');
+    }
+  };
+
   const bgPrimary = darkMode ? 'bg-black' : 'bg-gray-50';
   const bgSecondary = darkMode ? 'bg-zinc-900' : 'bg-white';
   const textPrimary = darkMode ? 'text-white' : 'text-gray-900';
@@ -780,107 +796,112 @@ export default function ProcessedFilesPage() {
                       </th>
                     </tr>
                   </thead>
-                                    <tbody className="divide-y divide-zinc-800">
-                                      {filteredJobs.map((job) => {
-                                        const audioUrl = job.metadata?.ttsUrl || job.audio_url;
-                                        return (
-                                          <tr key={job.id} className="bg-zinc-900 hover:bg-zinc-800">
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                              <input
-                                                type="checkbox"
-                                                checked={selectedJobs.has(job.id)}
-                                                onChange={() => toggleJobSelection(job.id)}
-                                                className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer"
-                                              />
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                                              {job.filename}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
-                                              {job.status}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
-                                              {new Date(job.created_at).toLocaleDateString('es-ES')}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                              <div className="flex flex-wrap gap-2">
-                                                                              {/* TTS Audio Play Button */}
-                                                                              {job.metadata?.ttsUrl && (
-                                                                                <a
-                                                                                  href={job.metadata.ttsUrl}
-                                                                                  target="_blank"
-                                                                                  rel="noopener noreferrer"
-                                                                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                                                                                  title="Reproducir audio en nueva pestaña"
-                                                                                >
-                                                                                  <Play className="h-3 w-3 mr-1" /> Reproducir Audio
-                                                                                </a>
-                                                                              )}                                                {/* Excel download - PRIORITY */}
-                                                {job.metadata?.excelUrl && (
-                                                  <a
-                                                    href={job.metadata.excelUrl}
-                                                    download
-                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-                                                    title="Archivo Excel con todos los datos estructurados"
-                                                  >
-                                                    <Download className="h-3 w-3 mr-1" /> EXCEL
-                                                  </a>
-                                                )}
-                                                {/* PDF Complete download - PRIORITY */}
-                                                {job.metadata?.pdfUrl && (
-                                                  <a
-                                                    href={job.metadata.pdfUrl}
-                                                    download
-                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500"
-                                                    title="PDF completo con todos los resultados"
-                                                  >
-                                                    <Download className="h-3 w-3 mr-1" /> PDF Completo
-                                                  </a>
-                                                )}
-                                                {job.txt_url && (
-                                                  <button
-                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                                                  >
-                                                    <Download className="h-3 w-3 mr-1" /> TXT
-                                                  </button>
-                                                )}
-                                                {job.srt_url && (
-                                                  <button
-                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                                                  >
-                                                    <Download className="h-3 w-3 mr-1" /> SRT
-                                                  </button>
-                                                )}
-                                                {job.vtt_url && (
-                                                  <button
-                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
-                                                  >
-                                                    <Download className="h-3 w-3 mr-1" /> VTT
-                                                  </button>
-                                                )}
-                                                {job.summary_url && (
-                                                  <button
-                                                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                                                  >
-                                                    <Download className="h-3 w-3 mr-1" /> Resumen
-                                                  </button>
-                                                )}
-                                              </div>
-                                            </td>
-                                            
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                              <button
-                                                onClick={() => handleDeleteJob(job.id)}
-                                                className="text-red-600 hover:text-red-900"
-                                                title="Eliminar archivo procesado"
-                                              >
-                                                <Trash2 className="h-5 w-5" />
-                                              </button>
-                                            </td>
-                                          </tr>
-                                        );
-                                      })}
-                                    </tbody>                </table>
+                  <tbody className="divide-y divide-zinc-800">
+                    {filteredJobs.map((job) => {
+                      const audioUrl = job.metadata?.ttsUrl || job.audio_url;
+                      const baseFilename = job.filename.replace(/\.[^/.]+$/, '');
+                      return (
+                        <tr key={job.id} className="bg-zinc-900 hover:bg-zinc-800">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={selectedJobs.has(job.id)}
+                              onChange={() => toggleJobSelection(job.id)}
+                              className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                            {job.filename}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
+                            {job.status}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
+                            {new Date(job.created_at).toLocaleDateString('es-ES')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <div className="flex flex-wrap gap-2">
+                              {/* TTS Audio Play Button */}
+                              {job.metadata?.ttsUrl && (
+                                <a
+                                  href={job.metadata.ttsUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                  title="Reproducir audio en nueva pestaña"
+                                >
+                                  <Play className="h-3 w-3 mr-1" /> Reproducir Audio
+                                </a>
+                              )}
+                              {/* Excel download - PRIORITY */}
+                              {job.metadata?.excelUrl && (
+                                <a
+                                  href={job.metadata.excelUrl}
+                                  download
+                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
+                                  title="Archivo Excel con todos los datos estructurados"
+                                >
+                                  <Download className="h-3 w-3 mr-1" /> EXCEL
+                                </a>
+                              )}
+                              {/* PDF Complete download - PRIORITY */}
+                              {job.metadata?.pdfUrl && (
+                                <a
+                                  href={job.metadata.pdfUrl}
+                                  download
+                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500"
+                                  title="PDF completo con todos los resultados"
+                                >
+                                  <Download className="h-3 w-3 mr-1" /> PDF Completo
+                                </a>
+                              )}
+                              {job.txt_url && (
+                                <button
+                                  onClick={() => handleIndividualDownload(job.txt_url, `${baseFilename}-transcripcion.txt`)}
+                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                >
+                                  <Download className="h-3 w-3 mr-1" /> TXT
+                                </button>
+                              )}
+                              {job.srt_url && (
+                                <button
+                                  onClick={() => handleIndividualDownload(job.srt_url, `${baseFilename}.srt`)}
+                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                >
+                                  <Download className="h-3 w-3 mr-1" /> SRT
+                                </button>
+                              )}
+                              {job.vtt_url && (
+                                <button
+                                  onClick={() => handleIndividualDownload(job.vtt_url, `${baseFilename}.vtt`)}
+                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                                >
+                                  <Download className="h-3 w-3 mr-1" /> VTT
+                                </button>
+                              )}
+                              {job.summary_url && (
+                                <button
+                                  onClick={() => handleIndividualDownload(job.summary_url, `${baseFilename}-resumen.txt`)}
+                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                >
+                                  <Download className="h-3 w-3 mr-1" /> Resumen
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              onClick={() => handleDeleteJob(job.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Eliminar archivo procesado"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>                </table>
               </div>
             </div>
             </>
