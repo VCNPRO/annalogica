@@ -520,7 +520,7 @@ export default function ProcessedFilesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black border-t-8 border-red-500">
+    <div className="min-h-screen bg-black">
       <Toast notification={notification} />
 
       <div className="fixed top-0 left-0 right-0 bg-orange-500 text-white px-4 py-2 text-center text-sm font-medium z-50">
