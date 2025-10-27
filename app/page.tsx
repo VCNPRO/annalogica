@@ -247,13 +247,12 @@ export default function Dashboard() {
         }
       }
     };
-    pollJobs();
-    const interval = setInterval(pollJobs, 5000);
-    return () => clearInterval(interval);
-
-
-
-  const extractAudio = async (videoFile: File): Promise<File> => {
+        pollJobs();
+        const interval = setInterval(pollJobs, 5000);
+        return () => clearInterval(interval);
+      }, [uploadedFiles, forcePolling]);
+    
+      const getFileType = (mimeType: string, filename: string): 'audio' | 'video' | 'text' => {
     const ffmpeg = ffmpegRef.current;
     setLoadingMessage(`Extrayendo audio de ${videoFile.name}...`);
     const arrayBuffer = await new Response(videoFile.stream()).arrayBuffer();
