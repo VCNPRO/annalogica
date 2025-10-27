@@ -250,18 +250,8 @@ export default function Dashboard() {
     pollJobs();
     const interval = setInterval(pollJobs, 5000);
     return () => clearInterval(interval);
-  }, [uploadedFiles, forcePolling]);
 
-  const getFileType = (mimeType: string, filename: string): 'audio' | 'video' | 'text' => {
-    if (mimeType.startsWith('audio/')) return 'audio';
-    if (mimeType.startsWith('video/')) return 'video';
-    if (mimeType.startsWith('text/') || mimeType === 'application/pdf' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'text';
-    const ext = filename.toLowerCase().split('.').pop();
-    if (ext === 'pdf' || ext === 'txt' || ext === 'docx') return 'text';
-    if (['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'].includes(ext || '')) return 'audio';
-    if (['mp4', 'avi', 'mov', 'mkv', 'webm'].includes(ext || '')) return 'video';
-    return 'text';
-  };
+
 
   const extractAudio = async (videoFile: File): Promise<File> => {
     const ffmpeg = ffmpegRef.current;
