@@ -224,34 +224,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [uploadedFiles]);
 
-  useEffect(() => {
-    const activeJobs = uploadedFiles.filter(
-      f => f.jobId && (f.status === 'pending' || f.status === 'processing' || (f.status === 'error' && f.canRetry === true))
-    );
-    if (activeJobs.length === 0) return;
-    const pollJobs = async () => {
-      for (const file of activeJobs) {
-        try {
-          const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
-          if (!res.ok) {
-            if (res.status === 404) {
-              setUploadedFiles(prev => prev.map(f => f.id === file.id ? { ...f, status: 'error' } : f));
-            }
-            continue;
-          }
-          const job = await res.json();
-          if (!job || !job.status) continue;
-          // ... (rest of polling logic is complex and omitted for brevity, assuming it exists)
-        } catch (err) {
-          console.error('[Polling] Error fetching job:', file.jobId, err);
-        }
-      }
-    };
-        pollJobs();
-        const interval = setInterval(pollJobs, 5000);
-        return () => clearInterval(interval);
-      }, [uploadedFiles, forcePolling]);
-    
+      
       const getFileType = (mimeType: string, filename: string): 'audio' | 'video' | 'text' => {
     const ffmpeg = ffmpegRef.current;
     setLoadingMessage(`Extrayendo audio de ${videoFile.name}...`);
@@ -1544,6 +1517,10 @@ export default function Dashboard() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+
+          )))
             </div>
           </div>
 
