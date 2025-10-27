@@ -57,7 +57,6 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 
 export default function Dashboard() {
-  // TEMPORAL: Marcador para forzar despliegue en Vercel - Gemini
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1419,31 +1418,7 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    {/* Video Player Preview */}
-                    {file.fileType === 'video' && file.blobUrl && (
-                      <div className="mt-2 mb-2 ml-6">
-                        <div className="mb-2 flex items-center">
-                          <input
-                            type="checkbox"
-                            id={`showVideoPreview-${file.id}`}
-                            checked={showVideoPreview}
-                            onChange={(e) => setShowVideoPreview(e.target.checked)}
-                            className="mr-2 accent-orange-500"
-                          />
-                          <label htmlFor={`showVideoPreview-${file.id}`} className={`text-sm ${textSecondary}`}>Mostrar previsualización de video</label>
-                        </div>
-                        {showVideoPreview && (
-                          <video
-                            src={file.blobUrl}
-                            controls
-                            preload="metadata"
-                            className="w-full max-w-sm rounded-lg border border-zinc-700"
-                          >
-                            Tu navegador no soporta el reproductor de video.
-                          </video>
-                        )}
-                      </div>
-                    )}
+
 
                     <div className="ml-6 space-y-2">
                       {file.status === 'uploading' && (
