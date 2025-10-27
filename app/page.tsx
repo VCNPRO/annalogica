@@ -57,6 +57,7 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 
 export default function Dashboard() {
+  // TEMPORAL: Marcador para forzar despliegue en Vercel - Gemini
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
