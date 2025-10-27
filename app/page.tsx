@@ -65,6 +65,7 @@ export default function Dashboard() {
   const [forcePolling, setForcePolling] = useState(0);
   const [ffmpegReady, setFfmpegReady] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [showVideoPreview, setShowVideoPreview] = useState(false); // Nuevo estado para controlar la visibilidad del reproductor de video
   const ffmpegRef = useRef(new FFmpeg());
 
   const loadFfmpeg = useCallback(async () => {
@@ -362,17 +363,18 @@ export default function Dashboard() {
     await Promise.all(uploadPromises);
   }, [router, ffmpegReady]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    processFiles(e.target.files);
-    e.target.value = ''; // Clear input to allow re-uploading same file
-  };
-
-  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    processFiles(e.dataTransfer.files);
-  }, [processFiles]);
-
+      const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      processFiles(e.target.files);
+      setShowVideoPreview(false); // Resetear la opción al cargar un nuevo archivo
+      e.target.value = ''; // Clear input to allow re-uploading same file
+    };
+  
+    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      processFiles(e.dataTransfer.files);
+      setShowVideoPreview(false); // Resetear la opción al soltar un nuevo archivo
+    }, [processFiles]);
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1421,14 +1423,26 @@ export default function Dashboard() {
                     {/* Video Player Preview */}
                     {file.fileType === 'video' && file.blobUrl && (
                       <div className="mt-2 mb-2 ml-6">
-                        <video
-                          src={file.blobUrl}
-                          controls
-                          preload="metadata"
-                          className="w-full max-w-sm rounded-lg border border-zinc-700"
-                        >
-                          Tu navegador no soporta el reproductor de video.
-                        </video>
+                        <div className="mb-2 flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`showVideoPreview-${file.id}`}
+                            checked={showVideoPreview}
+                            onChange={(e) => setShowVideoPreview(e.target.checked)}
+                            className="mr-2 accent-orange-500"
+                          />
+                          <label htmlFor={`showVideoPreview-${file.id}`} className={`text-sm ${textSecondary}`}>Mostrar previsualización de video</label>
+                        </div>
+                        {showVideoPreview && (
+                          <video
+                            src={file.blobUrl}
+                            controls
+                            preload="metadata"
+                            className="w-full max-w-sm rounded-lg border border-zinc-700"
+                          >
+                            Tu navegador no soporta el reproductor de video.
+                          </video>
+                        )}
                       </div>
                     )}
 
