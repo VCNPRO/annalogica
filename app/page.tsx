@@ -167,8 +167,8 @@ export default function Dashboard() {
     if (!seconds || seconds <= 0) return '0:00';
     const minutes = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setNotification({ message, type });
