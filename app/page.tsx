@@ -52,10 +52,6 @@ interface User {
   email: string;
 }
 
-
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
-
 export default function Dashboard() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -63,29 +59,7 @@ export default function Dashboard() {
   const [darkMode, setDarkMode] = useState(true);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [forcePolling, setForcePolling] = useState(0);
-  const [ffmpegReady, setFfmpegReady] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
-  const [showVideoPreview, setShowVideoPreview] = useState(false); // Nuevo estado para controlar la visibilidad del reproductor de video
-  const ffmpegRef = useRef(new FFmpeg());
-
-  const loadFfmpeg = useCallback(async () => {
-    setLoadingMessage('Cargando conversor de audio...');
-    const ffmpeg = ffmpegRef.current;
-    ffmpeg.on('log', ({ message }) => {
-      console.log(message);
-    });
-    const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
-    await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-    });
-    setFfmpegReady(true);
-    setLoadingMessage('');
-  }, []);
-
-  useEffect(() => {
-    loadFfmpeg();
-  }, [loadFfmpeg]);
+  const [showVideoPreview, setShowVideoPreview] = useState(false);
 
   // Load files from localStorage on initial render
   useEffect(() => {
@@ -254,50 +228,17 @@ export default function Dashboard() {
 
 
 
-  const extractAudio = async (videoFile: File): Promise<File> => {
-    const ffmpeg = ffmpegRef.current;
-    setLoadingMessage(`Extrayendo audio de ${videoFile.name}...`);
-    const arrayBuffer = await new Response(videoFile.stream()).arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    await ffmpeg.writeFile(videoFile.name, uint8Array);
-    await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmp3lame', 'output.mp3']);
-    const data = await ffmpeg.readFile('output.mp3');
-    let audioBlob: Blob;
-    if (data instanceof Uint8Array) {
-      const slicedBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
-      const plainArrayBuffer = new ArrayBuffer(slicedBuffer.byteLength);
-      new Uint8Array(plainArrayBuffer).set(new Uint8Array(slicedBuffer));
-      audioBlob = new Blob([plainArrayBuffer], { type: 'audio/mpeg' });
-    } else {
-      // This case should ideally not happen for binary output like MP3
-      throw new Error('FFmpeg returned string data for MP3 output, expected Uint8Array.');
-    }
-    const audioFile = new File([audioBlob], `${videoFile.name.replace(/\.[^/.]+$/, '')}.mp3`, { type: 'audio/mpeg' });
-    setLoadingMessage('');
-    return audioFile;
-  };
-
   const processFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    if (!ffmpegReady) {
-      showNotification('El conversor de audio aún no está listo, por favor espera un momento.', 'info');
-      return;
-    }
     setError(null);
 
     let filesToProcess: File[] = [];
-    setLoadingMessage('Preparando archivos...');
 
     for (const file of Array.from(files)) {
       const detectedType = getFileType(file.type, file.name);
       if (detectedType === 'video') {
-        try {
-          const audioFile = await extractAudio(file);
-          filesToProcess.push(audioFile);
-        } catch (err) {
-          console.error('Error extracting audio:', err);
-          showNotification(`Error al extraer audio de ${file.name}.`, 'error');
-        }
+        // Videos se envían directamente al servidor sin conversión
+        filesToProcess.push(file);
       } else if (detectedType === 'audio') {
         if (file.size > 25 * 1024 * 1024) {
           showNotification(`El archivo de audio ${file.name} excede el límite de 25MB y no puede ser procesado.`, 'error');
@@ -308,7 +249,6 @@ export default function Dashboard() {
         filesToProcess.push(file);
       }
     }
-    setLoadingMessage('');
 
     const filesToUpload = filesToProcess.map((file, i) => {
       const fileId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`;
@@ -350,7 +290,7 @@ export default function Dashboard() {
       }
     });
     await Promise.all(uploadPromises);
-  }, [router, ffmpegReady]);
+  }, [router]);
 
       const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       processFiles(e.target.files);
@@ -1079,13 +1019,6 @@ export default function Dashboard() {
                 />
               </label>
             </div>
-
-            {loadingMessage && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-sm text-amber-400">
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-amber-500 border-t-transparent"></div>
-                <span>{loadingMessage}</span>
-              </div>
-            )}
 
             {error && (
               <div className="mt-3 bg-red-50 border border-red-200 rounded p-2">
