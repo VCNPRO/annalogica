@@ -388,7 +388,7 @@ export default function Dashboard() {
   };
 
   const handleSelectAllUploaded = () => {
-    const currentUploadedFiles = uploadedFiles.filter(f => f.status !== 'completed');
+    const currentUploadedFiles = uploadedFiles; // Mostrar todos los archivos
     if (selectedUploadedFileIds.size === currentUploadedFiles.length) {
       setSelectedUploadedFileIds(new Set()); // Deselect all uploaded
     } else {
@@ -1270,14 +1270,14 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
-                    checked={selectedUploadedFileIds.size === uploadedFiles.filter(f => f.status !== 'completed').length && uploadedFiles.filter(f => f.status !== 'completed').length > 0}
+                    checked={selectedUploadedFileIds.size === uploadedFiles.length && uploadedFiles.length > 0}
                     onChange={handleSelectAllUploaded}
                     className="form-checkbox h-4 w-4 text-orange-500 rounded"
                   />
                   <span className="text-orange-500 text-sm">📁</span>
                   <h2 className={`text-sm font-medium ${textPrimary}`}>Archivos Cargados</h2>
                 </div>
-                <p className={`text-xs ${textSecondary}`}>Archivos en proceso de subida y procesamiento</p>
+                <p className={`text-xs ${textSecondary}`}>Todos los archivos: en proceso, pendientes y procesados</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -1357,13 +1357,13 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(60vh - 200px)' }}>
-              {uploadedFiles.filter(f => f.status !== 'completed').length === 0 ? (
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 200px)' }}>
+              {uploadedFiles.length === 0 ? (
                 <div className="px-4 py-8 text-center">
                   <p className={`text-xs ${textSecondary}`}>No hay archivos cargados aún.</p>
                 </div>
               ) : (
-                uploadedFiles.filter(f => f.status !== 'completed').map((file) => (
+                uploadedFiles.map((file) => (
                   <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
                     <div className="flex items-center gap-4 mb-2">
                       <input
