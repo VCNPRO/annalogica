@@ -333,10 +333,13 @@ export default function Dashboard() {
     const { upload } = await import('@vercel/blob/client');
     const uploadPromises = filesToUpload.map(async ({ file, fileId }) => {
       try {
+        // Capturar nombre antes del check para evitar problemas de tipo
+        const fileName = (file as any)?.name || 'desconocido';
+
         // Verificar que file sea realmente un objeto File
         if (!(file instanceof File)) {
           console.error('[Upload] ERROR: file no es una instancia de File:', typeof file, file);
-          throw new Error(`El archivo ${file.name || 'desconocido'} no es un objeto File válido`);
+          throw new Error(`El archivo ${fileName} no es un objeto File válido`);
         }
 
         console.log('[Upload] Subiendo archivo:', file.name, 'tipo:', file.type, 'tamaño:', file.size);
