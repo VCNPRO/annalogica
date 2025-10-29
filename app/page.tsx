@@ -52,7 +52,11 @@ interface Job {
   metadata?: {
     tags?: string[];
     ttsUrl?: string; // 🎤 TTS audio URL
+    requestedActions?: string[]; // 🔥 Acciones que el usuario pidió explícitamente
   };
+  status?: string;
+  progress?: number;
+  error?: string;
 }
 
 interface User {
@@ -642,9 +646,8 @@ export default function Dashboard() {
       showNotification('No se procesó ningún archivo. Verifica las acciones seleccionadas.', 'error');
     }
 
-    // Limpiar selección y acciones después de procesar
+    // Limpiar solo la selección después de procesar (mantener acciones para mostrar iconos correctos)
     setSelectedUploadedFileIds(new Set());
-    setUploadedFiles(prev => prev.map(f => ({ ...f, actions: [] })));
   };
 
 
@@ -756,36 +759,54 @@ export default function Dashboard() {
   const generateExcel = async (title: string, text: string, filename: string): Promise<Blob> => {
     try {
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(title);
+      // Usar nombre corto para la hoja (máximo 31 caracteres en Excel)
+      const sheetName = title.substring(0, 31);
+      const worksheet = workbook.addWorksheet(sheetName);
 
-      // Configurar columnas
-      worksheet.columns = [
-        { header: 'Contenido', key: 'content', width: 100 }
-      ];
-
-      // Estilo del header
-      worksheet.getRow(1).font = { bold: true, size: 12 };
-      worksheet.getRow(1).fill = {
+      // Título grande en la primera fila
+      worksheet.mergeCells('A1:A1');
+      const titleCell = worksheet.getCell('A1');
+      titleCell.value = title.toUpperCase();
+      titleCell.font = { bold: true, size: 16, color: { argb: 'FFE67E22' } };
+      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      titleCell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'FFE67E22' } // Naranja annalogica
+        fgColor: { argb: 'FFF5F5F5' }
       };
+      worksheet.getRow(1).height = 30;
 
-      // Agregar metadata
-      worksheet.addRow({ content: `Archivo: ${filename}` });
-      worksheet.addRow({ content: `Fecha: ${new Date().toLocaleDateString('es-ES')}` });
-      worksheet.addRow({ content: '' }); // Línea vacía
+      // Metadata
+      worksheet.addRow(['']);
+      worksheet.addRow([`Archivo: ${filename}`]);
+      worksheet.addRow([`Fecha: ${new Date().toLocaleDateString('es-ES')}`]);
+      worksheet.addRow(['']);
+
+      // Header de contenido
+      const headerRow = worksheet.addRow(['Contenido']);
+      headerRow.font = { bold: true, size: 12 };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE67E22' }
+      };
+      headerRow.getCell(1).font = { ...headerRow.font, color: { argb: 'FFFFFFFF' } };
 
       // Dividir el texto en líneas y agregarlas
       const lines = text.split('\n');
       lines.forEach(line => {
-        worksheet.addRow({ content: line });
+        worksheet.addRow([line]);
       });
 
-      // Ajustar altura de filas
-      worksheet.eachRow((row) => {
-        row.height = 15;
-        row.alignment = { wrapText: true, vertical: 'top' };
+      // Configurar columna
+      worksheet.getColumn(1).width = 100;
+
+      // Ajustar altura y alineación de filas de contenido
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 5) { // Solo las filas de contenido
+          row.height = 15;
+          row.alignment = { wrapText: true, vertical: 'top' };
+        }
       });
 
       // Generar buffer y convertir a Blob
@@ -1567,31 +1588,41 @@ export default function Dashboard() {
                       )}
 
                       {/* Mostrar iconos de resultados disponibles para archivos completados */}
-                      {file.status === 'completed' && (
+                      {file.status === 'completed' && file.actions && file.actions.length > 0 && (
                         <div className="ml-6 mt-2 flex flex-wrap gap-2">
-                          {file.txt_url && (
+                          {/* Solo mostrar TXT si se pidió explícitamente Transcribir */}
+                          {file.txt_url && file.actions.includes('Transcribir') && (
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'}`} title="Transcripción disponible">
                               📝 TXT
                             </span>
                           )}
-                          {file.srt_url && (
+                          {/* Solo mostrar SRT/VTT si se pidió Subtítulos */}
+                          {file.srt_url && file.actions.includes('Subtítulos') && (
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'}`} title="Subtítulos SRT disponibles">
                               📄 SRT
                             </span>
                           )}
-                          {file.vtt_url && (
+                          {file.vtt_url && file.actions.includes('Subtítulos') && (
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'}`} title="Subtítulos VTT disponibles">
                               📄 VTT
                             </span>
                           )}
-                          {file.summary_url && (
+                          {/* Solo mostrar Resumen si se pidió Resumir */}
+                          {file.summary_url && file.actions.includes('Resumir') && (
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'}`} title="Resumen disponible">
                               📋 Resumen
                             </span>
                           )}
-                          {file.speakers_url && (
+                          {/* Solo mostrar Oradores si se pidió explícitamente */}
+                          {file.speakers_url && file.actions.includes('Oradores') && (
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-orange-900/30 text-orange-300' : 'bg-orange-100 text-orange-700'}`} title="Análisis de oradores disponible">
                               🎙️ Oradores
+                            </span>
+                          )}
+                          {/* Mostrar Tags si se pidió Etiquetas */}
+                          {file.actions.includes('Etiquetas') && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-100 text-yellow-700'}`} title="Tags disponibles">
+                              🏷️ Tags
                             </span>
                           )}
                         </div>
