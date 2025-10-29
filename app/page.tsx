@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, BookOpen, LogOut } from 'lucide-react';
 import jsPDF from 'jspdf';
+import ExcelJS from 'exceljs';
 
 // OpenAI Whisper V3 + GPT-4o + Inngest - Arquitectura asíncrona con polling
 
@@ -750,6 +751,52 @@ export default function Dashboard() {
     }
   };
 
+  const generateExcel = async (title: string, text: string, filename: string): Promise<Blob> => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(title);
+
+      // Configurar columnas
+      worksheet.columns = [
+        { header: 'Contenido', key: 'content', width: 100 }
+      ];
+
+      // Estilo del header
+      worksheet.getRow(1).font = { bold: true, size: 12 };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE67E22' } // Naranja annalogica
+      };
+
+      // Agregar metadata
+      worksheet.addRow({ content: `Archivo: ${filename}` });
+      worksheet.addRow({ content: `Fecha: ${new Date().toLocaleDateString('es-ES')}` });
+      worksheet.addRow({ content: '' }); // Línea vacía
+
+      // Dividir el texto en líneas y agregarlas
+      const lines = text.split('\n');
+      lines.forEach(line => {
+        worksheet.addRow({ content: line });
+      });
+
+      // Ajustar altura de filas
+      worksheet.eachRow((row) => {
+        row.height = 15;
+        row.alignment = { wrapText: true, vertical: 'top' };
+      });
+
+      // Generar buffer y convertir a Blob
+      const buffer = await workbook.xlsx.writeBuffer();
+      return new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+    } catch (error) {
+      console.error(`Error generando Excel para "${title}":`, error);
+      throw error;
+    }
+  };
+
   const downloadFilesOrganized = async (file: UploadedFile, job: Job, dirHandle: FileSystemDirectoryHandle, format: 'txt' | 'pdf' | 'both') => {
     try {
       // Create folder for this file
@@ -765,67 +812,59 @@ export default function Dashboard() {
         await writable.close();
       };
 
-      // Download Transcription
+      // Download Transcription (PDF + Excel)
       if (job.txt_url) {
         const textRes = await fetch(job.txt_url);
         const textContent = await textRes.text();
-        if (format === 'pdf' || format === 'both') {
-          const pdfBlob = await generatePdf('Transcripción', textContent, file.name);
-          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
-          await saveBlob(pdfHandle, pdfBlob);
-        }
-        if (format === 'txt' || format === 'both') {
-          const txtBlob = new Blob([textContent], { type: 'text/plain' });
-          const txtHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
-          await saveBlob(txtHandle, txtBlob);
-        }
+        // Siempre PDF
+        const pdfBlob = await generatePdf('Transcripción', textContent, file.name);
+        const pdfHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
+        await saveBlob(pdfHandle, pdfBlob);
+        // Siempre Excel
+        const excelBlob = await generateExcel('Transcripción', textContent, file.name);
+        const excelHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.xlsx`, { create: true });
+        await saveBlob(excelHandle, excelBlob);
       }
 
-      // Download Summary
+      // Download Summary (PDF + Excel)
       if (job.summary_url) {
         const summaryRes = await fetch(job.summary_url);
         const summaryText = await summaryRes.text();
-        if (format === 'pdf' || format === 'both') {
-          const pdfBlob = await generatePdf('Resumen', summaryText, file.name);
-          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-resumen.pdf`, { create: true });
-          await saveBlob(pdfHandle, pdfBlob);
-        }
-        if (format === 'txt' || format === 'both') {
-          const txtBlob = new Blob([summaryText], { type: 'text/plain' });
-          const txtHandle = await folderHandle.getFileHandle(`${baseName}-resumen.txt`, { create: true });
-          await saveBlob(txtHandle, txtBlob);
-        }
+        // Siempre PDF
+        const pdfBlob = await generatePdf('Resumen', summaryText, file.name);
+        const pdfHandle = await folderHandle.getFileHandle(`${baseName}-resumen.pdf`, { create: true });
+        await saveBlob(pdfHandle, pdfBlob);
+        // Siempre Excel
+        const excelBlob = await generateExcel('Resumen', summaryText, file.name);
+        const excelHandle = await folderHandle.getFileHandle(`${baseName}-resumen.xlsx`, { create: true });
+        await saveBlob(excelHandle, excelBlob);
       }
 
-      // Download Speakers Report
+      // Download Speakers Report (PDF + Excel)
       if (job.speakers_url) {
         const speakersRes = await fetch(job.speakers_url);
         const speakersText = await speakersRes.text();
-        if (format === 'pdf' || format === 'both') {
-          const pdfBlob = await generatePdf('Análisis de Oradores', speakersText, file.name);
-          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-oradores.pdf`, { create: true });
-          await saveBlob(pdfHandle, pdfBlob);
-        }
-        if (format === 'txt' || format === 'both') {
-          const txtBlob = new Blob([speakersText], { type: 'text/plain' });
-          const txtHandle = await folderHandle.getFileHandle(`${baseName}-oradores.txt`, { create: true });
-          await saveBlob(txtHandle, txtBlob);
-        }
+        // Siempre PDF
+        const pdfBlob = await generatePdf('Análisis de Oradores', speakersText, file.name);
+        const pdfHandle = await folderHandle.getFileHandle(`${baseName}-oradores.pdf`, { create: true });
+        await saveBlob(pdfHandle, pdfBlob);
+        // Siempre Excel
+        const excelBlob = await generateExcel('Análisis de Oradores', speakersText, file.name);
+        const excelHandle = await folderHandle.getFileHandle(`${baseName}-oradores.xlsx`, { create: true });
+        await saveBlob(excelHandle, excelBlob);
       }
       
-      // Download Tags
+      // Download Tags (PDF + Excel)
       if (job.metadata?.tags && job.metadata.tags.length > 0) {
         const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
-        if (format === 'pdf' || format === 'both') {
-          const pdfBlob = await generatePdf('Tags', tagsText, file.name);
-          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
-          await saveBlob(pdfHandle, pdfBlob);
-        }
-        if (format === 'txt' || format === 'both') {
-          const txtBlob = new Blob([tagsText], { type: 'text/plain' });
-          const txtHandle = await folderHandle.getFileHandle(`${baseName}-tags.txt`, { create: true });
-          await saveBlob(txtHandle, txtBlob);
-        }
+        // Siempre PDF
+        const pdfBlob = await generatePdf('Tags', tagsText, file.name);
+        const pdfHandle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
+        await saveBlob(pdfHandle, pdfBlob);
+        // Siempre Excel
+        const excelBlob = await generateExcel('Tags', tagsText, file.name);
+        const excelHandle = await folderHandle.getFileHandle(`${baseName}-tags.xlsx`, { create: true });
+        await saveBlob(excelHandle, excelBlob);
       }
 
       // Download SRT (always as .srt)
@@ -875,59 +914,51 @@ export default function Dashboard() {
 
     const baseName = file.name.replace(/\.[^/.]+$/, '');
 
-    // Download Transcription
+    // Download Transcription (PDF + Excel)
     if (job.txt_url) {
       const res = await fetch(job.txt_url);
       const text = await res.text();
-      if (format === 'pdf' || format === 'both') {
-        const pdfBlob = await generatePdf('Transcripción', text, file.name);
-        triggerDownload(pdfBlob, `${baseName}-transcripcion.pdf`);
-      }
-      if (format === 'txt' || format === 'both') {
-        const txtBlob = new Blob([text], { type: 'text/plain' });
-        triggerDownload(txtBlob, `${baseName}-transcripcion.txt`);
-      }
+      // Siempre PDF
+      const pdfBlob = await generatePdf('Transcripción', text, file.name);
+      triggerDownload(pdfBlob, `${baseName}-transcripcion.pdf`);
+      // Siempre Excel
+      const excelBlob = await generateExcel('Transcripción', text, file.name);
+      triggerDownload(excelBlob, `${baseName}-transcripcion.xlsx`);
     }
 
-    // Download Summary
+    // Download Summary (PDF + Excel)
     if (job.summary_url) {
       const res = await fetch(job.summary_url);
       const text = await res.text();
-      if (format === 'pdf' || format === 'both') {
-        const pdfBlob = await generatePdf('Resumen', text, file.name);
-        triggerDownload(pdfBlob, `${baseName}-resumen.pdf`);
-      }
-      if (format === 'txt' || format === 'both') {
-        const txtBlob = new Blob([text], { type: 'text/plain' });
-        triggerDownload(txtBlob, `${baseName}-resumen.txt`);
-      }
+      // Siempre PDF
+      const pdfBlob = await generatePdf('Resumen', text, file.name);
+      triggerDownload(pdfBlob, `${baseName}-resumen.pdf`);
+      // Siempre Excel
+      const excelBlob = await generateExcel('Resumen', text, file.name);
+      triggerDownload(excelBlob, `${baseName}-resumen.xlsx`);
     }
 
-    // Download Speakers Report
+    // Download Speakers Report (PDF + Excel)
     if (job.speakers_url) {
       const res = await fetch(job.speakers_url);
       const text = await res.text();
-      if (format === 'pdf' || format === 'both') {
-        const pdfBlob = await generatePdf('Análisis de Oradores', text, file.name);
-        triggerDownload(pdfBlob, `${baseName}-oradores.pdf`);
-      }
-      if (format === 'txt' || format === 'both') {
-        const txtBlob = new Blob([text], { type: 'text/plain' });
-        triggerDownload(txtBlob, `${baseName}-oradores.txt`);
-      }
+      // Siempre PDF
+      const pdfBlob = await generatePdf('Análisis de Oradores', text, file.name);
+      triggerDownload(pdfBlob, `${baseName}-oradores.pdf`);
+      // Siempre Excel
+      const excelBlob = await generateExcel('Análisis de Oradores', text, file.name);
+      triggerDownload(excelBlob, `${baseName}-oradores.xlsx`);
     }
 
-    // Download Tags
+    // Download Tags (PDF + Excel)
     if (job.metadata?.tags && job.metadata.tags.length > 0) {
       const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
-      if (format === 'pdf' || format === 'both') {
-        const pdfBlob = await generatePdf('Tags', tagsText, file.name);
-        triggerDownload(pdfBlob, `${baseName}-tags.pdf`);
-      }
-      if (format === 'txt' || format === 'both') {
-        const txtBlob = new Blob([tagsText], { type: 'text/plain' });
-        triggerDownload(txtBlob, `${baseName}-tags.txt`);
-      }
+      // Siempre PDF
+      const pdfBlob = await generatePdf('Tags', tagsText, file.name);
+      triggerDownload(pdfBlob, `${baseName}-tags.pdf`);
+      // Siempre Excel
+      const excelBlob = await generateExcel('Tags', tagsText, file.name);
+      triggerDownload(excelBlob, `${baseName}-tags.xlsx`);
     }
 
     // Always download other formats as-is
