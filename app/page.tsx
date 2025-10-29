@@ -333,6 +333,14 @@ export default function Dashboard() {
     const { upload } = await import('@vercel/blob/client');
     const uploadPromises = filesToUpload.map(async ({ file, fileId }) => {
       try {
+        // Verificar que file sea realmente un objeto File
+        if (!(file instanceof File)) {
+          console.error('[Upload] ERROR: file no es una instancia de File:', typeof file, file);
+          throw new Error(`El archivo ${file.name || 'desconocido'} no es un objeto File válido`);
+        }
+
+        console.log('[Upload] Subiendo archivo:', file.name, 'tipo:', file.type, 'tamaño:', file.size);
+
         const timestamp = Date.now();
         const randomSuffix = Math.random().toString(36).substring(2, 8);
         const uniqueFilename = `${timestamp}-${randomSuffix}-${file.name}`;
@@ -347,6 +355,7 @@ export default function Dashboard() {
         setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, uploadProgress: 100, status: 'pending', blobUrl: blob.url } : f));
       } catch (err: any) {
         console.error(`Error uploading ${file.name}:`, err);
+        showNotification(`Error subiendo ${file.name}: ${err.message}`, 'error');
         setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error' } : f));
       }
     });
