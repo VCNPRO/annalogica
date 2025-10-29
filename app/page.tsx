@@ -32,6 +32,14 @@ interface UploadedFile {
   lastProgressTime?: number; // Cuándo cambió el progreso (timestamp)
   stuckWarningShown?: boolean; // Si ya se mostró alerta de clavado
   canRetry?: boolean; // Si el usuario puede reintentar
+  error?: string; // Mensaje de error si falla el procesamiento
+
+  // Results URLs
+  txt_url?: string;
+  srt_url?: string;
+  vtt_url?: string;
+  summary_url?: string;
+  speakers_url?: string;
 }
 
 interface Job {
