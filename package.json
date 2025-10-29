@@ -12,8 +12,6 @@
     "test": "jest --ci --coverage --silent"
   },
   "dependencies": {
-    "@ffmpeg/ffmpeg": "^0.12.15",
-    "@ffmpeg/util": "^0.12.2",
     "@sentry/nextjs": "^8.48.0",
     "@stripe/stripe-js": "^8.0.0",
     "@types/bcryptjs": "^2.4.6",
