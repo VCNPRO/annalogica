@@ -1588,8 +1588,16 @@ export default function Dashboard() {
                       )}
 
                       {/* Mostrar iconos de resultados disponibles para archivos completados */}
-                      {file.status === 'completed' && file.actions && file.actions.length > 0 && (
+                      {file.status === 'completed' && (() => {
+                        // Debug: mostrar acciones en consola
+                        console.log(`[Debug] Archivo ${file.name}: acciones =`, file.actions);
+                        return file.actions && file.actions.length > 0;
+                      })() && (
                         <div className="ml-6 mt-2 flex flex-wrap gap-2">
+                          {/* Debug badge */}
+                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'}`} title={`Acciones: ${file.actions.join(', ')}`}>
+                            🔍 {file.actions.join(', ')}
+                          </span>
                           {/* Solo mostrar TXT si se pidió explícitamente Transcribir */}
                           {file.txt_url && file.actions.includes('Transcribir') && (
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'}`} title="Transcripción disponible">
