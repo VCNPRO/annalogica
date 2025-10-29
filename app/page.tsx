@@ -1560,6 +1560,37 @@ export default function Dashboard() {
                           </p>
                         </div>
                       )}
+
+                      {/* Mostrar iconos de resultados disponibles para archivos completados */}
+                      {file.status === 'completed' && (
+                        <div className="ml-6 mt-2 flex flex-wrap gap-2">
+                          {file.txt_url && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'}`} title="Transcripción disponible">
+                              📝 TXT
+                            </span>
+                          )}
+                          {file.srt_url && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'}`} title="Subtítulos SRT disponibles">
+                              📄 SRT
+                            </span>
+                          )}
+                          {file.vtt_url && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'}`} title="Subtítulos VTT disponibles">
+                              📄 VTT
+                            </span>
+                          )}
+                          {file.summary_url && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'}`} title="Resumen disponible">
+                              📋 Resumen
+                            </span>
+                          )}
+                          {file.speakers_url && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-orange-900/30 text-orange-300' : 'bg-orange-100 text-orange-700'}`} title="Análisis de oradores disponible">
+                              🎙️ Oradores
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
