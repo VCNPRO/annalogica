@@ -272,7 +272,9 @@ export default function Dashboard() {
               srt_url: job.srt_url || f.srt_url,
               vtt_url: job.vtt_url || f.vtt_url,
               summary_url: job.summary_url || f.summary_url,
-              speakers_url: job.speakers_url || f.speakers_url
+              speakers_url: job.speakers_url || f.speakers_url,
+              // 🔥 IMPORTANTE: Preservar las acciones originales
+              actions: f.actions || []
             };
           }));
         } catch (err) {
