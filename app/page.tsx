@@ -407,14 +407,15 @@ export default function Dashboard() {
   };
 
   const handleApplyAction = (actionName: string) => {
+    // Toggle acción: agregar o quitar
     setUploadedFiles(prevFiles =>
       prevFiles.map(file =>
         selectedUploadedFileIds.has(file.id)
           ? {
               ...file,
               actions: file.actions.includes(actionName)
-                ? file.actions.filter(a => a !== actionName) // Deselect if already selected
-                : [...file.actions, actionName],
+                ? file.actions.filter(a => a !== actionName) // Quitar si ya está
+                : [...file.actions, actionName], // Agregar si no está
             }
           : file
       )
@@ -641,8 +642,9 @@ export default function Dashboard() {
       showNotification('No se procesó ningún archivo. Verifica las acciones seleccionadas.', 'error');
     }
 
-    // Deselect all after processing
+    // Limpiar selección y acciones después de procesar
     setSelectedUploadedFileIds(new Set());
+    setUploadedFiles(prev => prev.map(f => ({ ...f, actions: [] })));
   };
 
 
@@ -1246,14 +1248,17 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Fila 6: Procesar Archivos - ancho completo */}
+              {/* Botón Procesar Archivos */}
               <button
                 onClick={handleProcessSelectedFiles}
-                className="w-full p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors mt-2"
+                className="w-full p-3 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-bold transition-colors mt-3 shadow-lg"
               >
-                🚀 Procesar Archivos
+                🚀 Procesar Archivos Seleccionados
               </button>
             </div>
+            <p className={`text-xs ${textSecondary} text-center mt-2`}>
+              💡 Selecciona archivos y acciones, luego presiona Procesar
+            </p>
           </div>
 
           <div className="mt-auto pt-6 border-t border-zinc-800">

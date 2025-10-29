@@ -821,16 +821,25 @@ export default function ProcessedFilesPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <div className="flex flex-wrap gap-2">
-                              {/* TTS Audio Play Button */}
+                              {/* Transcription icon */}
+                              {job.txt_url && (
+                                <span
+                                  className="inline-flex items-center px-2 py-1 rounded text-xs bg-blue-600 text-white"
+                                  title="Transcripción disponible"
+                                >
+                                  📝
+                                </span>
+                              )}
+                              {/* TTS Audio Play Button - Solo icono */}
                               {job.metadata?.ttsUrl && (
                                 <a
                                   href={job.metadata.ttsUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                                  title="Reproducir audio en nueva pestaña"
+                                  className="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                                  title="Reproducir audio narrado"
                                 >
-                                  <Play className="h-3 w-3 mr-1" /> Reproducir Audio
+                                  🎤
                                 </a>
                               )}
                               {/* Excel download - PRIORITY */}
