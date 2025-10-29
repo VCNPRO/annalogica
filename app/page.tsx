@@ -140,7 +140,7 @@ export default function Dashboard() {
     if (!seconds || seconds <= 0) return '0:00';
     const minutes = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
   const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -215,7 +215,53 @@ export default function Dashboard() {
           }
           const job = await res.json();
           if (!job || !job.status) continue;
-          // ... (rest of polling logic is complex and omitted for brevity, assuming it exists)
+
+          setUploadedFiles(prev => prev.map(f => {
+            if (f.id !== file.id) return f;
+
+            const now = Date.now();
+            let newStatus: FileStatus = 'pending';
+
+            if (job.status === 'completed') {
+              newStatus = 'completed';
+            } else if (job.status === 'failed' || job.status === 'error') {
+              newStatus = 'error';
+            } else if (job.status === 'processing') {
+              newStatus = 'processing';
+            } else {
+              newStatus = 'pending';
+            }
+
+            // Inicializar processingStartTime cuando comienza el processing
+            let processingStartTime = f.processingStartTime;
+            if (newStatus === 'processing' && !processingStartTime) {
+              processingStartTime = now;
+            }
+
+            // Calcular tiempo estimado restante basado en progreso
+            let estimatedTimeRemaining = f.estimatedTimeRemaining;
+            if (newStatus === 'processing' && job.progress && processingStartTime) {
+              const elapsed = (now - processingStartTime) / 1000; // segundos
+              const progressRate = job.progress / elapsed; // progreso por segundo
+              if (progressRate > 0 && job.progress < 100) {
+                estimatedTimeRemaining = (100 - job.progress) / progressRate;
+              }
+            }
+
+            return {
+              ...f,
+              status: newStatus,
+              processingProgress: job.progress || f.processingProgress || 0,
+              processingStartTime,
+              estimatedTimeRemaining,
+              error: job.error || f.error,
+              txt_url: job.txt_url || f.txt_url,
+              srt_url: job.srt_url || f.srt_url,
+              vtt_url: job.vtt_url || f.vtt_url,
+              summary_url: job.summary_url || f.summary_url,
+              speakers_url: job.speakers_url || f.speakers_url
+            };
+          }));
         } catch (err) {
           console.error('[Polling] Error fetching job:', file.jobId, err);
         }
