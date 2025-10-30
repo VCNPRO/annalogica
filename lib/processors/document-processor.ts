@@ -252,7 +252,7 @@ export async function processDocumentFile(
 
     // Save extracted text (TXT)
     const txtFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-extracted.txt`;
-    const txtBlob = await put(txtFilename, extractedText, {
+    const txtBlob = await put(txtFilename, Buffer.from(extractedText, 'utf-8'), {
       access: 'public',
       contentType: 'text/plain; charset=utf-8',
       addRandomSuffix: true
@@ -261,7 +261,7 @@ export async function processDocumentFile(
     // Save summary if generated
     if (summary) {
       const summaryFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-summary.txt`;
-      const summaryBlob = await put(summaryFilename, summary, {
+      const summaryBlob = await put(summaryFilename, Buffer.from(summary, 'utf-8'), {
         access: 'public',
         contentType: 'text/plain; charset=utf-8',
         addRandomSuffix: true
