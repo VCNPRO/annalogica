@@ -849,74 +849,60 @@ export default function Dashboard() {
         await writable.close();
       };
 
-      // Download Transcription (PDF + Excel)
-      if (job.txt_url) {
+      // 🔥 Obtener acciones solicitadas por el usuario
+      const requestedActions = file.actions || [];
+      console.log('[Download] Acciones solicitadas:', requestedActions);
+
+      // Download Transcription (solo PDF) - Solo si se pidió "Transcribir"
+      if (job.txt_url && requestedActions.includes('Transcribir')) {
         const textRes = await fetch(job.txt_url);
         const textContent = await textRes.text();
-        // Siempre PDF
         const pdfBlob = await generatePdf('Transcripción', textContent, file.name);
         const pdfHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
         await saveBlob(pdfHandle, pdfBlob);
-        // Siempre Excel
-        const excelBlob = await generateExcel('Transcripción', textContent, file.name);
-        const excelHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.xlsx`, { create: true });
-        await saveBlob(excelHandle, excelBlob);
       }
 
-      // Download Summary (PDF + Excel)
-      if (job.summary_url) {
+      // Download Summary (solo PDF) - Solo si se pidió "Resumir"
+      if (job.summary_url && requestedActions.includes('Resumir')) {
         const summaryRes = await fetch(job.summary_url);
         const summaryText = await summaryRes.text();
-        // Siempre PDF
         const pdfBlob = await generatePdf('Resumen', summaryText, file.name);
         const pdfHandle = await folderHandle.getFileHandle(`${baseName}-resumen.pdf`, { create: true });
         await saveBlob(pdfHandle, pdfBlob);
-        // Siempre Excel
-        const excelBlob = await generateExcel('Resumen', summaryText, file.name);
-        const excelHandle = await folderHandle.getFileHandle(`${baseName}-resumen.xlsx`, { create: true });
-        await saveBlob(excelHandle, excelBlob);
       }
 
-      // Download Speakers Report (PDF + Excel)
-      if (job.speakers_url) {
+      // Download Speakers Report (solo PDF) - Solo si se pidió "Oradores"
+      if (job.speakers_url && requestedActions.includes('Oradores')) {
         const speakersRes = await fetch(job.speakers_url);
         const speakersText = await speakersRes.text();
-        // Siempre PDF
         const pdfBlob = await generatePdf('Análisis de Oradores', speakersText, file.name);
         const pdfHandle = await folderHandle.getFileHandle(`${baseName}-oradores.pdf`, { create: true });
         await saveBlob(pdfHandle, pdfBlob);
-        // Siempre Excel
-        const excelBlob = await generateExcel('Análisis de Oradores', speakersText, file.name);
-        const excelHandle = await folderHandle.getFileHandle(`${baseName}-oradores.xlsx`, { create: true });
-        await saveBlob(excelHandle, excelBlob);
       }
-      
-      // Download Tags (PDF + Excel)
-      if (job.metadata?.tags && job.metadata.tags.length > 0) {
+
+      // Download Tags (solo PDF) - Solo si se pidió "Aplicar Tags"
+      if (job.metadata?.tags && job.metadata.tags.length > 0 && requestedActions.includes('Aplicar Tags')) {
         const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
-        // Siempre PDF
         const pdfBlob = await generatePdf('Tags', tagsText, file.name);
         const pdfHandle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
         await saveBlob(pdfHandle, pdfBlob);
-        // Siempre Excel
-        const excelBlob = await generateExcel('Tags', tagsText, file.name);
-        const excelHandle = await folderHandle.getFileHandle(`${baseName}-tags.xlsx`, { create: true });
-        await saveBlob(excelHandle, excelBlob);
       }
 
-      // Download SRT (always as .srt)
-      if (job.srt_url) {
+      // Download SRT (como .txt) - Solo si se pidió "SRT"
+      if (job.srt_url && requestedActions.includes('SRT')) {
         const srtRes = await fetch(job.srt_url);
-        const srtBlob = await srtRes.blob();
-        const fileHandle = await folderHandle.getFileHandle(`${baseName}.srt`, { create: true });
+        const srtContent = await srtRes.text();
+        const srtBlob = new Blob([srtContent], { type: 'text/plain' });
+        const fileHandle = await folderHandle.getFileHandle(`${baseName}.srt.txt`, { create: true });
         await saveBlob(fileHandle, srtBlob);
       }
 
-      // Download VTT (always as .vtt)
-      if (job.vtt_url) {
+      // Download VTT (como .txt) - Solo si se pidió "VTT"
+      if (job.vtt_url && requestedActions.includes('VTT')) {
         const vttRes = await fetch(job.vtt_url);
-        const vttBlob = await vttRes.blob();
-        const fileHandle = await folderHandle.getFileHandle(`${baseName}.vtt`, { create: true });
+        const vttContent = await vttRes.text();
+        const vttBlob = new Blob([vttContent], { type: 'text/plain' });
+        const fileHandle = await folderHandle.getFileHandle(`${baseName}.vtt.txt`, { create: true });
         await saveBlob(fileHandle, vttBlob);
       }
 
@@ -951,56 +937,56 @@ export default function Dashboard() {
 
     const baseName = file.name.replace(/\.[^/.]+$/, '');
 
-    // Download Transcription (PDF + Excel)
-    if (job.txt_url) {
+    // 🔥 Obtener acciones solicitadas por el usuario
+    const requestedActions = file.actions || [];
+    console.log('[Download] Acciones solicitadas:', requestedActions);
+
+    // Download Transcription (solo PDF) - Solo si se pidió "Transcribir"
+    if (job.txt_url && requestedActions.includes('Transcribir')) {
       const res = await fetch(job.txt_url);
       const text = await res.text();
-      // Siempre PDF
       const pdfBlob = await generatePdf('Transcripción', text, file.name);
       triggerDownload(pdfBlob, `${baseName}-transcripcion.pdf`);
-      // Siempre Excel
-      const excelBlob = await generateExcel('Transcripción', text, file.name);
-      triggerDownload(excelBlob, `${baseName}-transcripcion.xlsx`);
     }
 
-    // Download Summary (PDF + Excel)
-    if (job.summary_url) {
+    // Download Summary (solo PDF) - Solo si se pidió "Resumir"
+    if (job.summary_url && requestedActions.includes('Resumir')) {
       const res = await fetch(job.summary_url);
       const text = await res.text();
-      // Siempre PDF
       const pdfBlob = await generatePdf('Resumen', text, file.name);
       triggerDownload(pdfBlob, `${baseName}-resumen.pdf`);
-      // Siempre Excel
-      const excelBlob = await generateExcel('Resumen', text, file.name);
-      triggerDownload(excelBlob, `${baseName}-resumen.xlsx`);
     }
 
-    // Download Speakers Report (PDF + Excel)
-    if (job.speakers_url) {
+    // Download Speakers Report (solo PDF) - Solo si se pidió "Oradores"
+    if (job.speakers_url && requestedActions.includes('Oradores')) {
       const res = await fetch(job.speakers_url);
       const text = await res.text();
-      // Siempre PDF
       const pdfBlob = await generatePdf('Análisis de Oradores', text, file.name);
       triggerDownload(pdfBlob, `${baseName}-oradores.pdf`);
-      // Siempre Excel
-      const excelBlob = await generateExcel('Análisis de Oradores', text, file.name);
-      triggerDownload(excelBlob, `${baseName}-oradores.xlsx`);
     }
 
-    // Download Tags (PDF + Excel)
-    if (job.metadata?.tags && job.metadata.tags.length > 0) {
+    // Download Tags (solo PDF) - Solo si se pidió "Aplicar Tags"
+    if (job.metadata?.tags && job.metadata.tags.length > 0 && requestedActions.includes('Aplicar Tags')) {
       const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
-      // Siempre PDF
       const pdfBlob = await generatePdf('Tags', tagsText, file.name);
       triggerDownload(pdfBlob, `${baseName}-tags.pdf`);
-      // Siempre Excel
-      const excelBlob = await generateExcel('Tags', tagsText, file.name);
-      triggerDownload(excelBlob, `${baseName}-tags.xlsx`);
     }
 
-    // Always download other formats as-is
-    if (job.srt_url) window.open(job.srt_url, '_blank');
-    if (job.vtt_url) window.open(job.vtt_url, '_blank');
+    // Download SRT (como .txt) - Solo si se pidió "SRT"
+    if (job.srt_url && requestedActions.includes('SRT')) {
+      const res = await fetch(job.srt_url);
+      const text = await res.text();
+      const srtBlob = new Blob([text], { type: 'text/plain' });
+      triggerDownload(srtBlob, `${baseName}.srt.txt`);
+    }
+
+    // Download VTT (como .txt) - Solo si se pidió "VTT"
+    if (job.vtt_url && requestedActions.includes('VTT')) {
+      const res = await fetch(job.vtt_url);
+      const text = await res.text();
+      const vttBlob = new Blob([text], { type: 'text/plain' });
+      triggerDownload(vttBlob, `${baseName}.vtt.txt`);
+    }
 
     // 🎤 Download TTS Audio
     if (job.metadata?.ttsUrl) window.open(job.metadata.ttsUrl, '_blank');
@@ -1601,52 +1587,177 @@ export default function Dashboard() {
                         </div>
                       )}
 
-                      {/* Mostrar iconos de resultados disponibles para archivos completados */}
-                      {file.status === 'completed' && (() => {
-                        // Debug: mostrar acciones en consola
-                        console.log(`[Debug] Archivo ${file.name}: acciones =`, file.actions);
-                        return file.actions && file.actions.length > 0;
-                      })() && (
-                        <div className="ml-6 mt-2 flex flex-wrap gap-2">
-                          {/* Debug badge */}
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] ${darkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'}`} title={`Acciones: ${file.actions.join(', ')}`}>
-                            🔍 {file.actions.join(', ')}
-                          </span>
-                          {/* Solo mostrar TXT si se pidió explícitamente Transcribir */}
-                          {file.txt_url && file.actions.includes('Transcribir') && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'}`} title="Transcripción disponible">
-                              📝 TXT
-                            </span>
-                          )}
-                          {/* Solo mostrar SRT/VTT si se pidió Subtítulos */}
-                          {file.srt_url && file.actions.includes('Subtítulos') && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'}`} title="Subtítulos SRT disponibles">
-                              📄 SRT
-                            </span>
-                          )}
-                          {file.vtt_url && file.actions.includes('Subtítulos') && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-purple-900/30 text-purple-300' : 'bg-purple-100 text-purple-700'}`} title="Subtítulos VTT disponibles">
-                              📄 VTT
-                            </span>
-                          )}
-                          {/* Solo mostrar Resumen si se pidió Resumir */}
-                          {file.summary_url && file.actions.includes('Resumir') && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-green-900/30 text-green-300' : 'bg-green-100 text-green-700'}`} title="Resumen disponible">
-                              📋 Resumen
-                            </span>
-                          )}
-                          {/* Solo mostrar Oradores si se pidió explícitamente */}
-                          {file.speakers_url && file.actions.includes('Oradores') && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-orange-900/30 text-orange-300' : 'bg-orange-100 text-orange-700'}`} title="Análisis de oradores disponible">
-                              🎙️ Oradores
-                            </span>
-                          )}
-                          {/* Mostrar Tags si se pidió Etiquetas */}
-                          {file.actions.includes('Etiquetas') && (
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${darkMode ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-100 text-yellow-700'}`} title="Tags disponibles">
-                              🏷️ Tags
-                            </span>
-                          )}
+                      {/* Mostrar botones de descarga individuales para archivos completados */}
+                      {file.status === 'completed' && file.actions && file.actions.length > 0 && (
+                        <div className="ml-6 mt-2">
+                          <p className={`text-xs font-medium ${textSecondary} mb-2`}>Archivos disponibles para descargar:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {/* Solo mostrar botón de Transcripción si se pidió explícitamente Transcribir */}
+                            {file.txt_url && file.actions.includes('Transcribir') && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(file.txt_url!);
+                                    const text = await res.text();
+                                    const pdfBlob = await generatePdf('Transcripción', text, file.name);
+                                    const url = URL.createObjectURL(pdfBlob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    showNotification('Transcripción descargada correctamente', 'success');
+                                  } catch (error) {
+                                    showNotification('Error al descargar transcripción', 'error');
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                                title="Descargar transcripción en PDF"
+                              >
+                                📝 Transcripción (PDF)
+                              </button>
+                            )}
+                            {/* Solo mostrar botón de SRT si se pidió SRT */}
+                            {file.srt_url && file.actions.includes('SRT') && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(file.srt_url!);
+                                    const text = await res.text();
+                                    const blob = new Blob([text], { type: 'text/plain' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}.srt.txt`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    showNotification('Subtítulos SRT descargados correctamente', 'success');
+                                  } catch (error) {
+                                    showNotification('Error al descargar SRT', 'error');
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-500 hover:bg-purple-600 text-white'}`}
+                                title="Descargar subtítulos SRT como TXT"
+                              >
+                                📄 SRT (TXT)
+                              </button>
+                            )}
+                            {/* Solo mostrar botón de VTT si se pidió VTT */}
+                            {file.vtt_url && file.actions.includes('VTT') && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(file.vtt_url!);
+                                    const text = await res.text();
+                                    const blob = new Blob([text], { type: 'text/plain' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}.vtt.txt`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    showNotification('Subtítulos VTT descargados correctamente', 'success');
+                                  } catch (error) {
+                                    showNotification('Error al descargar VTT', 'error');
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-500 hover:bg-purple-600 text-white'}`}
+                                title="Descargar subtítulos VTT como TXT"
+                              >
+                                📄 VTT (TXT)
+                              </button>
+                            )}
+                            {/* Solo mostrar botón de Resumen si se pidió Resumir */}
+                            {file.summary_url && file.actions.includes('Resumir') && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(file.summary_url!);
+                                    const text = await res.text();
+                                    const pdfBlob = await generatePdf('Resumen', text, file.name);
+                                    const url = URL.createObjectURL(pdfBlob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}-resumen.pdf`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    showNotification('Resumen descargado correctamente', 'success');
+                                  } catch (error) {
+                                    showNotification('Error al descargar resumen', 'error');
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                                title="Descargar resumen en PDF"
+                              >
+                                📋 Resumen (PDF)
+                              </button>
+                            )}
+                            {/* Solo mostrar botón de Oradores si se pidió explícitamente */}
+                            {file.speakers_url && file.actions.includes('Oradores') && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(file.speakers_url!);
+                                    const text = await res.text();
+                                    const pdfBlob = await generatePdf('Análisis de Oradores', text, file.name);
+                                    const url = URL.createObjectURL(pdfBlob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}-oradores.pdf`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    showNotification('Análisis de oradores descargado correctamente', 'success');
+                                  } catch (error) {
+                                    showNotification('Error al descargar análisis de oradores', 'error');
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white'}`}
+                                title="Descargar análisis de oradores en PDF"
+                              >
+                                🎙️ Oradores (PDF)
+                              </button>
+                            )}
+                            {/* Solo mostrar botón de Tags si se pidió Aplicar Tags */}
+                            {file.actions.includes('Aplicar Tags') && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    // Obtener job para acceder a metadata.tags
+                                    const jobRes = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
+                                    const jobData = await jobRes.json();
+                                    const tags = jobData.metadata?.tags || [];
+                                    const tagsText = `Tags para: ${file.name}\n\n- ${tags.join('\n- ')}`;
+                                    const pdfBlob = await generatePdf('Tags', tagsText, file.name);
+                                    const url = URL.createObjectURL(pdfBlob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}-tags.pdf`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    showNotification('Tags descargados correctamente', 'success');
+                                  } catch (error) {
+                                    showNotification('Error al descargar tags', 'error');
+                                  }
+                                }}
+                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-yellow-500 hover:bg-yellow-600 text-white'}`}
+                                title="Descargar tags en PDF"
+                              >
+                                🏷️ Tags (PDF)
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
