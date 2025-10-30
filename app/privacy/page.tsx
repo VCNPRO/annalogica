@@ -5,7 +5,7 @@ export default function PrivacyPage() {
         <h1 className="text-4xl font-bold mb-8">Política de Privacidad</h1>
 
         <p className="text-sm text-slate-400 mb-8">
-          Última actualización: 6 de Octubre de 2025
+          Última actualización: 30 de Octubre de 2025
         </p>
 
         <section className="mb-8">
@@ -130,11 +130,15 @@ export default function PrivacyPage() {
           <p className="text-slate-300">
             Para cualquier pregunta sobre esta política o el tratamiento de tus datos:
           </p>
-          <p className="text-slate-300 mt-4">
-            <strong>Email:</strong> <a href="mailto:privacy@annalogica.eu" className="text-blue-400 hover:underline">privacy@annalogica.eu</a><br />
-            <strong>Dirección:</strong> [Tu dirección legal]<br />
-            <strong>Responsable de protección de datos:</strong> [Nombre del DPO]
-          </p>
+          <div className="text-slate-300 mt-4 space-y-2">
+            <p><strong>Empresa:</strong> videoconversion digital lab, S.L.</p>
+            <p><strong>Emails de contacto:</strong></p>
+            <ul className="list-disc list-inside ml-4 space-y-1">
+              <li><a href="mailto:support@annalogica.eu" className="text-blue-400 hover:underline">support@annalogica.eu</a> - Soporte técnico</li>
+              <li><a href="mailto:admin@annalogica.eu" className="text-blue-400 hover:underline">admin@annalogica.eu</a> - Administración</li>
+              <li><a href="mailto:infopreus@annalogica.eu" className="text-blue-400 hover:underline">infopreus@annalogica.eu</a> - Información y precios</li>
+            </ul>
+          </div>
         </section>
 
         <div className="mt-12 pt-8 border-t border-slate-700">

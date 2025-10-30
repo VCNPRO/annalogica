@@ -5,7 +5,7 @@ export default function TermsPage() {
         <h1 className="text-4xl font-bold mb-8">Términos y Condiciones de Servicio</h1>
 
         <p className="text-sm text-slate-400 mb-8">
-          Última actualización: 6 de Octubre de 2025
+          Última actualización: 30 de Octubre de 2025
         </p>
 
         <section className="mb-8">
@@ -195,11 +195,17 @@ export default function TermsPage() {
 
         <section className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">17. Contacto</h2>
-          <p className="text-slate-300">
-            Para preguntas sobre estos Términos:<br />
-            <strong>Email:</strong> <a href="mailto:legal@annalogica.eu" className="text-blue-400 hover:underline">legal@annalogica.eu</a><br />
-            <strong>Sitio web:</strong> <a href="https://annalogica.eu" className="text-blue-400 hover:underline">annalogica.eu</a>
-          </p>
+          <div className="text-slate-300 space-y-2">
+            <p>Para preguntas sobre estos Términos:</p>
+            <p><strong>Empresa:</strong> videoconversion digital lab, S.L.</p>
+            <p><strong>Sitio web:</strong> <a href="https://annalogica.eu" className="text-blue-400 hover:underline">annalogica.eu</a></p>
+            <p><strong>Emails de contacto:</strong></p>
+            <ul className="list-disc list-inside ml-4 space-y-1">
+              <li><a href="mailto:support@annalogica.eu" className="text-blue-400 hover:underline">support@annalogica.eu</a> - Soporte técnico</li>
+              <li><a href="mailto:admin@annalogica.eu" className="text-blue-400 hover:underline">admin@annalogica.eu</a> - Administración</li>
+              <li><a href="mailto:infopreus@annalogica.eu" className="text-blue-400 hover:underline">infopreus@annalogica.eu</a> - Información y precios</li>
+            </ul>
+          </div>
         </section>
 
         <div className="mt-12 pt-8 border-t border-slate-700">

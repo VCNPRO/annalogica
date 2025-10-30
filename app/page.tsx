@@ -179,6 +179,8 @@ export default function Dashboard() {
       try {
         const res = await fetch('/api/auth/me', { credentials: 'include' });
         if (!res.ok) {
+          // 🔥 SECURITY FIX: Si no está autenticado, limpiar localStorage
+          localStorage.clear();
           router.push('/login');
           return;
         }
@@ -188,6 +190,8 @@ export default function Dashboard() {
         setLoading(false);
       } catch (error) {
         console.error('Error verificando autenticación:', error);
+        // 🔥 SECURITY FIX: Si hay error, limpiar localStorage
+        localStorage.clear();
         router.push('/login');
       }
     };
@@ -713,8 +717,11 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error en logout:', error);
     } finally {
-      // Limpiar datos locales no sensibles
+      // 🔥 SECURITY FIX: Limpiar TODOS los datos locales, incluyendo archivos
       localStorage.removeItem('user');
+      localStorage.removeItem('uploadedFiles');
+      // Limpiar también cualquier otro dato relacionado con la sesión
+      localStorage.clear();
       router.push('/login');
     }
   };
@@ -1094,7 +1101,7 @@ export default function Dashboard() {
               <span className={textSecondary}>trabajando para</span>
             </div>
             {(user?.name || user?.email) && (
-              <p className={`font-orbitron text-white text-xl font-semibold -mt-1 ml-1`}>{user.name || user.email}</p>
+              <p className={`text-white text-xl font-medium -mt-1 ml-1`}>{user.name || user.email}</p>
             )}
           </div>
 
@@ -1284,16 +1291,17 @@ export default function Dashboard() {
 
           <div className="mt-auto pt-6 border-t border-zinc-800">
             <p className={`text-xs ${textSecondary} text-center mb-1`}>
-              © 2025 Annalogica. Todos los derechos reservados.
+              © 2025 Annalogica by videoconversion digital lab, S.L.
             </p>
             <div className="flex justify-center gap-3 text-xs mb-2">
               <a href="/privacy" className={`${textSecondary} hover:text-orange-500`}>Privacidad</a>
               <a href="/terms" className={`${textSecondary} hover:text-orange-500`}>Términos</a>
-              <a href="mailto:legal@annalogica.eu" className={`${textSecondary} hover:text-orange-500`}>Contacto</a>
+              <a href="mailto:admin@annalogica.eu" className={`${textSecondary} hover:text-orange-500`}>Contacto</a>
             </div>
-            <p className={`text-xs ${textSecondary} text-center`}>
-              support@annalogica.eu
-            </p>
+            <div className={`text-xs ${textSecondary} text-center space-y-1`}>
+              <p>support@annalogica.eu | admin@annalogica.eu</p>
+              <p>infopreus@annalogica.eu</p>
+            </div>
           </div>
         </div>
 

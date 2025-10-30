@@ -718,67 +718,81 @@ export default function ProcessedFilesPage() {
             </div>
           </div>
 
-          <div className="mb-6 space-y-4">
-            {/* Search Bar */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-zinc-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Buscar por nombre de archivo o código..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-10 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-zinc-400 hover:text-white"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              )}
-            </div>
-
-            {/* Filters */}
+          <div className="mb-6">
+            {/* Reorganized search and filters in single row */}
             <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-zinc-400" />
-                <span className="text-sm text-zinc-400">Filtros:</span>
+              {/* Search Bar - reduced to half width */}
+              <div className="relative flex-1" style={{ maxWidth: '300px' }}>
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-zinc-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o código..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-2 flex items-center text-zinc-400 hover:text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
               {/* Type Filter */}
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as any)}
-                className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
                 <option value="all">Todos los tipos</option>
                 <option value="audio">🎙️ Solo Audio</option>
                 <option value="document">📄 Solo Documentos</option>
               </select>
 
-              {/* Status Filter */}
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              {/* Download Selected Button */}
+              <button
+                onClick={handleBulkDownload}
+                disabled={selectedJobs.size === 0}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
-                <option value="all">Todos los estados</option>
-                <option value="completed">✅ Completados</option>
-                <option value="processing">⏳ Procesando</option>
-                <option value="failed">❌ Errores</option>
-              </select>
+                <Download className="h-4 w-4 mr-1" />
+                Descargar ({selectedJobs.size})
+              </button>
+
+              {/* Choose Folder Button */}
+              <button
+                onClick={async () => {
+                  if (!('showDirectoryPicker' in window)) {
+                    showNotification('Tu navegador no soporta la selección de carpetas.', 'error');
+                    return;
+                  }
+                  try {
+                    const handle = await (window as any).showDirectoryPicker();
+                    setDownloadDirHandle(handle);
+                    showNotification(`Carpeta seleccionada: "${handle.name}"`, 'success');
+                  } catch (err) {
+                    console.error('Error al seleccionar carpeta:', err);
+                  }
+                }}
+                className="inline-flex items-center px-3 py-2 border border-zinc-600 text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                title="Elegir carpeta de destino"
+              >
+                📁 Carpeta
+              </button>
 
               {/* Clear Filters Button */}
               {hasActiveFilters && (
                 <button
                   onClick={clearFilters}
-                  className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
+                  className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
                 >
                   <X className="h-3 w-3" />
-                  Limpiar filtros
+                  Limpiar
                 </button>
               )}
 
@@ -789,54 +803,59 @@ export default function ProcessedFilesPage() {
             </div>
           </div>
 
-          {/* Bulk Download Controls */}
+          {/* Export CSV/Excel buttons */}
           {filteredJobs.length > 0 && (
             <div className="mb-4 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-zinc-400">Exportar todo:</span>
                 <button
-                  onClick={handleBulkDownload}
-                  disabled={selectedJobs.size === 0}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/export?format=csv', { credentials: 'include' });
+                      if (!res.ok) throw new Error('Error al exportar');
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `annalogica-export-${Date.now()}.csv`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      showNotification('Exportación CSV descargada correctamente', 'success');
+                    } catch (error) {
+                      showNotification('Error al exportar CSV', 'error');
+                    }
+                  }}
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Descargar Seleccionados ({selectedJobs.size})
+                  📄 CSV
                 </button>
                 <button
                   onClick={async () => {
-                    if (!('showDirectoryPicker' in window)) {
-                      showNotification('Tu navegador no soporta la selección de carpetas.', 'error');
-                      return;
-                    }
                     try {
-                      const handle = await (window as any).showDirectoryPicker();
-                      setDownloadDirHandle(handle);
-                      showNotification(`Carpeta de descarga seleccionada: "${handle.name}"`, 'success');
-                    } catch (err) {
-                      console.error('Error al seleccionar carpeta:', err);
+                      const res = await fetch('/api/export?format=excel', { credentials: 'include' });
+                      if (!res.ok) throw new Error('Error al exportar');
+                      const blob = await res.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `annalogica-export-${Date.now()}.xlsx`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      showNotification('Exportación Excel descargada correctamente', 'success');
+                    } catch (error) {
+                      showNotification('Error al exportar Excel', 'error');
                     }
                   }}
-                  className="inline-flex items-center px-4 py-2 border border-zinc-600 text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  title="Elegir una carpeta local donde guardar todas las descargas de forma organizada"
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                 >
-                  📁 Elegir Carpeta
+                  📊 Excel
                 </button>
-                {downloadDirHandle && <span className="text-xs text-zinc-400">Carpeta: {downloadDirHandle.name}</span>}
               </div>
-              <div className="flex items-center gap-3">
-                  <span className={`text-sm text-zinc-300`}>Formato:</span>
-                  <label className="flex items-center gap-1 text-sm text-zinc-300">
-                    <input type="radio" name="downloadFormat" value="pdf" checked={downloadFormat === 'pdf'} onChange={() => setDownloadFormat('pdf')} className="accent-orange-500" />
-                    PDF
-                  </label>
-                  <label className="flex items-center gap-1 text-sm text-zinc-300">
-                    <input type="radio" name="downloadFormat" value="txt" checked={downloadFormat === 'txt'} onChange={() => setDownloadFormat('txt')} className="accent-orange-500" />
-                    TXT
-                  </label>
-                  <label className="flex items-center gap-1 text-sm text-zinc-300">
-                    <input type="radio" name="downloadFormat" value="both" checked={downloadFormat === 'both'} onChange={() => setDownloadFormat('both')} className="accent-orange-500" />
-                    Ambos
-                  </label>
-              </div>
+              {downloadDirHandle && <span className="text-xs text-zinc-400">Carpeta: {downloadDirHandle.name}</span>}
             </div>
           )}
 
