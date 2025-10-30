@@ -915,7 +915,30 @@ export default function ProcessedFilesPage() {
                             />
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                            {job.filename}
+                            <div>
+                              {job.filename}
+                              {/* 🔍 DEBUG: Mostrar acciones guardadas */}
+                              {(() => {
+                                const actions = (job.metadata as any)?.actions || [];
+                                if (actions.length > 0) {
+                                  return (
+                                    <div className="mt-1">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-blue-900/50 text-blue-300">
+                                        🔍 Acciones guardadas: {actions.join(', ')}
+                                      </span>
+                                    </div>
+                                  );
+                                } else {
+                                  return (
+                                    <div className="mt-1">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-gray-800 text-gray-400">
+                                        ⚠️ Sin acciones (archivo antiguo)
+                                      </span>
+                                    </div>
+                                  );
+                                }
+                              })()}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
                             {job.status}
