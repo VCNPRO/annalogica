@@ -217,7 +217,7 @@ export async function GET(request: NextRequest) {
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber > 1) { // Skip header
           row.alignment = { wrapText: true, vertical: 'top' };
-          row.height = undefined; // Auto height
+          // Auto height (no need to set)
         }
       });
 
