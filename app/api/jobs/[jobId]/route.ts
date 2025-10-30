@@ -131,8 +131,16 @@ export async function POST(req: NextRequest) {
 
     // 4) Hint optimista: pasa a 'processing' y sube progreso
     await TranscriptionJobDB.updateStatus(jobId, 'processing');
+    // 🔥 FIX: Preservar actions y summaryType al actualizar metadata
     await TranscriptionJobDB.updateResults(jobId, {
-      metadata: { startedAt: new Date().toISOString(), progress: 20 },
+      metadata: {
+        enqueuedAt: new Date().toISOString(),
+        mime,
+        actions,
+        summaryType,
+        startedAt: new Date().toISOString(),
+        progress: 20,
+      },
     });
 
     return NextResponse.json(

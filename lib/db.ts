@@ -304,6 +304,17 @@ export const TranscriptionJobDB = {
     // 🔥 FIX: Convertir audioDuration a integer (columna es INTEGER en BD)
     const durationInteger = results.audioDuration ? Math.floor(results.audioDuration) : null;
 
+    // 🔥 FIX: Si se proporciona metadata, hacer merge con el metadata existente
+    // en lugar de reemplazarlo completamente para preservar actions, summaryType, etc.
+    let metadataUpdate = null;
+    if (results.metadata) {
+      // Obtener job actual para hacer merge de metadata
+      const currentJob = await TranscriptionJobDB.findById(id);
+      const currentMetadata = currentJob?.metadata || {};
+      // Merge: las nuevas propiedades sobrescriben, pero se preservan las existentes
+      metadataUpdate = JSON.stringify({ ...currentMetadata, ...results.metadata });
+    }
+
     const result = await sql`
       UPDATE transcription_jobs
       SET
@@ -314,7 +325,7 @@ export const TranscriptionJobDB = {
         speakers_url = COALESCE(${results.speakersUrl || null}, speakers_url),
         summary_url = COALESCE(${results.summaryUrl || null}, summary_url),
         audio_duration_seconds = COALESCE(${durationInteger}, audio_duration_seconds),
-        metadata = COALESCE(${results.metadata || null}, metadata)
+        metadata = COALESCE(${metadataUpdate}, metadata)
       WHERE id = ${id}
     `;
     return (result.rowCount ?? 0) > 0;
