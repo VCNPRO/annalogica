@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const format = searchParams.get('format') || 'excel';
 
     // Get all processed jobs for this user
-    const jobs = await TranscriptionJobDB.findByUser(auth.userId);
+    const jobs = await TranscriptionJobDB.findByUserId(auth.userId);
 
     if (!jobs || jobs.length === 0) {
       return NextResponse.json(
