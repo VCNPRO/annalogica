@@ -358,12 +358,19 @@ export default function ProcessedFilesPage() {
 
       // 🔥 Obtener acciones solicitadas por el usuario
       const requestedActions = (job.metadata as any)?.actions || [];
-      console.log('[DownloadOrganized] Acciones solicitadas:', requestedActions);
+      const hasActions = requestedActions.length > 0;
+      console.log('[DownloadOrganized] Acciones solicitadas:', requestedActions, 'Has actions:', hasActions);
+
+      // Si no hay acciones definidas (archivos antiguos), descargar todo
+      // Si hay acciones definidas, solo descargar lo solicitado
+      const shouldDownload = (actionName: string) => {
+        return !hasActions || requestedActions.includes(actionName);
+      };
 
       const downloadTasks = [];
 
-      // Solo descargar transcripción si se pidió "Transcribir"
-      if (job.txt_url && requestedActions.includes('Transcribir')) {
+      // Solo descargar transcripción si se pidió "Transcribir" o si no hay acciones definidas
+      if (job.txt_url && shouldDownload('Transcribir')) {
         downloadTasks.push(async () => {
           const res = await fetch(job.txt_url!);
           const content = await res.text();
@@ -374,8 +381,8 @@ export default function ProcessedFilesPage() {
         });
       }
 
-      // Solo descargar resumen si se pidió "Resumir"
-      if (job.summary_url && requestedActions.includes('Resumir')) {
+      // Solo descargar resumen si se pidió "Resumir" o si no hay acciones definidas
+      if (job.summary_url && shouldDownload('Resumir')) {
         downloadTasks.push(async () => {
           const res = await fetch(job.summary_url!);
           const content = await res.text();
@@ -386,8 +393,8 @@ export default function ProcessedFilesPage() {
         });
       }
 
-      // Solo descargar SRT si se pidió "SRT" - como .txt
-      if (job.srt_url && requestedActions.includes('SRT')) {
+      // Solo descargar SRT si se pidió "SRT" o si no hay acciones definidas - como .txt
+      if (job.srt_url && shouldDownload('SRT')) {
         downloadTasks.push(async () => {
           const res = await fetch(job.srt_url!);
           const content = await res.text();
@@ -397,8 +404,8 @@ export default function ProcessedFilesPage() {
         });
       }
 
-      // Solo descargar VTT si se pidió "VTT" - como .txt
-      if (job.vtt_url && requestedActions.includes('VTT')) {
+      // Solo descargar VTT si se pidió "VTT" o si no hay acciones definidas - como .txt
+      if (job.vtt_url && shouldDownload('VTT')) {
         downloadTasks.push(async () => {
           const res = await fetch(job.vtt_url!);
           const content = await res.text();
@@ -408,8 +415,8 @@ export default function ProcessedFilesPage() {
         });
       }
 
-      // Solo descargar oradores si se pidió "Oradores"
-      if (job.speakers_url && requestedActions.includes('Oradores')) {
+      // Solo descargar oradores si se pidió "Oradores" o si no hay acciones definidas
+      if (job.speakers_url && shouldDownload('Oradores')) {
         downloadTasks.push(async () => {
           const res = await fetch(job.speakers_url!);
           const content = await res.text();
@@ -419,8 +426,8 @@ export default function ProcessedFilesPage() {
         });
       }
 
-      // Solo descargar tags si se pidió "Aplicar Tags"
-      if (job.metadata?.tags && (job.metadata?.tags as string[]).length > 0 && requestedActions.includes('Aplicar Tags')) {
+      // Solo descargar tags si se pidió "Aplicar Tags" o si no hay acciones definidas
+      if (job.metadata?.tags && (job.metadata?.tags as string[]).length > 0 && shouldDownload('Aplicar Tags')) {
         downloadTasks.push(async () => {
           const tags = (job.metadata?.tags as string[]) || [];
           const tagsText = `Tags para: ${job.filename}\n\n- ${tags.join('\n- ')}`;
@@ -453,12 +460,19 @@ export default function ProcessedFilesPage() {
 
     // 🔥 Obtener acciones solicitadas por el usuario
     const requestedActions = (job.metadata as any)?.actions || [];
-    console.log('[DownloadIndividually] Acciones solicitadas:', requestedActions);
+    const hasActions = requestedActions.length > 0;
+    console.log('[DownloadIndividually] Acciones solicitadas:', requestedActions, 'Has actions:', hasActions);
+
+    // Si no hay acciones definidas (archivos antiguos), descargar todo
+    // Si hay acciones definidas, solo descargar lo solicitado
+    const shouldDownload = (actionName: string) => {
+      return !hasActions || requestedActions.includes(actionName);
+    };
 
     const downloadTasks = [];
 
-    // Solo descargar transcripción si se pidió "Transcribir"
-    if (job.txt_url && requestedActions.includes('Transcribir')) {
+    // Solo descargar transcripción si se pidió "Transcribir" o si no hay acciones definidas
+    if (job.txt_url && shouldDownload('Transcribir')) {
       downloadTasks.push(async () => {
         const res = await fetch(job.txt_url!);
         const content = await res.text();
@@ -468,8 +482,8 @@ export default function ProcessedFilesPage() {
       });
     }
 
-    // Solo descargar resumen si se pidió "Resumir"
-    if (job.summary_url && requestedActions.includes('Resumir')) {
+    // Solo descargar resumen si se pidió "Resumir" o si no hay acciones definidas
+    if (job.summary_url && shouldDownload('Resumir')) {
       downloadTasks.push(async () => {
         const res = await fetch(job.summary_url!);
         const content = await res.text();
@@ -479,8 +493,8 @@ export default function ProcessedFilesPage() {
       });
     }
 
-    // Solo descargar SRT si se pidió "SRT" - como .txt
-    if (job.srt_url && requestedActions.includes('SRT')) {
+    // Solo descargar SRT si se pidió "SRT" o si no hay acciones definidas - como .txt
+    if (job.srt_url && shouldDownload('SRT')) {
       downloadTasks.push(async () => {
         const res = await fetch(job.srt_url!);
         const content = await res.text();
@@ -489,8 +503,8 @@ export default function ProcessedFilesPage() {
       });
     }
 
-    // Solo descargar VTT si se pidió "VTT" - como .txt
-    if (job.vtt_url && requestedActions.includes('VTT')) {
+    // Solo descargar VTT si se pidió "VTT" o si no hay acciones definidas - como .txt
+    if (job.vtt_url && shouldDownload('VTT')) {
       downloadTasks.push(async () => {
         const res = await fetch(job.vtt_url!);
         const content = await res.text();
@@ -499,8 +513,8 @@ export default function ProcessedFilesPage() {
       });
     }
 
-    // Solo descargar oradores si se pidió "Oradores"
-    if (job.speakers_url && requestedActions.includes('Oradores')) {
+    // Solo descargar oradores si se pidió "Oradores" o si no hay acciones definidas
+    if (job.speakers_url && shouldDownload('Oradores')) {
       downloadTasks.push(async () => {
         const res = await fetch(job.speakers_url!);
         const content = await res.text();
@@ -509,8 +523,8 @@ export default function ProcessedFilesPage() {
       });
     }
 
-    // Solo descargar tags si se pidió "Aplicar Tags"
-    if (job.metadata?.tags && (job.metadata?.tags as string[]).length > 0 && requestedActions.includes('Aplicar Tags')) {
+    // Solo descargar tags si se pidió "Aplicar Tags" o si no hay acciones definidas
+    if (job.metadata?.tags && (job.metadata?.tags as string[]).length > 0 && shouldDownload('Aplicar Tags')) {
       downloadTasks.push(async () => {
         const tags = (job.metadata?.tags as string[]) || [];
         const tagsText = `Tags para: ${job.filename}\n\n- ${tags.join('\n- ')}`;
@@ -914,12 +928,19 @@ export default function ProcessedFilesPage() {
                               {(() => {
                                 // 🔥 Obtener acciones solicitadas por el usuario
                                 const requestedActions = (job.metadata as any)?.actions || [];
-                                console.log('[ProcessedFiles] Job:', job.filename, 'Acciones solicitadas:', requestedActions);
+                                const hasActions = requestedActions.length > 0;
+                                console.log('[ProcessedFiles] Job:', job.filename, 'Acciones solicitadas:', requestedActions, 'Has actions:', hasActions);
+
+                                // Si no hay acciones definidas (archivos antiguos), mostrar todo
+                                // Si hay acciones definidas, solo mostrar lo solicitado
+                                const shouldShow = (actionName: string) => {
+                                  return !hasActions || requestedActions.includes(actionName);
+                                };
 
                                 return (
                                   <>
-                                    {/* Solo mostrar transcripción si se pidió "Transcribir" */}
-                                    {job.txt_url && requestedActions.includes('Transcribir') && (
+                                    {/* Solo mostrar transcripción si se pidió "Transcribir" o si no hay acciones definidas */}
+                                    {job.txt_url && shouldShow('Transcribir') && (
                                       <button
                                         onClick={async () => {
                                           try {
@@ -938,8 +959,8 @@ export default function ProcessedFilesPage() {
                                       </button>
                                     )}
 
-                                    {/* Solo mostrar SRT si se pidió "SRT" - descargar como .txt */}
-                                    {job.srt_url && requestedActions.includes('SRT') && (
+                                    {/* Solo mostrar SRT si se pidió "SRT" o si no hay acciones definidas - descargar como .txt */}
+                                    {job.srt_url && shouldShow('SRT') && (
                                       <button
                                         onClick={async () => {
                                           try {
@@ -958,8 +979,8 @@ export default function ProcessedFilesPage() {
                                       </button>
                                     )}
 
-                                    {/* Solo mostrar VTT si se pidió "VTT" - descargar como .txt */}
-                                    {job.vtt_url && requestedActions.includes('VTT') && (
+                                    {/* Solo mostrar VTT si se pidió "VTT" o si no hay acciones definidas - descargar como .txt */}
+                                    {job.vtt_url && shouldShow('VTT') && (
                                       <button
                                         onClick={async () => {
                                           try {
@@ -978,8 +999,8 @@ export default function ProcessedFilesPage() {
                                       </button>
                                     )}
 
-                                    {/* Solo mostrar resumen si se pidió "Resumir" */}
-                                    {job.summary_url && requestedActions.includes('Resumir') && (
+                                    {/* Solo mostrar resumen si se pidió "Resumir" o si no hay acciones definidas */}
+                                    {job.summary_url && shouldShow('Resumir') && (
                                       <button
                                         onClick={async () => {
                                           try {
@@ -998,8 +1019,8 @@ export default function ProcessedFilesPage() {
                                       </button>
                                     )}
 
-                                    {/* Solo mostrar oradores si se pidió "Oradores" */}
-                                    {job.speakers_url && requestedActions.includes('Oradores') && (
+                                    {/* Solo mostrar oradores si se pidió "Oradores" o si no hay acciones definidas */}
+                                    {job.speakers_url && shouldShow('Oradores') && (
                                       <button
                                         onClick={async () => {
                                           try {
@@ -1018,8 +1039,8 @@ export default function ProcessedFilesPage() {
                                       </button>
                                     )}
 
-                                    {/* Solo mostrar tags si se pidió "Aplicar Tags" */}
-                                    {job.metadata?.tags && (job.metadata?.tags as string[]).length > 0 && requestedActions.includes('Aplicar Tags') && (
+                                    {/* Solo mostrar tags si se pidió "Aplicar Tags" o si no hay acciones definidas */}
+                                    {job.metadata?.tags && (job.metadata?.tags as string[]).length > 0 && shouldShow('Aplicar Tags') && (
                                       <button
                                         onClick={async () => {
                                           try {
