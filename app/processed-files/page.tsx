@@ -212,7 +212,7 @@ export default function ProcessedFilesPage() {
   };
 
   const handleDeleteJob = async (jobId: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este archivo procesado y todos sus resultados?')) {
+    if (!confirm(t('processedFiles.confirmDelete'))) {
       return;
     }
 
@@ -228,10 +228,10 @@ export default function ProcessedFilesPage() {
       }
 
       setProcessedJobs(prev => prev.filter(job => job.id !== jobId));
-      showNotification('Archivo procesado eliminado correctamente.', 'success');
+      showNotification(t('processedFiles.fileDeleted'), 'success');
     } catch (err: any) {
       console.error('Error deleting job:', err);
-      showNotification(`Error al eliminar: ${err.message}`, 'error');
+      showNotification(t('processedFiles.deleteError', { error: err.message }), 'error');
     }
   };
 
@@ -241,7 +241,7 @@ export default function ProcessedFilesPage() {
       return;
     }
 
-    if (!confirm(`¿Estás seguro de que quieres eliminar ${selectedJobs.size} archivo(s) seleccionado(s)?`)) {
+    if (!confirm(t('processedFiles.confirmDeleteMultiple', { count: selectedJobs.size }))) {
       return;
     }
 
@@ -553,7 +553,7 @@ export default function ProcessedFilesPage() {
     }
 
     if (!downloadDirHandle && 'showDirectoryPicker' in window) {
-      showNotification('Por favor, elige una carpeta de destino primero.', 'error');
+      showNotification(t('processedFiles.selectFolderFirst'), 'error');
       return;
     }
 
@@ -571,7 +571,7 @@ export default function ProcessedFilesPage() {
 
   const handleIndividualDownload = async (url: string | undefined, downloadFilename: string) => {
     if (!url) {
-      showNotification('No hay archivo disponible para este tipo de descarga.', 'error');
+      showNotification(t('processedFiles.fileNotAvailable'), 'error');
       return;
     }
     try {
@@ -581,7 +581,7 @@ export default function ProcessedFilesPage() {
       triggerDownload(blob, downloadFilename);
     } catch (err: any) {
       console.error(`Error al descargar ${downloadFilename}:`, err);
-      showNotification(`Error al descargar: ${err.message}`, 'error');
+      showNotification(t('processedFiles.downloadingError', { error: err.message }), 'error');
     }
   };
 
@@ -653,7 +653,7 @@ export default function ProcessedFilesPage() {
                 )}
                 <div className="border-t border-zinc-700 pt-2 mt-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-zinc-300">Horas transcritas:</span>
+                    <span className="text-zinc-300">{t('processedFiles.hoursTranscribed')}</span>
                     <span className="text-green-400 font-semibold">{userStats.totalHours}h</span>
                   </div>
                 </div>
@@ -665,12 +665,9 @@ export default function ProcessedFilesPage() {
           <div className="bg-zinc-800 rounded-lg p-4 mb-4">
             <div className="flex items-start gap-2 mb-2">
               <Info className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
-              <h3 className="text-sm font-medium text-white">Política de Retención</h3>
+              <h3 className="text-sm font-medium text-white">{t('processedFiles.retentionPolicy')}</h3>
             </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Los archivos procesados se conservan durante <span className="text-white font-medium">30 días</span>.
-              Los archivos originales de audio/video se eliminan automáticamente tras el procesamiento.
-            </p>
+            <p className="text-xs text-zinc-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('processedFiles.retentionText') }} />
           </div>
 
           <div className="mt-auto">
@@ -693,7 +690,7 @@ export default function ProcessedFilesPage() {
             {/* Translation language selector */}
             <div className="flex items-center gap-3">
               <label htmlFor="target-language" className="text-sm text-zinc-400">
-                Idioma para traducir:
+                {t('processedFiles.translateLanguage')}
               </label>
               <select
                 id="target-language"
@@ -730,7 +727,7 @@ export default function ProcessedFilesPage() {
                 </div>
                 <input
                   type="text"
-                  placeholder="Buscar por nombre o código..."
+                  placeholder={t('processedFiles.searchPlaceholder')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white placeholder-zinc-400 focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -751,9 +748,9 @@ export default function ProcessedFilesPage() {
                 onChange={(e) => setFilterType(e.target.value as any)}
                 className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
-                <option value="all">Todos los tipos</option>
-                <option value="audio">🎙️ Solo Audio</option>
-                <option value="document">📄 Solo Documentos</option>
+                <option value="all">{t('processedFiles.allTypes')}</option>
+                <option value="audio">{t('processedFiles.audioOnly')}</option>
+                <option value="document">{t('processedFiles.documentsOnly')}</option>
               </select>
 
               {/* Download Selected Button */}
@@ -770,13 +767,13 @@ export default function ProcessedFilesPage() {
               <button
                 onClick={async () => {
                   if (!('showDirectoryPicker' in window)) {
-                    showNotification('Tu navegador no soporta la selección de carpetas.', 'error');
+                    showNotification(t('processedFiles.browserNotSupported'), 'error');
                     return;
                   }
                   try {
                     const handle = await (window as any).showDirectoryPicker();
                     setDownloadDirHandle(handle);
-                    showNotification(`Carpeta seleccionada: "${handle.name}"`, 'success');
+                    showNotification(t('processedFiles.folderSelected', { name: handle.name }), 'success');
                   } catch (err) {
                     console.error('Error al seleccionar carpeta:', err);
                   }
@@ -784,7 +781,7 @@ export default function ProcessedFilesPage() {
                 className="inline-flex items-center px-3 py-2 border border-zinc-600 text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 title="Elegir carpeta de destino"
               >
-                📁 Carpeta
+                {t('processedFiles.folder')}
               </button>
 
               {/* Clear Filters Button */}
@@ -794,13 +791,13 @@ export default function ProcessedFilesPage() {
                   className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white text-sm rounded-lg transition-colors flex items-center gap-1"
                 >
                   <X className="h-3 w-3" />
-                  Limpiar
+                  {t('processedFiles.clear')}
                 </button>
               )}
 
               {/* Results Count */}
               <span className="text-sm text-zinc-400 ml-auto">
-                {filteredJobs.length} de {processedJobs.length} archivos
+                {t('processedFiles.filesCount', { filtered: filteredJobs.length, total: processedJobs.length })}
               </span>
             </div>
           </div>
@@ -809,7 +806,7 @@ export default function ProcessedFilesPage() {
           {filteredJobs.length > 0 && (
             <div className="mb-4 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <span className="text-sm text-zinc-400">Exportar todo:</span>
+                <span className="text-sm text-zinc-400">{t('processedFiles.exportAll')}</span>
                 <button
                   onClick={async () => {
                     try {
@@ -857,7 +854,7 @@ export default function ProcessedFilesPage() {
                   📊 Excel
                 </button>
               </div>
-              {downloadDirHandle && <span className="text-xs text-zinc-400">Carpeta: {downloadDirHandle.name}</span>}
+              {downloadDirHandle && <span className="text-xs text-zinc-400">{t('processedFiles.folderLabel')} {downloadDirHandle.name}</span>}
             </div>
           )}
 
@@ -880,7 +877,7 @@ export default function ProcessedFilesPage() {
               {selectedJobs.size > 0 && (
                 <div className="mb-4 flex items-center justify-between bg-zinc-900 rounded-lg border border-zinc-800 p-4">
                   <span className="text-white">
-                    {selectedJobs.size} archivo(s) seleccionado(s)
+                    {t('processedFiles.filesSelected', { count: selectedJobs.size })}
                   </span>
                   <button
                     onClick={handleDeleteSelected}
@@ -905,19 +902,19 @@ export default function ProcessedFilesPage() {
                         />
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                        Archivo Original
+                        {t('processedFiles.originalFile')}
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                        Estado
+                        {t('processedFiles.status')}
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                        Fecha
+                        {t('processedFiles.date')}
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">
-                        Descargas
+                        {t('processedFiles.downloads')}
                       </th>
                       <th scope="col" className="relative px-6 py-3">
-                        <span className="sr-only">Acciones</span>
+                        <span className="sr-only">{t('processedFiles.actions')}</span>
                       </th>
                     </tr>
                   </thead>
