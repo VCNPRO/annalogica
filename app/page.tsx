@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, BookOpen, LogOut } from 'lucide-react';
 import jsPDF from 'jspdf';
 import ExcelJS from 'exceljs';
+import { useTranslations } from '@/hooks/useTranslations';
 
 // OpenAI Whisper V3 + GPT-4o + Inngest - Arquitectura asíncrona con polling
 
@@ -67,6 +68,7 @@ interface User {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { t, loading: translationsLoading } = useTranslations();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
@@ -1001,11 +1003,11 @@ export default function Dashboard() {
 
   const getStatusText = (status: FileStatus) => {
     switch (status) {
-      case 'uploading': return 'Subiendo';
-      case 'pending': return 'Pendiente';
-      case 'processing': return 'Procesando';
-      case 'completed': return 'Completado';
-      case 'error': return 'Error';
+      case 'uploading': return t('dashboard.status.uploading');
+      case 'pending': return t('dashboard.status.pending');
+      case 'processing': return t('dashboard.status.processing');
+      case 'completed': return t('dashboard.status.completed');
+      case 'error': return t('dashboard.status.error');
     }
   };
 
@@ -1098,7 +1100,7 @@ export default function Dashboard() {
           <div className="flex flex-col mb-6">
             <div className="flex items-baseline gap-x-3">
               <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>
-              <span className={textSecondary}>trabajando para</span>
+              <span className={textSecondary}>{t('dashboard.workingFor')}</span>
             </div>
             {(user?.name || user?.email) && (
               <p className={`text-white text-xl font-medium -mt-1 ml-1`}>{user.name || user.email}</p>
@@ -1112,18 +1114,18 @@ export default function Dashboard() {
               onDragOver={handleDragOver}
             >
               <p className={`text-xs ${textSecondary} mb-3`}>
-                Archivos admitidos: Audio, Video, TXT, DOCX, PDF.
+                {t('dashboard.uploadFiles')}
               </p>
               <div className={`${textSecondary} mb-3`}>
                 <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
-              <p className={`text-xs ${textSecondary} mb-1`}>Arrastra y suelta hasta 50 archivos aquí</p>
-              <p className={`text-xs ${textSecondary} mb-2`}>o</p>
+              <p className={`text-xs ${textSecondary} mb-1`}>{t('dashboard.dragDrop')}</p>
+              <p className={`text-xs ${textSecondary} mb-2`}>{t('dashboard.or')}</p>
               <label>
                 <span className="text-orange-500 text-xs font-medium hover:text-orange-600 cursor-pointer">
-                  Selecciona archivos de tu equipo
+                  {t('dashboard.selectFiles')}
                 </span>
                 <input
                   type="file"
@@ -1145,9 +1147,9 @@ export default function Dashboard() {
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-orange-500 text-sm">🤖</span>
-              <h2 className={`text-sm font-medium ${textPrimary}`}>Acciones IA</h2>
+              <h2 className={`text-sm font-medium ${textPrimary}`}>{t('dashboard.aiActions')}</h2>
             </div>
-            <p className={`text-xs ${textSecondary} mb-3`}>Selecciona archivos y aplica acciones.</p>
+            <p className={`text-xs ${textSecondary} mb-3`}>{t('dashboard.selectFilesAndActions')}</p>
 
             <div className="space-y-2">
               {/* Fila 1: Transcribir + Oradores */}
@@ -1156,17 +1158,17 @@ export default function Dashboard() {
                   onClick={() => !hasDocuments && handleApplyAction('Transcribir')}
                   className={`p-2 ${canTranscribe && !hasDocuments ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
                   disabled={!canTranscribe || hasDocuments}
-                  title={hasDocuments ? 'No disponible para documentos' : 'Transcribir audio/video a texto'}
+                  title={hasDocuments ? t('dashboard.notAvailableForDocs') : t('dashboard.transcribe')}
                 >
-                  📝 Transcribir
+                  📝 {t('dashboard.transcribe')}
                 </button>
                 <button
                   onClick={() => !hasDocuments && handleApplyAction('Oradores')}
                   className={`p-2 ${hasDocuments ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'} text-white rounded-lg text-xs font-medium transition-colors`}
                   disabled={hasDocuments}
-                  title={hasDocuments ? 'No disponible para documentos' : 'Identificar y analizar hablantes'}
+                  title={hasDocuments ? t('dashboard.notAvailableForDocs') : t('dashboard.speakers')}
                 >
-                  🎙️ Oradores
+                  🎙️ {t('dashboard.speakers')}
                 </button>
               </div>
 
@@ -1175,9 +1177,9 @@ export default function Dashboard() {
                 <button
                   onClick={() => handleApplyAction('Resumir')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                  title="Generar resumen del contenido"
+                  title={t('dashboard.summary')}
                 >
-                  📋 Resumen
+                  📋 {t('dashboard.summary')}
                 </button>
                 <div className="flex items-center justify-around gap-1 text-xs">
                   <label className="flex items-center gap-1">
@@ -1188,7 +1190,7 @@ export default function Dashboard() {
                       checked={summaryType === 'short'}
                       onChange={() => setSummaryType('short')}
                     />
-                    <span className={textSecondary}>Corto</span>
+                    <span className={textSecondary}>{t('dashboard.short')}</span>
                   </label>
                   <label className="flex items-center gap-1">
                     <input
@@ -1198,7 +1200,7 @@ export default function Dashboard() {
                       checked={summaryType === 'detailed'}
                       onChange={() => setSummaryType('detailed')}
                     />
-                    <span className={textSecondary}>Detallado</span>
+                    <span className={textSecondary}>{t('dashboard.detailed')}</span>
                   </label>
                 </div>
               </div>
@@ -1209,9 +1211,9 @@ export default function Dashboard() {
                   onClick={() => !hasDocuments && handleApplyAction('Subtítulos')}
                   className={`p-2 ${hasDocuments ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'} text-white rounded-lg text-xs font-medium transition-colors`}
                   disabled={hasDocuments}
-                  title={hasDocuments ? 'No disponible para documentos' : 'Generar archivos de subtítulos'}
+                  title={hasDocuments ? t('dashboard.notAvailableForDocs') : t('dashboard.subtitles')}
                 >
-                  📄 Subtítulos
+                  📄 {t('dashboard.subtitles')}
                 </button>
                 <div className="flex items-center justify-around gap-1 text-xs">
                   <label className={`flex items-center gap-1 ${hasDocuments ? 'opacity-50 cursor-not-allowed' : ''}`}>
@@ -1246,16 +1248,16 @@ export default function Dashboard() {
                 <button
                   onClick={() => handleApplyAction('Etiquetas')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                  title="Generar etiquetas temáticas"
+                  title={t('dashboard.tags')}
                 >
-                  🏷️ Etiquetas
+                  🏷️ {t('dashboard.tags')}
                 </button>
                 <Link
                   href="/processed-files"
                   className="flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors"
-                  title="Ver todos los archivos procesados"
+                  title={t('dashboard.processedFiles')}
                 >
-                  ✅ Archivos Procesados
+                  ✅ {t('dashboard.processedFiles')}
                 </Link>
               </div>
 
@@ -1265,13 +1267,13 @@ export default function Dashboard() {
                   onClick={() => hasDocuments && handleApplyAction('GenerarAudio')}
                   className={`p-2 ${hasDocuments ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
                   disabled={!hasDocuments}
-                  title={hasDocuments ? 'Generar audio narrado del texto (TTS)' : 'Solo disponible para documentos'}
+                  title={hasDocuments ? t('dashboard.generateAudio') : t('dashboard.onlyForDocs')}
                 >
-                  🎤 Generar Audio
+                  🎤 {t('dashboard.generateAudio')}
                 </button>
                 <div className="flex items-center justify-center text-xs">
                   <span className={`${textSecondary} text-[10px]`}>
-                    {hasDocuments ? '🔊 Voz natural AI' : 'Solo para PDFs/Docs'}
+                    {hasDocuments ? `🔊 ${t('dashboard.naturalVoice')}` : t('dashboard.onlyForDocs')}
                   </span>
                 </div>
               </div>
@@ -1281,11 +1283,11 @@ export default function Dashboard() {
                 onClick={handleProcessSelectedFiles}
                 className="w-full p-3 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-bold transition-colors mt-3 shadow-lg"
               >
-                🚀 Procesar Archivos Seleccionados
+                🚀 {t('dashboard.processSelectedFiles')}
               </button>
             </div>
             <p className={`text-xs ${textSecondary} text-center mt-2`}>
-              💡 Selecciona archivos y acciones, luego presiona Procesar
+              💡 {t('dashboard.tipSelectFiles')}
             </p>
           </div>
 
@@ -1294,28 +1296,28 @@ export default function Dashboard() {
               © 2025 Annalogica by videoconversion digital lab, S.L.
             </p>
             <div className="flex justify-center gap-3 text-xs mb-2">
-              <a href="/privacy" className={`${textSecondary} hover:text-orange-500`}>Privacidad</a>
-              <a href="/terms" className={`${textSecondary} hover:text-orange-500`}>Términos</a>
-              <a href="/settings#contacto" className={`${textSecondary} hover:text-orange-500`}>Contacto</a>
+              <a href="/privacy" className={`${textSecondary} hover:text-orange-500`}>{t('nav.privacy')}</a>
+              <a href="/terms" className={`${textSecondary} hover:text-orange-500`}>{t('nav.terms')}</a>
+              <a href="/settings#contacto" className={`${textSecondary} hover:text-orange-500`}>{t('nav.contact')}</a>
             </div>
             <div className={`text-xs ${textSecondary} text-center space-y-1`}>
-              <p>soporte@annalogica.eu | ventas@annalogica.eu</p>
+              <p>{t('dashboard.emails')}</p>
             </div>
           </div>
         </div>
 
         <div className="flex-1 p-6 overflow-y-auto flex flex-col" style={{ height: '100%' }}>
           <div className="mb-6 flex justify-start">
-            <label htmlFor="language-select" className="sr-only">Idioma del Contenido</label>
+            <label htmlFor="language-select" className="sr-only">{t('dashboard.contentLanguage')}</label>
             <select
                 id="language-select"
                 className={`p-2 ${bgSecondary} rounded-lg shadow-sm ${border} border ${textPrimary} text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 style={{ minWidth: '180px' }}
-                title="Selecciona el idioma del audio/video"
+                title={t('dashboard.contentLanguage')}
             >
-                <option value="auto">Detección automática</option>
+                <option value="auto">{t('dashboard.autoDetect')}</option>
                 <option value="es">Español</option>
                 <option value="ca">Català</option>
                 <option value="eu">Euskera</option>
@@ -1339,9 +1341,9 @@ export default function Dashboard() {
                     className="form-checkbox h-4 w-4 text-orange-500 rounded"
                   />
                   <span className="text-orange-500 text-sm">📁</span>
-                  <h2 className={`text-sm font-medium ${textPrimary}`}>Archivos Cargados</h2>
+                  <h2 className={`text-sm font-medium ${textPrimary}`}>{t('dashboard.uploadedFiles')}</h2>
                 </div>
-                <p className={`text-xs ${textSecondary}`}>Todos los archivos: en proceso, pendientes y procesados</p>
+                <p className={`text-xs ${textSecondary}`}>{t('dashboard.allFiles')}</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -1371,10 +1373,10 @@ export default function Dashboard() {
                     }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
-                  title="Reiniciar procesamiento de archivos seleccionados"
+                  title={t('dashboard.restart')}
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  Reiniciar
+                  {t('dashboard.restart')}
                 </button>
                 <button
                   onClick={async () => {
@@ -1413,10 +1415,10 @@ export default function Dashboard() {
                     showNotification(`${total} archivo(s) eliminado(s) correctamente`, 'success');
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
-                  title="Eliminar archivos seleccionados"
+                  title={t('common.delete')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  Eliminar
+                  {t('common.delete')}
                 </button>
               </div>
             </div>
@@ -1471,7 +1473,7 @@ export default function Dashboard() {
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
                               </span>
-                              <span className={`text-sm font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>Subiendo archivo...</span>
+                              <span className={`text-sm font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>{t('dashboard.uploadingFile')}</span>
                             </div>
                             <span className={`text-sm font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>{file.uploadProgress.toFixed(0)}%</span>
                           </div>
@@ -1502,7 +1504,7 @@ export default function Dashboard() {
                                 </span>
                               )}
                               <span className={`text-sm font-medium ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
-                                {(file.processingProgress || 0) >= 98 ? '🟡 Finalizando...' : (file.processingProgress || 0) >= 90 ? '⚡ Generando resumen' : '🎙️ Transcribiendo'}
+                                {(file.processingProgress || 0) >= 98 ? `🟡 ${t('dashboard.finalizing')}` : (file.processingProgress || 0) >= 90 ? `⚡ ${t('dashboard.generatingSummary')}` : `🎙️ ${t('dashboard.transcribing')}`}
                               </span>
                             </div>
                             <span className={`text-sm font-bold ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>{file.processingProgress || 0}%</span>
