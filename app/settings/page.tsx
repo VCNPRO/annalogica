@@ -252,7 +252,7 @@ export default function Settings() {
 
             <div className="space-y-4">
               <div>
-                <label className={`block text-sm font-medium mb-2 ${textPrimary}`}>{t('nav.settings')} {t('languages.' + language)}</label>
+                <label className={`block text-sm font-medium mb-2 ${textPrimary}`}>{t('languages.' + language)}</label>
                 <select
                   value={language}
                   onChange={(e) => changeLanguage(e.target.value)}

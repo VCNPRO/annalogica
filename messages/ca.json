@@ -180,5 +180,18 @@
     "pt": "Português",
     "it": "Italiano",
     "de": "Deutsch"
+  },
+  "subscription": {
+    "yourPlan": "El teu Pla",
+    "limitReached": "Límit assolit! Millora per continuar.",
+    "filesRemaining": "Et queden {count} arxius aquest mes",
+    "upgrade": "Millorar",
+    "filesUsed": "Arxius utilitzats",
+    "used": "utilitzat",
+    "available": "{count} disponibles",
+    "noFilesAvailable": "Sense arxius disponibles",
+    "renews": "Es renova el",
+    "inDays": "en {days} dies",
+    "soon": "pròximament"
   }
 }

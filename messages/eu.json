@@ -180,5 +180,18 @@
     "pt": "Português",
     "it": "Italiano",
     "de": "Deutsch"
+  },
+  "subscription": {
+    "yourPlan": "Zure Plana",
+    "limitReached": "Muga lortuta! Hobetu jarraitzeko.",
+    "filesRemaining": "{count} fitxategi geratzen zaizkizu hilabete honetan",
+    "upgrade": "Hobetu",
+    "filesUsed": "Erabilitako fitxategiak",
+    "used": "erabilitako",
+    "available": "{count} eskuragarri",
+    "noFilesAvailable": "Ez dago fitxategirik eskuragarri",
+    "renews": "Berrituko da",
+    "inDays": "{days} egunetan",
+    "soon": "laster"
   }
 }

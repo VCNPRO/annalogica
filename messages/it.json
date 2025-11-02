@@ -180,5 +180,18 @@
     "pt": "Português",
     "it": "Italiano",
     "de": "Deutsch"
+  },
+  "subscription": {
+    "yourPlan": "Il tuo Piano",
+    "limitReached": "Limite raggiunto! Aggiorna per continuare.",
+    "filesRemaining": "Ti rimangono {count} file questo mese",
+    "upgrade": "Aggiornare",
+    "filesUsed": "File utilizzati",
+    "used": "utilizzato",
+    "available": "{count} disponibili",
+    "noFilesAvailable": "Nessun file disponibile",
+    "renews": "Si rinnova il",
+    "inDays": "tra {days} giorni",
+    "soon": "presto"
   }
 }
