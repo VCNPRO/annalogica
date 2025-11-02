@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
-import { verifyAuth } from '@/lib/auth';
+import { verifyRequestAuth } from '@/lib/auth';
 
 const SUPPORTED_LANGUAGES = ['es', 'ca', 'eu', 'gl', 'en', 'fr', 'pt', 'it', 'de'];
 
 export async function PATCH(request: NextRequest) {
   try {
     // Verify authentication
-    const user = await verifyAuth(request);
+    const user = verifyRequestAuth(request);
     if (!user) {
       return NextResponse.json(
         { error: 'No autenticado' },
@@ -49,7 +49,7 @@ export async function PATCH(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     // Verify authentication
-    const user = await verifyAuth(request);
+    const user = verifyRequestAuth(request);
     if (!user) {
       return NextResponse.json(
         { error: 'No autenticado' },
