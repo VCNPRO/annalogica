@@ -87,7 +87,8 @@
     "autoDetect": "Detekzio automatikoa",
     "contentLanguage": "Edukiaren Hizkuntza",
     "copyright": "© 2025 Annalogica by videoconversion digital lab, S.L.",
-    "emails": "soporte@annalogica.eu | ventas@annalogica.eu"
+    "emails": "soporte@annalogica.eu | ventas@annalogica.eu",
+    "noFilesYet": "Ez dago fitxategirik kargatuta oraindik."
   },
   "settings": {
     "title": "ezarpenak",

@@ -417,50 +417,50 @@ export default function Settings() {
                   showNotification(t('settings.openingEmail'), 'success');
                 }} className="space-y-3">
                   <div>
-                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>Nombre</label>
+                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>{t('settings.name')}</label>
                     <input
                       type="text"
                       name="nombre"
                       required
                       className={`w-full p-2 border ${border} rounded ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500`}
-                      placeholder="Tu nombre"
+                      placeholder={t('settings.yourName')}
                     />
                   </div>
                   <div>
-                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>Email</label>
+                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>{t('settings.email')}</label>
                     <input
                       type="email"
                       name="email"
                       required
                       className={`w-full p-2 border ${border} rounded ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500`}
-                      placeholder="tu@email.com"
+                      placeholder={t('settings.yourEmail')}
                     />
                   </div>
                   <div>
-                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>Asunto</label>
+                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>{t('settings.subject')}</label>
                     <input
                       type="text"
                       name="asunto"
                       required
                       className={`w-full p-2 border ${border} rounded ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500`}
-                      placeholder="¿En qué podemos ayudarte?"
+                      placeholder={t('settings.howCanWeHelp')}
                     />
                   </div>
                   <div>
-                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>Mensaje</label>
+                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>{t('settings.message')}</label>
                     <textarea
                       name="mensaje"
                       required
                       rows={4}
                       className={`w-full p-2 border ${border} rounded ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500`}
-                      placeholder="Cuéntanos más..."
+                      placeholder={t('settings.tellUsMore')}
                     />
                   </div>
                   <button
                     type="submit"
                     className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded text-xs font-medium transition-colors"
                   >
-                    📧 Enviar mensaje
+                    📧 {t('settings.sendMessageBtn')}
                   </button>
                 </form>
               </div>
@@ -476,37 +476,26 @@ export default function Settings() {
                     </div>
                     <div className="space-y-1 pl-6">
                       <a href="mailto:soporte@annalogica.eu" className={`block text-xs ${textSecondary} hover:text-orange-500`}>
-                        📧 soporte@annalogica.eu
+                        📧 {t('settings.supportEmail')}
                       </a>
-                      <p className={`text-[10px] ${textSecondary}`}>Para consultas técnicas y soporte</p>
+                      <p className={`text-[10px] ${textSecondary}`}>{t('settings.supportDesc')}</p>
                     </div>
                     <div className="space-y-1 pl-6 mt-2">
                       <a href="mailto:ventas@annalogica.eu" className={`block text-xs ${textSecondary} hover:text-orange-500`}>
-                        💼 ventas@annalogica.eu
+                        💼 {t('settings.salesEmail')}
                       </a>
-                      <p className={`text-[10px] ${textSecondary}`}>Para consultas comerciales y ventas</p>
+                      <p className={`text-[10px] ${textSecondary}`}>{t('settings.salesDesc')}</p>
                     </div>
                   </div>
 
                   <div className={`p-3 rounded-lg border ${border}`}>
                     <div className="flex items-center gap-2 mb-2">
                       <MapPin className="h-4 w-4 text-orange-500" />
-                      <span className={`text-xs font-semibold ${textPrimary}`}>Dirección</span>
+                      <span className={`text-xs font-semibold ${textPrimary}`}>{t('settings.address')}</span>
                     </div>
                     <div className="pl-6">
-                      <p className={`text-xs ${textSecondary}`}>videoconversion digital lab, S.L.</p>
-                      <p className={`text-xs ${textSecondary}`}>Barcelona, España</p>
-                    </div>
-                  </div>
-
-                  <div className={`p-3 rounded-lg border ${border} ${darkMode ? 'bg-orange-900/20' : 'bg-orange-50'}`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="h-4 w-4 text-orange-500" />
-                      <span className={`text-xs font-semibold ${textPrimary}`}>Horario de atención</span>
-                    </div>
-                    <div className="pl-6">
-                      <p className={`text-xs ${textSecondary}`}>Lunes a Viernes: 9:00 - 18:00 (CET)</p>
-                      <p className={`text-xs ${textSecondary}`}>Fin de semana: Cerrado</p>
+                      <p className={`text-xs ${textSecondary}`}>{t('settings.companyName')}</p>
+                      <p className={`text-xs ${textSecondary}`}>{t('settings.location')}</p>
                     </div>
                   </div>
                 </div>
@@ -518,31 +507,31 @@ export default function Settings() {
           <div className={`${bgSecondary} rounded-lg ${border} border p-6 lg:col-span-2`}>
             <div className="flex items-center gap-3 mb-4">
               <Clock className="h-5 w-5 text-blue-500" />
-              <h2 className={`text-lg font-semibold ${textPrimary}`}>Política de Retención de Archivos</h2>
+              <h2 className={`text-lg font-semibold ${textPrimary}`}>{t('settings.retentionPolicy')}</h2>
             </div>
 
             <div className={`${darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'} border rounded-lg p-5`}>
               <div className="space-y-4 text-sm">
                 <p className={`font-medium ${darkMode ? 'text-blue-100' : 'text-blue-900'}`}>
-                  Los archivos procesados se almacenan temporalmente en nuestros servidores por un máximo de <strong className={darkMode ? 'text-blue-400' : 'text-blue-600'}>30 días</strong>.
+                  {t('settings.retentionDescription')} <strong className={darkMode ? 'text-blue-400' : 'text-blue-600'}>{t('settings.days')}</strong>.
                 </p>
 
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <p className={`font-semibold mb-2 ${darkMode ? 'text-blue-200' : 'text-blue-800'}`}>✅ Archivos guardados (30 días):</p>
+                    <p className={`font-semibold mb-2 ${darkMode ? 'text-blue-200' : 'text-blue-800'}`}>✅ {t('settings.savedFiles')}</p>
                     <ul className={`list-disc list-inside pl-2 space-y-1 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                      <li>Transcripciones (TXT)</li>
-                      <li>Subtítulos (SRT y VTT)</li>
-                      <li>Resúmenes (TXT)</li>
-                      <li>Tags y metadatos</li>
+                      <li>{t('settings.transcriptionsTxt')}</li>
+                      <li>{t('settings.subtitlesSrtVtt')}</li>
+                      <li>{t('settings.summariesTxt')}</li>
+                      <li>{t('settings.tagsMetadata')}</li>
                     </ul>
                   </div>
 
                   <div>
-                    <p className={`font-semibold mb-2 ${darkMode ? 'text-blue-200' : 'text-blue-800'}`}>❌ NO se guardan:</p>
+                    <p className={`font-semibold mb-2 ${darkMode ? 'text-blue-200' : 'text-blue-800'}`}>❌ {t('settings.notSaved')}</p>
                     <ul className={`list-disc list-inside pl-2 space-y-1 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                      <li>Archivos de audio/video originales</li>
-                      <li className="text-xs italic">(Se eliminan tras el procesamiento)</li>
+                      <li>{t('settings.originalFiles')}</li>
+                      <li className="text-xs italic">{t('settings.deletedAfterProcessing')}</li>
                     </ul>
                   </div>
                 </div>
@@ -551,10 +540,9 @@ export default function Settings() {
                   <div className="flex gap-3">
                     <span className={`text-lg ${darkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>⚠️</span>
                     <div>
-                      <p className={`font-semibold text-sm mb-1 ${darkMode ? 'text-yellow-200' : 'text-yellow-900'}`}>Importante</p>
+                      <p className={`font-semibold text-sm mb-1 ${darkMode ? 'text-yellow-200' : 'text-yellow-900'}`}>{t('settings.importantWarning')}</p>
                       <p className={`text-xs ${darkMode ? 'text-yellow-300' : 'text-yellow-800'}`}>
-                        Descarga todos tus archivos procesados antes de que se cumplan los 30 días.
-                        Pasado ese plazo, los archivos se eliminarán <strong>automáticamente y de forma permanente</strong> de nuestros servidores.
+                        {t('settings.downloadBeforeExpiry')} <strong>{t('settings.automaticallyPermanently')}</strong> {t('settings.fromServers')}
                       </p>
                     </div>
                   </div>
@@ -563,7 +551,7 @@ export default function Settings() {
                 <div className="flex items-start gap-2 pt-2">
                   <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
                   <p className={`text-xs ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                    Esta política garantiza la privacidad de tus datos y el cumplimiento con regulaciones de protección de datos (GDPR/LOPD).
+                    {t('settings.privacyCompliance')}
                   </p>
                 </div>
               </div>

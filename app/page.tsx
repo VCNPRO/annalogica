@@ -1426,7 +1426,7 @@ export default function Dashboard() {
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 200px)' }}>
               {uploadedFiles.length === 0 ? (
                 <div className="px-4 py-8 text-center">
-                  <p className={`text-xs ${textSecondary}`}>No hay archivos cargados aún.</p>
+                  <p className={`text-xs ${textSecondary}`}>{t('dashboard.noFilesYet')}</p>
                 </div>
               ) : (
                 uploadedFiles.map((file) => (

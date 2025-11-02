@@ -87,7 +87,8 @@
     "autoDetect": "Automatische Erkennung",
     "contentLanguage": "Inhaltssprache",
     "copyright": "© 2025 Annalogica by videoconversion digital lab, S.L.",
-    "emails": "soporte@annalogica.eu | ventas@annalogica.eu"
+    "emails": "soporte@annalogica.eu | ventas@annalogica.eu",
+    "noFilesYet": "Noch keine Dateien hochgeladen."
   },
   "settings": {
     "title": "einstellungen",

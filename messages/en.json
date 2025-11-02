@@ -87,7 +87,8 @@
     "autoDetect": "Auto-detect",
     "contentLanguage": "Content Language",
     "copyright": "© 2025 Annalogica by videoconversion digital lab, S.L.",
-    "emails": "soporte@annalogica.eu | ventas@annalogica.eu"
+    "emails": "soporte@annalogica.eu | ventas@annalogica.eu",
+    "noFilesYet": "No files uploaded yet."
   },
   "settings": {
     "title": "settings",
@@ -180,6 +181,15 @@
     "pt": "Português",
     "it": "Italiano",
     "de": "Deutsch"
+  },
+  "processedFiles": {
+    "title": "Processed Files",
+    "summary": "Files Summary",
+    "totalProcessed": "Total processed:",
+    "inProcess": "In process:",
+    "backToDashboard": "Back to Dashboard",
+    "download": "Download",
+    "deleteSelected": "Delete Selected"
   },
   "subscription": {
     "yourPlan": "Your Plan",

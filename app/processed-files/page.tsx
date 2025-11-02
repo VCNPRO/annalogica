@@ -7,6 +7,7 @@ import { Trash2, Download, ArrowLeft, Settings, Info, Languages, Search, Filter,
 import jsPDF from 'jspdf'; // Assuming jsPDF is used for PDF generation
 import { useNotification } from '@/hooks/useNotification';
 import { Toast } from '@/components/Toast';
+import { useTranslations } from '@/hooks/useTranslations';
 
 // 🎤 Componente para el reproductor de audio de un job
 interface ProcessedJob {
@@ -37,6 +38,7 @@ interface User {
 
 export default function ProcessedFilesPage() {
   const router = useRouter();
+  const { t } = useTranslations();
   const { notification, showNotification } = useNotification();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -616,15 +618,15 @@ export default function ProcessedFilesPage() {
           <nav className="flex flex-col space-y-2 mb-6">
             <Link href="/" className="flex items-center gap-2 p-3 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium transition-colors">
               <ArrowLeft className="h-4 w-4" />
-              <span>Volver al Dashboard</span>
+              <span>{t('processedFiles.backToDashboard')}</span>
             </Link>
             <Link href="/processed-files" className="flex items-center gap-2 p-3 rounded-lg bg-black text-white font-medium">
               <span className="text-green-500">✅</span>
-              <span>Archivos Procesados</span>
+              <span>{t('processedFiles.title')}</span>
             </Link>
             <Link href="/settings" className="flex items-center gap-2 p-3 rounded-lg hover:bg-zinc-800 text-white transition-colors">
               <Settings className="h-4 w-4 text-zinc-400" />
-              <span>Ajustes</span>
+              <span>{t('nav.settings')}</span>
             </Link>
           </nav>
 
@@ -632,15 +634,15 @@ export default function ProcessedFilesPage() {
           {userStats && (
             <div className="bg-zinc-800 rounded-lg p-4 mb-4">
               <h3 className="text-sm font-medium text-zinc-400 mb-3">
-                📊 Resumen de Archivos
+                📊 {t('processedFiles.summary')}
               </h3>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-300">Total procesados:</span>
+                  <span className="text-zinc-300">{t('processedFiles.totalProcessed')}</span>
                   <span className="text-orange-500 font-semibold">{userStats.completed}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-zinc-300">En proceso:</span>
+                  <span className="text-zinc-300">{t('processedFiles.inProcess')}</span>
                   <span className="text-blue-400 font-semibold">{userStats.processing}</span>
                 </div>
                 {userStats.errors > 0 && (
