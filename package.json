@@ -8,6 +8,7 @@
     "start": "next start",
     "generate-guide": "node scripts/generate-user-guide.js",
     "migrate:admin": "node scripts/apply-admin-migration.js",
+    "migrate:language": "node scripts/apply-language-migration.js",
     "postinstall": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'public/pdf.worker.min.mjs')\"",
     "test": "jest --ci --coverage --silent"
   },
@@ -30,6 +31,7 @@
     "lucide-react": "^0.544.0",
     "mammoth": "^1.11.0",
     "next": "15.5.4",
+    "next-intl": "^4.4.0",
     "openai": "^4.51.0",
     "opossum": "^9.0.0",
     "pdfjs-dist": "^5.4.296",

@@ -6,10 +6,12 @@ import { Moon, Sun, Globe, Settings as SettingsIcon, Download, Clock, Info, Book
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { useNotification } from '@/hooks/useNotification';
 import { Toast } from '@/components/Toast';
+import { useTranslations } from '@/hooks/useTranslations';
 
 export default function Settings() {
   const router = useRouter();
   const { notification, showNotification } = useNotification();
+  const { t, loading: translationsLoading } = useTranslations();
   const [user, setUser] = useState<any>(null);
   const [subscriptionData, setSubscriptionData] = useState<{
     plan: string;
@@ -59,12 +61,29 @@ export default function Settings() {
 
       // Load saved settings
       const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' || 'dark';
-      const savedLang = localStorage.getItem('language') || 'es';
       const savedOptions = localStorage.getItem('defaultOptions');
 
       setDarkMode(savedTheme === 'dark');
-      setLanguage(savedLang);
       if (savedOptions) setDefaultOptions(JSON.parse(savedOptions));
+
+      // Load language from database
+      try {
+        const langResponse = await fetch('/api/user/language', {
+          credentials: 'include'
+        });
+
+        if (langResponse.ok) {
+          const langData = await langResponse.json();
+          const userLanguage = langData.language || 'es';
+          setLanguage(userLanguage);
+          localStorage.setItem('locale', userLanguage);
+        }
+      } catch (langError) {
+        console.error('Error loading language:', langError);
+        // Fallback to localStorage or default
+        const savedLang = localStorage.getItem('locale') || 'es';
+        setLanguage(savedLang);
+      }
 
       // Load subscription data
       try {
@@ -100,9 +119,25 @@ export default function Settings() {
     document.documentElement.classList.toggle('dark', newTheme);
   };
 
-  const changeLanguage = (lang: string) => {
+  const changeLanguage = async (lang: string) => {
     setLanguage(lang);
-    localStorage.setItem('language', lang);
+    localStorage.setItem('locale', lang);
+
+    // Save to database
+    try {
+      await fetch('/api/user/language', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ language: lang })
+      });
+      showNotification(t('notifications.idCopied'), 'success');
+      // Reload to apply new language
+      setTimeout(() => router.refresh(), 500);
+    } catch (error) {
+      console.error('Error updating language:', error);
+      showNotification('❌ Error al actualizar idioma', 'error');
+    }
   };
 
   const saveOptions = () => {
@@ -130,7 +165,7 @@ export default function Settings() {
     }
   };
 
-  if (loading) {
+  if (loading || translationsLoading) {
     return (
       <div className={`min-h-screen ${darkMode ? 'bg-black' : 'bg-gray-50'} flex items-center justify-center`}>
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-orange-500 border-t-transparent"></div>
@@ -184,16 +219,16 @@ export default function Settings() {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
               <SettingsIcon className="h-8 w-8 text-orange-500" />
-              <h1 className="font-orbitron text-3xl text-orange-500 font-bold">ajustes</h1>
+              <h1 className="font-orbitron text-3xl text-orange-500 font-bold">{t('settings.title')}</h1>
             </div>
             <button
               onClick={() => router.push('/')}
               className={`${bgSecondary} ${border} border px-4 py-2 rounded-lg text-orange-500 hover:text-orange-600 text-sm font-medium transition-colors inline-flex items-center gap-2`}
             >
-              ← Volver al Dashboard
+              ← {t('settings.backToDashboard')}
             </button>
           </div>
-          <p className={`${textSecondary} text-sm`}>Personaliza tu experiencia con annalogica</p>
+          <p className={`${textSecondary} text-sm`}>{t('settings.subtitle')}</p>
         </div>
 
         {/* Subscription Banner */}
@@ -245,7 +280,13 @@ export default function Settings() {
               >
                 <option value="es">🇪🇸 Español</option>
                 <option value="ca">🇪🇸 Català</option>
+                <option value="eu">🇪🇸 Euskera</option>
+                <option value="gl">🇪🇸 Galego</option>
                 <option value="en">🇬🇧 English</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="pt">🇵🇹 Português</option>
+                <option value="it">🇮🇹 Italiano</option>
+                <option value="de">🇩🇪 Deutsch</option>
               </select>
             </div>
           </div>
