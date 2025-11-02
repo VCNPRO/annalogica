@@ -18,35 +18,44 @@ export function useTranslations() {
   useEffect(() => {
     async function loadMessages() {
       try {
-        // Get locale from localStorage or API
-        const savedLocale = localStorage.getItem('locale') as Locale;
-        let userLocale: Locale = savedLocale || 'es';
+        // Cargar INMEDIATAMENTE desde localStorage (no bloquear)
+        const savedLocale = (localStorage.getItem('locale') as Locale) || 'es';
+        setLocale(savedLocale);
 
-        // Try to get from API if authenticated
-        try {
-          const res = await fetch('/api/user/language', {
-            credentials: 'include'
-          });
-          if (res.ok) {
-            const data = await res.json();
-            userLocale = data.language || userLocale;
-          }
-        } catch (err) {
-          // If not authenticated, use localStorage
-        }
-
-        setLocale(userLocale);
-
-        // Load messages from cache or import
-        if (cachedMessages[userLocale]) {
-          setMessages(cachedMessages[userLocale]);
+        // Load messages from cache or import - PRIORITARIO
+        if (cachedMessages[savedLocale]) {
+          setMessages(cachedMessages[savedLocale]);
+          setLoading(false);
         } else {
-          const imported = await import(`@/messages/${userLocale}.json`);
-          cachedMessages[userLocale] = imported.default;
+          const imported = await import(`@/messages/${savedLocale}.json`);
+          cachedMessages[savedLocale] = imported.default;
           setMessages(imported.default);
+          setLoading(false);
         }
 
-        setLoading(false);
+        // Sync with API in background (NO BLOQUEAR)
+        fetch('/api/user/language', {
+          credentials: 'include'
+        })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data?.language && data.language !== savedLocale) {
+              // Si el idioma de BD es diferente, actualizar
+              localStorage.setItem('locale', data.language);
+              setLocale(data.language);
+
+              if (cachedMessages[data.language]) {
+                setMessages(cachedMessages[data.language]);
+              } else {
+                import(`@/messages/${data.language}.json`).then(imported => {
+                  cachedMessages[data.language] = imported.default;
+                  setMessages(imported.default);
+                });
+              }
+            }
+          })
+          .catch(() => {}); // Silently fail - ya tenemos localStorage
+
       } catch (error) {
         console.error('Error loading translations:', error);
         // Fallback to Spanish
