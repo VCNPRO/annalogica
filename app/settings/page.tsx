@@ -247,47 +247,54 @@ export default function Settings() {
         {/* Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* Apariencia e Idioma - Juntos y más pequeños */}
-          <div className={`${bgSecondary} rounded-lg ${border} border p-4`}>
-            <div className="flex items-center gap-2 mb-3">
-              {darkMode ? <Moon className="h-4 w-4 text-orange-500" /> : <Sun className="h-4 w-4 text-orange-500" />}
-              <h2 className={`text-sm font-semibold ${textPrimary}`}>Apariencia e Idioma</h2>
+          {/* Idioma de Usuario - Principal */}
+          <div className={`${bgSecondary} rounded-lg ${border} border p-5`}>
+            <div className="flex items-center gap-3 mb-4">
+              <Globe className="h-6 w-6 text-orange-500" />
+              <h2 className={`text-lg font-semibold ${textPrimary}`}>{t('settings.appearanceLanguage')}</h2>
             </div>
 
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => { setDarkMode(false); localStorage.setItem('theme', 'light'); document.documentElement.classList.remove('dark'); }}
-                  className={`p-2 rounded-lg border-2 transition-all ${!darkMode ? 'border-orange-500 bg-orange-50' : 'border-gray-300 dark:border-zinc-700'}`}
+            <div className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${textPrimary}`}>{t('nav.settings')} {t('languages.' + language)}</label>
+                <select
+                  value={language}
+                  onChange={(e) => changeLanguage(e.target.value)}
+                  className={`w-full p-3 border ${border} rounded-lg ${bgSecondary} ${textPrimary} text-base focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
                 >
-                  <Sun className={`mx-auto h-4 w-4 mb-1 ${!darkMode ? 'text-orange-500' : textSecondary}`} />
-                  <p className={`text-xs ${!darkMode ? 'text-orange-600 font-medium' : textSecondary}`}>Claro</p>
-                </button>
-
-                <button
-                  onClick={() => { setDarkMode(true); localStorage.setItem('theme', 'dark'); document.documentElement.classList.add('dark'); }}
-                  className={`p-2 rounded-lg border-2 transition-all ${darkMode ? 'border-orange-500 bg-zinc-800' : 'border-gray-300'}`}
-                >
-                  <Moon className={`mx-auto h-4 w-4 mb-1 ${darkMode ? 'text-orange-500' : textSecondary}`} />
-                  <p className={`text-xs ${darkMode ? 'text-orange-400 font-medium' : textSecondary}`}>Oscuro</p>
-                </button>
+                  <option value="es">🇪🇸 {t('languages.es')}</option>
+                  <option value="ca">🇪🇸 {t('languages.ca')}</option>
+                  <option value="eu">🇪🇸 {t('languages.eu')}</option>
+                  <option value="gl">🇪🇸 {t('languages.gl')}</option>
+                  <option value="en">🇬🇧 {t('languages.en')}</option>
+                  <option value="fr">🇫🇷 {t('languages.fr')}</option>
+                  <option value="pt">🇵🇹 {t('languages.pt')}</option>
+                  <option value="it">🇮🇹 {t('languages.it')}</option>
+                  <option value="de">🇩🇪 {t('languages.de')}</option>
+                </select>
               </div>
 
-              <select
-                value={language}
-                onChange={(e) => changeLanguage(e.target.value)}
-                className={`w-full p-2 border ${border} rounded-lg ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
-              >
-                <option value="es">🇪🇸 Español</option>
-                <option value="ca">🇪🇸 Català</option>
-                <option value="eu">🇪🇸 Euskera</option>
-                <option value="gl">🇪🇸 Galego</option>
-                <option value="en">🇬🇧 English</option>
-                <option value="fr">🇫🇷 Français</option>
-                <option value="pt">🇵🇹 Português</option>
-                <option value="it">🇮🇹 Italiano</option>
-                <option value="de">🇩🇪 Deutsch</option>
-              </select>
+              {/* Tema - Más pequeño */}
+              <div>
+                <label className={`block text-xs font-medium mb-2 ${textSecondary}`}>{t('settings.appearanceLanguage').split(' ')[0]}</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => { setDarkMode(false); localStorage.setItem('theme', 'light'); document.documentElement.classList.remove('dark'); }}
+                    className={`p-2 rounded-lg border-2 transition-all ${!darkMode ? 'border-orange-500 bg-orange-50' : 'border-gray-300 dark:border-zinc-700'}`}
+                  >
+                    <Sun className={`mx-auto h-4 w-4 mb-1 ${!darkMode ? 'text-orange-500' : textSecondary}`} />
+                    <p className={`text-xs ${!darkMode ? 'text-orange-600 font-medium' : textSecondary}`}>{t('settings.light')}</p>
+                  </button>
+
+                  <button
+                    onClick={() => { setDarkMode(true); localStorage.setItem('theme', 'dark'); document.documentElement.classList.add('dark'); }}
+                    className={`p-2 rounded-lg border-2 transition-all ${darkMode ? 'border-orange-500 bg-zinc-800' : 'border-gray-300'}`}
+                  >
+                    <Moon className={`mx-auto h-4 w-4 mb-1 ${darkMode ? 'text-orange-500' : textSecondary}`} />
+                    <p className={`text-xs ${darkMode ? 'text-orange-400 font-medium' : textSecondary}`}>{t('settings.dark')}</p>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -295,12 +302,12 @@ export default function Settings() {
           <div className={`${bgSecondary} rounded-lg ${border} border p-4`}>
             <div className="flex items-center gap-2 mb-3">
               <Info className="h-4 w-4 text-blue-500" />
-              <h2 className={`text-sm font-semibold ${textPrimary}`}>ID de Cliente</h2>
+              <h2 className={`text-sm font-semibold ${textPrimary}`}>{t('settings.clientId')}</h2>
             </div>
 
             <div className={`${darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'} border rounded-lg p-3`}>
               <p className={`text-xs mb-2 ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>
-                Usa este ID para soporte técnico
+                {t('settings.clientIdDescription')}
               </p>
               <div className="flex items-center gap-2">
                 <code className={`flex-1 px-3 py-2 ${darkMode ? 'bg-black' : 'bg-white'} border ${border} rounded text-xs font-mono ${textPrimary}`}>
@@ -313,14 +320,14 @@ export default function Settings() {
                       ? 'bg-green-600 hover:bg-green-700'
                       : 'bg-orange-600 hover:bg-orange-700'
                   } text-white text-xs`}
-                  title="Copiar ID completo"
+                  title={t('settings.copy')}
                 >
                   {copied ? (
                     <>
                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
-                      <span>OK</span>
+                      <span>{t('settings.copied')}</span>
                     </>
                   ) : (
                     <>
@@ -328,7 +335,7 @@ export default function Settings() {
                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                       </svg>
-                      <span>Copiar</span>
+                      <span>{t('settings.copy')}</span>
                     </>
                   )}
                 </button>
@@ -340,7 +347,7 @@ export default function Settings() {
           <div className={`${bgSecondary} rounded-lg ${border} border p-4 lg:col-span-2`}>
             <div className="flex items-center gap-2 mb-4">
               <Download className="h-4 w-4 text-orange-500" />
-              <h2 className={`text-sm font-semibold ${textPrimary}`}>Opciones de Descarga</h2>
+              <h2 className={`text-sm font-semibold ${textPrimary}`}>{t('settings.downloadOptions')}</h2>
             </div>
 
             <div className="space-y-3">
@@ -352,30 +359,30 @@ export default function Settings() {
                   className="mt-1 w-4 h-4 text-orange-500 accent-orange-500"
                 />
                 <div className="flex-1">
-                  <span className={`text-sm font-medium ${textPrimary}`}>Organizar en carpetas</span>
-                  <p className={`text-xs ${textSecondary} mt-1`}>Crea una carpeta por archivo con todos los resultados</p>
+                  <span className={`text-sm font-medium ${textPrimary}`}>{t('settings.organizeInFolders')}</span>
+                  <p className={`text-xs ${textSecondary} mt-1`}>{t('settings.organizeFoldersDesc')}</p>
                 </div>
               </label>
 
               <div className={`p-3 rounded-lg border ${border}`}>
-                <label className={`block text-sm font-medium mb-2 ${textPrimary}`}>Carpeta de destino</label>
-                <p className={`text-xs ${textSecondary} mb-3`}>Los archivos se descargarán en la carpeta que elijas en tu equipo local. Esta preferencia se guardará para futuras descargas.</p>
+                <label className={`block text-sm font-medium mb-2 ${textPrimary}`}>{t('settings.destinationFolder')}</label>
+                <p className={`text-xs ${textSecondary} mb-3`}>{t('settings.destinationFolderDesc')}</p>
                 <button
                   onClick={async () => {
                     try {
                       // @ts-ignore - File System Access API
                       const dirHandle = await window.showDirectoryPicker();
                       setDownloadDirHandle(dirHandle);
-                      showNotification('✅ Carpeta seleccionada correctamente', 'success');
+                      showNotification(t('settings.folderSelected'), 'success');
                     } catch (err) {
                       if ((err as Error).name !== 'AbortError') {
-                        showNotification('❌ No se pudo seleccionar la carpeta', 'error');
+                        showNotification(t('settings.folderError'), 'error');
                       }
                     }
                   }}
                   className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
                 >
-                  📁 Elegir carpeta de descargas
+                  📁 {t('settings.chooseFolder')}
                 </button>
               </div>
             </div>
@@ -384,7 +391,7 @@ export default function Settings() {
               onClick={saveOptions}
               className="mt-4 w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
             >
-              💾 Guardar Preferencias
+              💾 {t('settings.savePreferences')}
             </button>
           </div>
 
@@ -392,13 +399,13 @@ export default function Settings() {
           <div id="contacto" className={`${bgSecondary} rounded-lg ${border} border p-4 lg:col-span-2`}>
             <div className="flex items-center gap-2 mb-4">
               <Mail className="h-4 w-4 text-orange-500" />
-              <h2 className={`text-sm font-semibold ${textPrimary}`}>Contacto</h2>
+              <h2 className={`text-sm font-semibold ${textPrimary}`}>{t('settings.contact')}</h2>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
               {/* Formulario de Contacto */}
               <div>
-                <h3 className={`text-xs font-semibold ${textPrimary} mb-3`}>Envíanos un mensaje</h3>
+                <h3 className={`text-xs font-semibold ${textPrimary} mb-3`}>{t('settings.sendMessage')}</h3>
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   const formData = new FormData(e.currentTarget);
@@ -411,7 +418,7 @@ export default function Settings() {
                   const mailtoLink = `mailto:soporte@annalogica.eu?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(`Nombre: ${nombre}\nEmail: ${email}\n\nMensaje:\n${mensaje}`)}`;
                   window.location.href = mailtoLink;
 
-                  showNotification('✅ Abriendo tu cliente de email...', 'success');
+                  showNotification(t('settings.openingEmail'), 'success');
                 }} className="space-y-3">
                   <div>
                     <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>Nombre</label>
@@ -464,7 +471,7 @@ export default function Settings() {
 
               {/* Datos de Contacto */}
               <div>
-                <h3 className={`text-xs font-semibold ${textPrimary} mb-3`}>Información de contacto</h3>
+                <h3 className={`text-xs font-semibold ${textPrimary} mb-3`}>{t('settings.contactInfo')}</h3>
                 <div className="space-y-3">
                   <div className={`p-3 rounded-lg border ${border}`}>
                     <div className="flex items-center gap-2 mb-2">
