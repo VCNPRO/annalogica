@@ -1296,11 +1296,10 @@ export default function Dashboard() {
             <div className="flex justify-center gap-3 text-xs mb-2">
               <a href="/privacy" className={`${textSecondary} hover:text-orange-500`}>Privacidad</a>
               <a href="/terms" className={`${textSecondary} hover:text-orange-500`}>Términos</a>
-              <a href="mailto:admin@annalogica.eu" className={`${textSecondary} hover:text-orange-500`}>Contacto</a>
+              <a href="/settings#contacto" className={`${textSecondary} hover:text-orange-500`}>Contacto</a>
             </div>
             <div className={`text-xs ${textSecondary} text-center space-y-1`}>
-              <p>support@annalogica.eu | admin@annalogica.eu</p>
-              <p>infopreus@annalogica.eu</p>
+              <p>soporte@annalogica.eu | ventas@annalogica.eu</p>
             </div>
           </div>
         </div>

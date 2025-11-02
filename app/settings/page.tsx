@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Moon, Sun, Globe, Settings as SettingsIcon, Download, Clock, Info, BookOpen, LogOut } from 'lucide-react';
+import { Moon, Sun, Globe, Settings as SettingsIcon, Download, Clock, Info, BookOpen, LogOut, Mail, Phone, MapPin } from 'lucide-react';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { useNotification } from '@/hooks/useNotification';
 import { Toast } from '@/components/Toast';
@@ -21,6 +21,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [language, setLanguage] = useState('es');
+  const [downloadDirHandle, setDownloadDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [defaultOptions, setDefaultOptions] = useState({
     summaryType: 'detailed' as 'short' | 'detailed',
     autoGeneratePDF: true,
@@ -209,198 +210,264 @@ export default function Settings() {
         )}
 
         {/* Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
-          {/* Tema */}
-          <div className={`${bgSecondary} rounded-lg ${border} border p-6`}>
-            <div className="flex items-center gap-3 mb-4">
-              {darkMode ? <Moon className="h-5 w-5 text-orange-500" /> : <Sun className="h-5 w-5 text-orange-500" />}
-              <h2 className={`text-lg font-semibold ${textPrimary}`}>Apariencia</h2>
+          {/* Apariencia e Idioma - Juntos y más pequeños */}
+          <div className={`${bgSecondary} rounded-lg ${border} border p-4`}>
+            <div className="flex items-center gap-2 mb-3">
+              {darkMode ? <Moon className="h-4 w-4 text-orange-500" /> : <Sun className="h-4 w-4 text-orange-500" />}
+              <h2 className={`text-sm font-semibold ${textPrimary}`}>Apariencia e Idioma</h2>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => { setDarkMode(false); localStorage.setItem('theme', 'light'); document.documentElement.classList.remove('dark'); }}
-                className={`p-4 rounded-lg border-2 transition-all ${!darkMode ? 'border-orange-500 bg-orange-50' : 'border-gray-300 dark:border-zinc-700'}`}
-              >
-                <Sun className={`mx-auto h-6 w-6 mb-2 ${!darkMode ? 'text-orange-500' : textSecondary}`} />
-                <p className={`text-sm ${!darkMode ? 'text-orange-600 font-medium' : textSecondary}`}>Claro</p>
-              </button>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { setDarkMode(false); localStorage.setItem('theme', 'light'); document.documentElement.classList.remove('dark'); }}
+                  className={`p-2 rounded-lg border-2 transition-all ${!darkMode ? 'border-orange-500 bg-orange-50' : 'border-gray-300 dark:border-zinc-700'}`}
+                >
+                  <Sun className={`mx-auto h-4 w-4 mb-1 ${!darkMode ? 'text-orange-500' : textSecondary}`} />
+                  <p className={`text-xs ${!darkMode ? 'text-orange-600 font-medium' : textSecondary}`}>Claro</p>
+                </button>
 
-              <button
-                onClick={() => { setDarkMode(true); localStorage.setItem('theme', 'dark'); document.documentElement.classList.add('dark'); }}
-                className={`p-4 rounded-lg border-2 transition-all ${darkMode ? 'border-orange-500 bg-zinc-800' : 'border-gray-300'}`}
+                <button
+                  onClick={() => { setDarkMode(true); localStorage.setItem('theme', 'dark'); document.documentElement.classList.add('dark'); }}
+                  className={`p-2 rounded-lg border-2 transition-all ${darkMode ? 'border-orange-500 bg-zinc-800' : 'border-gray-300'}`}
+                >
+                  <Moon className={`mx-auto h-4 w-4 mb-1 ${darkMode ? 'text-orange-500' : textSecondary}`} />
+                  <p className={`text-xs ${darkMode ? 'text-orange-400 font-medium' : textSecondary}`}>Oscuro</p>
+                </button>
+              </div>
+
+              <select
+                value={language}
+                onChange={(e) => changeLanguage(e.target.value)}
+                className={`w-full p-2 border ${border} rounded-lg ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
               >
-                <Moon className={`mx-auto h-6 w-6 mb-2 ${darkMode ? 'text-orange-500' : textSecondary}`} />
-                <p className={`text-sm ${darkMode ? 'text-orange-400 font-medium' : textSecondary}`}>Oscuro</p>
-              </button>
+                <option value="es">🇪🇸 Español</option>
+                <option value="ca">🇪🇸 Català</option>
+                <option value="en">🇬🇧 English</option>
+              </select>
             </div>
           </div>
 
-          {/* Idioma */}
-          <div className={`${bgSecondary} rounded-lg ${border} border p-6`}>
-            <div className="flex items-center gap-3 mb-4">
-              <Globe className="h-5 w-5 text-orange-500" />
-              <h2 className={`text-lg font-semibold ${textPrimary}`}>Idioma</h2>
+          {/* ID de Cliente - Más pequeño y con ID corto */}
+          <div className={`${bgSecondary} rounded-lg ${border} border p-4`}>
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="h-4 w-4 text-blue-500" />
+              <h2 className={`text-sm font-semibold ${textPrimary}`}>ID de Cliente</h2>
             </div>
 
-            <select
-              value={language}
-              onChange={(e) => changeLanguage(e.target.value)}
-              className={`w-full p-3 border ${border} rounded-lg ${bgSecondary} ${textPrimary} text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
-            >
-              <option value="es">🇪🇸 Español</option>
-              <option value="ca">🇪🇸 Català</option>
-              <option value="en">🇬🇧 English</option>
-            </select>
-          </div>
-
-          {/* ID de Cliente */}
-          <div className={`${bgSecondary} rounded-lg ${border} border p-6 lg:col-span-2`}>
-            <div className="flex items-center gap-3 mb-4">
-              <Info className="h-5 w-5 text-blue-500" />
-              <h2 className={`text-lg font-semibold ${textPrimary}`}>ID de Cliente</h2>
-            </div>
-
-            <div className={`${darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'} border rounded-lg p-5`}>
-              <p className={`text-sm mb-4 ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>
-                Este es tu identificador único. Úsalo si necesitas contactar con soporte técnico.
+            <div className={`${darkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'} border rounded-lg p-3`}>
+              <p className={`text-xs mb-2 ${darkMode ? 'text-blue-200' : 'text-blue-900'}`}>
+                Usa este ID para soporte técnico
               </p>
-              <div className="flex items-center gap-3">
-                <code className={`flex-1 px-4 py-3 ${darkMode ? 'bg-black' : 'bg-white'} border ${border} rounded-lg text-xs font-mono ${textPrimary} break-all`}>
-                  {user?.id || 'Cargando...'}
+              <div className="flex items-center gap-2">
+                <code className={`flex-1 px-3 py-2 ${darkMode ? 'bg-black' : 'bg-white'} border ${border} rounded text-xs font-mono ${textPrimary}`}>
+                  {user?.id ? user.id.slice(-8).toUpperCase() : '...'}
                 </code>
                 <button
                   onClick={copyUserId}
-                  className={`px-4 py-3 rounded-lg transition-colors flex items-center gap-2 ${
+                  className={`px-3 py-2 rounded transition-colors flex items-center gap-1 ${
                     copied
                       ? 'bg-green-600 hover:bg-green-700'
                       : 'bg-orange-600 hover:bg-orange-700'
-                  } text-white`}
-                  title="Copiar ID"
+                  } text-white text-xs`}
+                  title="Copiar ID completo"
                 >
                   {copied ? (
                     <>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
-                      <span className="text-sm">Copiado</span>
+                      <span>OK</span>
                     </>
                   ) : (
                     <>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                         <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                       </svg>
-                      <span className="text-sm">Copiar</span>
+                      <span>Copiar</span>
                     </>
                   )}
                 </button>
               </div>
-              <p className={`text-xs mt-3 ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>
-                📧 Contacto: <a href="mailto:soporte@annalogica.eu" className="underline hover:text-blue-500">soporte@annalogica.eu</a>
-              </p>
             </div>
           </div>
 
-          {/* Opciones de Descarga */}
-          <div className={`${bgSecondary} rounded-lg ${border} border p-6 lg:col-span-2`}>
-            <div className="flex items-center gap-3 mb-6">
-              <Download className="h-5 w-5 text-orange-500" />
-              <h2 className={`text-lg font-semibold ${textPrimary}`}>Opciones de Descarga</h2>
+          {/* Opciones de Descarga - Simplificado */}
+          <div className={`${bgSecondary} rounded-lg ${border} border p-4 lg:col-span-2`}>
+            <div className="flex items-center gap-2 mb-4">
+              <Download className="h-4 w-4 text-orange-500" />
+              <h2 className={`text-sm font-semibold ${textPrimary}`}>Opciones de Descarga</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Left Column */}
-              <div className="space-y-4">
-                <div>
-                  <label className={`block text-sm font-medium mb-2 ${textPrimary}`}>Tipo de resumen por defecto</label>
-                  <select
-                    value={defaultOptions.summaryType}
-                    onChange={(e) => setDefaultOptions({...defaultOptions, summaryType: e.target.value as any})}
-                    className={`w-full p-3 border ${border} rounded-lg ${bgSecondary} ${textPrimary} text-sm focus:ring-2 focus:ring-orange-500`}
-                  >
-                    <option value="short">Resumen Corto</option>
-                    <option value="detailed">Resumen Detallado</option>
-                  </select>
+            <div className="space-y-3">
+              <label className={`flex items-start gap-3 p-3 rounded-lg border ${border} cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors`}>
+                <input
+                  type="checkbox"
+                  checked={defaultOptions.organizeInFolders}
+                  onChange={(e) => setDefaultOptions({...defaultOptions, organizeInFolders: e.target.checked})}
+                  className="mt-1 w-4 h-4 text-orange-500 accent-orange-500"
+                />
+                <div className="flex-1">
+                  <span className={`text-sm font-medium ${textPrimary}`}>Organizar en carpetas</span>
+                  <p className={`text-xs ${textSecondary} mt-1`}>Crea una carpeta por archivo con todos los resultados</p>
                 </div>
+              </label>
 
-                <div>
-                  <label className={`block text-sm font-medium mb-3 ${textPrimary}`}>Formato de transcripción</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <label className={`flex items-center justify-center gap-2 p-3 border ${border} rounded-lg cursor-pointer transition-all ${defaultOptions.downloadFormat === 'txt' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : ''}`}>
-                      <input
-                        type="radio"
-                        name="downloadFormat"
-                        value="txt"
-                        checked={defaultOptions.downloadFormat === 'txt'}
-                        onChange={() => setDefaultOptions({...defaultOptions, downloadFormat: 'txt'})}
-                        className="w-4 h-4 text-orange-500 accent-orange-500"
-                      />
-                      <span className={`text-xs font-medium ${defaultOptions.downloadFormat === 'txt' ? 'text-orange-600 dark:text-orange-400' : textPrimary}`}>TXT</span>
-                    </label>
-                    <label className={`flex items-center justify-center gap-2 p-3 border ${border} rounded-lg cursor-pointer transition-all ${defaultOptions.downloadFormat === 'pdf' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : ''}`}>
-                      <input
-                        type="radio"
-                        name="downloadFormat"
-                        value="pdf"
-                        checked={defaultOptions.downloadFormat === 'pdf'}
-                        onChange={() => setDefaultOptions({...defaultOptions, downloadFormat: 'pdf'})}
-                        className="w-4 h-4 text-orange-500 accent-orange-500"
-                      />
-                      <span className={`text-xs font-medium ${defaultOptions.downloadFormat === 'pdf' ? 'text-orange-600 dark:text-orange-400' : textPrimary}`}>PDF</span>
-                    </label>
-                    <label className={`flex items-center justify-center gap-2 p-3 border ${border} rounded-lg cursor-pointer transition-all ${defaultOptions.downloadFormat === 'both' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : ''}`}>
-                      <input
-                        type="radio"
-                        name="downloadFormat"
-                        value="both"
-                        checked={defaultOptions.downloadFormat === 'both'}
-                        onChange={() => setDefaultOptions({...defaultOptions, downloadFormat: 'both'})}
-                        className="w-4 h-4 text-orange-500 accent-orange-500"
-                      />
-                      <span className={`text-xs font-medium ${defaultOptions.downloadFormat === 'both' ? 'text-orange-600 dark:text-orange-400' : textPrimary}`}>Ambos</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column */}
-              <div className="space-y-4">
-                <label className={`flex items-start gap-3 p-3 rounded-lg border ${border} cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors`}>
-                  <input
-                    type="checkbox"
-                    checked={defaultOptions.organizeInFolders}
-                    onChange={(e) => setDefaultOptions({...defaultOptions, organizeInFolders: e.target.checked})}
-                    className="mt-1 w-4 h-4 text-orange-500 accent-orange-500"
-                  />
-                  <div className="flex-1">
-                    <span className={`text-sm font-medium ${textPrimary}`}>Organizar en carpetas</span>
-                    <p className={`text-xs ${textSecondary} mt-1`}>Crea una carpeta por archivo con todos los resultados (requiere permiso del navegador)</p>
-                  </div>
-                </label>
-
-                <label className={`flex items-start gap-3 p-3 rounded-lg border ${border} cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors`}>
-                  <input
-                    type="checkbox"
-                    checked={defaultOptions.autoGenerateSRT}
-                    onChange={(e) => setDefaultOptions({...defaultOptions, autoGenerateSRT: e.target.checked})}
-                    className="mt-1 w-4 h-4 text-orange-500 accent-orange-500"
-                  />
-                  <div className="flex-1">
-                    <span className={`text-sm font-medium ${textPrimary}`}>Generar subtítulos automáticamente</span>
-                    <p className={`text-xs ${textSecondary} mt-1`}>Genera archivos SRT y VTT con cada transcripción</p>
-                  </div>
-                </label>
+              <div className={`p-3 rounded-lg border ${border}`}>
+                <label className={`block text-sm font-medium mb-2 ${textPrimary}`}>Carpeta de destino</label>
+                <p className={`text-xs ${textSecondary} mb-3`}>Los archivos se descargarán en la carpeta que elijas en tu equipo local. Esta preferencia se guardará para futuras descargas.</p>
+                <button
+                  onClick={async () => {
+                    try {
+                      // @ts-ignore - File System Access API
+                      const dirHandle = await window.showDirectoryPicker();
+                      setDownloadDirHandle(dirHandle);
+                      showNotification('✅ Carpeta seleccionada correctamente', 'success');
+                    } catch (err) {
+                      if ((err as Error).name !== 'AbortError') {
+                        showNotification('❌ No se pudo seleccionar la carpeta', 'error');
+                      }
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  📁 Elegir carpeta de descargas
+                </button>
               </div>
             </div>
 
             <button
               onClick={saveOptions}
-              className="mt-6 w-full bg-orange-600 hover:bg-orange-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+              className="mt-4 w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
             >
               💾 Guardar Preferencias
             </button>
+          </div>
+
+          {/* Sección de Contacto */}
+          <div id="contacto" className={`${bgSecondary} rounded-lg ${border} border p-4 lg:col-span-2`}>
+            <div className="flex items-center gap-2 mb-4">
+              <Mail className="h-4 w-4 text-orange-500" />
+              <h2 className={`text-sm font-semibold ${textPrimary}`}>Contacto</h2>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Formulario de Contacto */}
+              <div>
+                <h3 className={`text-xs font-semibold ${textPrimary} mb-3`}>Envíanos un mensaje</h3>
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const nombre = formData.get('nombre') as string;
+                  const email = formData.get('email') as string;
+                  const asunto = formData.get('asunto') as string;
+                  const mensaje = formData.get('mensaje') as string;
+
+                  // Construir mailto link con los datos del formulario
+                  const mailtoLink = `mailto:soporte@annalogica.eu?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(`Nombre: ${nombre}\nEmail: ${email}\n\nMensaje:\n${mensaje}`)}`;
+                  window.location.href = mailtoLink;
+
+                  showNotification('✅ Abriendo tu cliente de email...', 'success');
+                }} className="space-y-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>Nombre</label>
+                    <input
+                      type="text"
+                      name="nombre"
+                      required
+                      className={`w-full p-2 border ${border} rounded ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500`}
+                      placeholder="Tu nombre"
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      required
+                      className={`w-full p-2 border ${border} rounded ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500`}
+                      placeholder="tu@email.com"
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>Asunto</label>
+                    <input
+                      type="text"
+                      name="asunto"
+                      required
+                      className={`w-full p-2 border ${border} rounded ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500`}
+                      placeholder="¿En qué podemos ayudarte?"
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${textPrimary}`}>Mensaje</label>
+                    <textarea
+                      name="mensaje"
+                      required
+                      rows={4}
+                      className={`w-full p-2 border ${border} rounded ${bgSecondary} ${textPrimary} text-xs focus:ring-2 focus:ring-orange-500`}
+                      placeholder="Cuéntanos más..."
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded text-xs font-medium transition-colors"
+                  >
+                    📧 Enviar mensaje
+                  </button>
+                </form>
+              </div>
+
+              {/* Datos de Contacto */}
+              <div>
+                <h3 className={`text-xs font-semibold ${textPrimary} mb-3`}>Información de contacto</h3>
+                <div className="space-y-3">
+                  <div className={`p-3 rounded-lg border ${border}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Mail className="h-4 w-4 text-orange-500" />
+                      <span className={`text-xs font-semibold ${textPrimary}`}>Email</span>
+                    </div>
+                    <div className="space-y-1 pl-6">
+                      <a href="mailto:soporte@annalogica.eu" className={`block text-xs ${textSecondary} hover:text-orange-500`}>
+                        📧 soporte@annalogica.eu
+                      </a>
+                      <p className={`text-[10px] ${textSecondary}`}>Para consultas técnicas y soporte</p>
+                    </div>
+                    <div className="space-y-1 pl-6 mt-2">
+                      <a href="mailto:ventas@annalogica.eu" className={`block text-xs ${textSecondary} hover:text-orange-500`}>
+                        💼 ventas@annalogica.eu
+                      </a>
+                      <p className={`text-[10px] ${textSecondary}`}>Para consultas comerciales y ventas</p>
+                    </div>
+                  </div>
+
+                  <div className={`p-3 rounded-lg border ${border}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <MapPin className="h-4 w-4 text-orange-500" />
+                      <span className={`text-xs font-semibold ${textPrimary}`}>Dirección</span>
+                    </div>
+                    <div className="pl-6">
+                      <p className={`text-xs ${textSecondary}`}>videoconversion digital lab, S.L.</p>
+                      <p className={`text-xs ${textSecondary}`}>Barcelona, España</p>
+                    </div>
+                  </div>
+
+                  <div className={`p-3 rounded-lg border ${border} ${darkMode ? 'bg-orange-900/20' : 'bg-orange-50'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-orange-500" />
+                      <span className={`text-xs font-semibold ${textPrimary}`}>Horario de atención</span>
+                    </div>
+                    <div className="pl-6">
+                      <p className={`text-xs ${textSecondary}`}>Lunes a Viernes: 9:00 - 18:00 (CET)</p>
+                      <p className={`text-xs ${textSecondary}`}>Fin de semana: Cerrado</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Política de Retención */}
