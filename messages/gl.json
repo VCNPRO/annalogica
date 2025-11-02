@@ -194,5 +194,20 @@
     "renews": "Renóvase o",
     "inDays": "en {days} días",
     "soon": "proximamente"
+  },
+  "processedFiles": {
+    "title": "Arquivos Procesados",
+    "summary": "Resumo de Arquivos",
+    "totalProcessed": "Total procesados:",
+    "inProcess": "En proceso:",
+    "errors": "Erros:",
+    "backToDashboard": "Volver ao Panel",
+    "download": "Descargar",
+    "deleteSelected": "Eliminar Seleccionados",
+    "noFilesSelected": "Non hai arquivos seleccionados",
+    "noFilesSelectedDownload": "Non hai arquivos seleccionados para descargar.",
+    "noFilesProcessedYet": "Non hai arquivos procesados aínda.",
+    "noFilesFoundFilters": "Non se atoparon arquivos cos filtros seleccionados.",
+    "deleteFile": "Eliminar arquivo procesado"
   }
 }

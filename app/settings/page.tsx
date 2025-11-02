@@ -131,9 +131,8 @@ export default function Settings() {
       body: JSON.stringify({ language: lang })
     }).catch(err => console.error('Error updating language:', err));
 
-    // Reload immediately para aplicar traducciones
-    showNotification('✅ Idioma actualizado', 'success');
-    setTimeout(() => window.location.reload(), 300);
+    // Reload inmediatamente para aplicar traducciones
+    window.location.reload();
   };
 
   const saveOptions = () => {

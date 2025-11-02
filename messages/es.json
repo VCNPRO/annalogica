@@ -187,9 +187,15 @@
     "summary": "Resumen de Archivos",
     "totalProcessed": "Total procesados:",
     "inProcess": "En proceso:",
+    "errors": "Errores:",
     "backToDashboard": "Volver al Dashboard",
     "download": "Descargar",
-    "deleteSelected": "Eliminar Seleccionados"
+    "deleteSelected": "Eliminar Seleccionados",
+    "noFilesSelected": "No hay archivos seleccionados",
+    "noFilesSelectedDownload": "No hay archivos seleccionados para descargar.",
+    "noFilesProcessedYet": "No hay archivos procesados aún.",
+    "noFilesFoundFilters": "No se encontraron archivos con los filtros seleccionados.",
+    "deleteFile": "Eliminar archivo procesado"
   },
   "subscription": {
     "yourPlan": "Tu Plan",

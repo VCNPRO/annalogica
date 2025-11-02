@@ -187,9 +187,15 @@
     "summary": "Resum d'Arxius",
     "totalProcessed": "Total processats:",
     "inProcess": "En procés:",
+    "errors": "Errors:",
     "backToDashboard": "Tornar al Tauler",
     "download": "Descarregar",
-    "deleteSelected": "Eliminar Seleccionats"
+    "deleteSelected": "Eliminar Seleccionats",
+    "noFilesSelected": "No hi ha arxius seleccionats",
+    "noFilesSelectedDownload": "No hi ha arxius seleccionats per descarregar.",
+    "noFilesProcessedYet": "No hi ha arxius processats encara.",
+    "noFilesFoundFilters": "No s'han trobat arxius amb els filtres seleccionats.",
+    "deleteFile": "Eliminar arxiu processat"
   },
   "subscription": {
     "yourPlan": "El teu Pla",

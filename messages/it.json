@@ -194,5 +194,20 @@
     "renews": "Si rinnova il",
     "inDays": "tra {days} giorni",
     "soon": "presto"
+  },
+  "processedFiles": {
+    "title": "File Elaborati",
+    "summary": "Riepilogo File",
+    "totalProcessed": "Totale elaborati:",
+    "inProcess": "In elaborazione:",
+    "errors": "Errori:",
+    "backToDashboard": "Torna al Cruscotto",
+    "download": "Scaricare",
+    "deleteSelected": "Eliminare Selezionati",
+    "noFilesSelected": "Nessun file selezionato",
+    "noFilesSelectedDownload": "Nessun file selezionato per il download.",
+    "noFilesProcessedYet": "Nessun file elaborato ancora.",
+    "noFilesFoundFilters": "Nessun file trovato con i filtri selezionati.",
+    "deleteFile": "Eliminare file elaborato"
   }
 }

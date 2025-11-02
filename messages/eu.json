@@ -194,5 +194,20 @@
     "renews": "Berrituko da",
     "inDays": "{days} egunetan",
     "soon": "laster"
+  },
+  "processedFiles": {
+    "title": "Prozesatutako Fitxategiak",
+    "summary": "Fitxategien Laburpena",
+    "totalProcessed": "Prozesatutako guztira:",
+    "inProcess": "Prozesuan:",
+    "errors": "Erroreak:",
+    "backToDashboard": "Itzuli Aginte-panelera",
+    "download": "Deskargatu",
+    "deleteSelected": "Hautatutakoak Ezabatu",
+    "noFilesSelected": "Ez dago fitxategirik hautatuta",
+    "noFilesSelectedDownload": "Ez dago fitxategirik hautatuta deskargatzeko.",
+    "noFilesProcessedYet": "Ez dago fitxategi prozesaturik oraindik.",
+    "noFilesFoundFilters": "Ez da fitxategirik aurkitu hautatutako filtroekin.",
+    "deleteFile": "Prozesatutako fitxategia ezabatu"
   }
 }

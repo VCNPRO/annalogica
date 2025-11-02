@@ -237,7 +237,7 @@ export default function ProcessedFilesPage() {
 
   const handleDeleteSelected = async () => {
     if (selectedJobs.size === 0) {
-      showNotification('No hay archivos seleccionados', 'error');
+      showNotification(t('processedFiles.noFilesSelected'), 'error');
       return;
     }
 
@@ -548,7 +548,7 @@ export default function ProcessedFilesPage() {
 
   const handleBulkDownload = async () => {
     if (selectedJobs.size === 0) {
-      showNotification('No hay archivos seleccionados para descargar.', 'info');
+      showNotification(t('processedFiles.noFilesSelectedDownload'), 'info');
       return;
     }
 
@@ -647,7 +647,7 @@ export default function ProcessedFilesPage() {
                 </div>
                 {userStats.errors > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-zinc-300">Errores:</span>
+                    <span className="text-zinc-300">{t('processedFiles.errors')}</span>
                     <span className="text-red-400 font-semibold">{userStats.errors}</span>
                   </div>
                 )}
@@ -688,7 +688,7 @@ export default function ProcessedFilesPage() {
         {/* Main Content */}
         <div className="flex-1 p-6 overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-white">Archivos Procesados</h2>
+            <h2 className="text-xl font-bold text-white">{t('processedFiles.title')}</h2>
 
             {/* Translation language selector */}
             <div className="flex items-center gap-3">
@@ -763,7 +763,7 @@ export default function ProcessedFilesPage() {
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 <Download className="h-4 w-4 mr-1" />
-                Descargar ({selectedJobs.size})
+                {t('processedFiles.download')} ({selectedJobs.size})
               </button>
 
               {/* Choose Folder Button */}
@@ -871,8 +871,8 @@ export default function ProcessedFilesPage() {
             <div className="p-6 text-center bg-zinc-900 rounded-lg border border-zinc-800">
               <p className="text-zinc-400">
                 {hasActiveFilters
-                  ? 'No se encontraron archivos con los filtros seleccionados.'
-                  : 'No hay archivos procesados aún.'}
+                  ? t('processedFiles.noFilesFoundFilters')
+                  : t('processedFiles.noFilesProcessedYet')}
               </p>
             </div>
           ) : (
@@ -887,7 +887,7 @@ export default function ProcessedFilesPage() {
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Eliminar Seleccionados
+                    {t('processedFiles.deleteSelected')}
                   </button>
                 </div>
               )}
@@ -1124,7 +1124,7 @@ export default function ProcessedFilesPage() {
                             <button
                               onClick={() => handleDeleteJob(job.id)}
                               className="text-red-600 hover:text-red-900"
-                              title="Eliminar archivo procesado"
+                              title={t('processedFiles.deleteFile')}
                             >
                               <Trash2 className="h-5 w-5" />
                             </button>
