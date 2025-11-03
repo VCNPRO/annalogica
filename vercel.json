@@ -8,6 +8,10 @@
     },
     "app/api/process-document/route.ts": {
       "maxDuration": 300
+    },
+    "app/api/blob-upload/route.ts": {
+      "maxDuration": 300,
+      "maxRequestBodySize": "200mb"
     }
   },
   "crons": [
