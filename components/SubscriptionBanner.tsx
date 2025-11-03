@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { TrendingUp, FileText, Calendar } from 'lucide-react';
+import { useTranslations } from '@/hooks/useTranslations';
 
 interface SubscriptionBannerProps {
   plan: string;
@@ -19,6 +20,7 @@ export default function SubscriptionBanner({
   daysUntilReset,
 }: SubscriptionBannerProps) {
   const router = useRouter();
+  const { t, locale } = useTranslations();
   const percentage = filesTotal > 0 ? Math.round((filesUsed / filesTotal) * 100) : 0;
   const remaining = Math.max(0, filesTotal - filesUsed);
 
@@ -38,8 +40,19 @@ export default function SubscriptionBanner({
   };
 
   const formatResetDate = (date: Date | null) => {
-    if (!date) return 'próximamente';
-    return new Intl.DateTimeFormat('es-ES', {
+    if (!date) return t('subscription.soon');
+    const localeMap: Record<string, string> = {
+      es: 'es-ES',
+      ca: 'ca-ES',
+      eu: 'eu-ES',
+      gl: 'gl-ES',
+      en: 'en-US',
+      fr: 'fr-FR',
+      pt: 'pt-PT',
+      it: 'it-IT',
+      de: 'de-DE'
+    };
+    return new Intl.DateTimeFormat(localeMap[locale] || 'es-ES', {
       day: 'numeric',
       month: 'long',
     }).format(date);
@@ -68,12 +81,12 @@ export default function SubscriptionBanner({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-            Tu Plan: {getPlanDisplayName()}
+            {t('subscription.yourPlan')}: {getPlanDisplayName()}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {percentage >= 100
-              ? '¡Límite alcanzado! Mejora para continuar.'
-              : `Te quedan ${remaining} archivos este mes`}
+              ? t('subscription.limitReached')
+              : t('subscription.filesRemaining', { count: remaining })}
           </p>
         </div>
         {plan !== 'empresarial' && (
@@ -82,7 +95,7 @@ export default function SubscriptionBanner({
             className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center gap-2"
           >
             <TrendingUp className="h-4 w-4" />
-            Mejorar
+            {t('subscription.upgrade')}
           </button>
         )}
       </div>
@@ -92,7 +105,7 @@ export default function SubscriptionBanner({
         <div className="flex items-center justify-between text-sm">
           <span className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
             <FileText className="h-4 w-4" />
-            Archivos usados
+            {t('subscription.filesUsed')}
           </span>
           <span className="font-bold text-gray-900 dark:text-white">
             {filesUsed} / {filesTotal}
@@ -105,8 +118,8 @@ export default function SubscriptionBanner({
           />
         </div>
         <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
-          <span>{percentage}% usado</span>
-          <span>{remaining > 0 ? `${remaining} disponibles` : 'Sin archivos disponibles'}</span>
+          <span>{percentage}% {t('subscription.used')}</span>
+          <span>{remaining > 0 ? t('subscription.available', { count: remaining }) : t('subscription.noFilesAvailable')}</span>
         </div>
       </div>
 
@@ -114,8 +127,8 @@ export default function SubscriptionBanner({
       <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
         <Calendar className="h-4 w-4" />
         <span>
-          Se renueva el {formatResetDate(resetDate)}
-          {daysUntilReset > 0 && ` (en ${daysUntilReset} días)`}
+          {t('subscription.renews')} {formatResetDate(resetDate)}
+          {daysUntilReset > 0 && ` (${t('subscription.inDays', { days: daysUntilReset })})`}
         </span>
       </div>
     </div>
