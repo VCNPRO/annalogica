@@ -1,8 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Inicializar el cliente de Gemini con la API key del servidor
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Función para inicializar el cliente de Gemini
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'tu_gemini_api_key_aqui' || apiKey === 'tu_api_key_aqui') {
+    throw new Error('GEMINI_API_KEY no está configurada correctamente');
+  }
+  return new GoogleGenerativeAI(apiKey);
+}
 
 // Guía de usuario de annalogica
 const USER_GUIDE = `
@@ -111,7 +117,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Crear el modelo con el contexto de la guía de usuario
+    // Inicializar cliente y crear el modelo con el contexto de la guía de usuario
+    const genAI = getGeminiClient();
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.0-flash-exp',
       systemInstruction: `Eres un asistente virtual amigable y útil para annalogica, una aplicación de transcripción de audio y video.
@@ -158,8 +165,26 @@ Instrucciones importantes:
 
   } catch (error: any) {
     console.error('Error en chat API:', error);
+
+    // Mensajes de error más específicos
+    let errorMessage = 'Error procesando solicitud';
+
+    if (error.message?.includes('API key')) {
+      errorMessage = 'API key de Gemini inválida. Por favor, verifica tu configuración.';
+    } else if (error.message?.includes('quota') || error.message?.includes('limit')) {
+      errorMessage = 'Límite de uso de API alcanzado. Intenta de nuevo más tarde.';
+    } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+      errorMessage = 'Error de conexión con el servicio de IA. Verifica tu conexión a internet.';
+    } else if (error.message) {
+      errorMessage = `Error: ${error.message}`;
+    }
+
     return NextResponse.json(
-      { error: 'Error procesando solicitud', details: error.message },
+      {
+        error: errorMessage,
+        message: errorMessage,
+        details: error.message
+      },
       { status: 500 }
     );
   }
