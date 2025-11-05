@@ -245,8 +245,32 @@ export async function parseDocumentFromURL(
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
+    // Get response as arrayBuffer
     const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+
+    // Convert to Buffer with proper handling
+    let buffer: Buffer;
+    try {
+      if (arrayBuffer instanceof ArrayBuffer) {
+        buffer = Buffer.from(arrayBuffer);
+      } else if (Buffer.isBuffer(arrayBuffer)) {
+        buffer = arrayBuffer;
+      } else if (arrayBuffer && typeof arrayBuffer === 'object') {
+        // Handle case where arrayBuffer might be a Uint8Array or similar
+        buffer = Buffer.from(arrayBuffer as any);
+      } else {
+        throw new Error(`Invalid response type: ${typeof arrayBuffer}`);
+      }
+    } catch (conversionError: any) {
+      console.error('[DocumentParser] Buffer conversion error:', {
+        type: typeof arrayBuffer,
+        isArrayBuffer: arrayBuffer instanceof ArrayBuffer,
+        isBuffer: Buffer.isBuffer(arrayBuffer),
+        constructor: arrayBuffer?.constructor?.name,
+        error: conversionError.message
+      });
+      throw new Error(`No se pudo convertir la respuesta a Buffer: ${conversionError.message}`);
+    }
 
     console.log(`[DocumentParser] ✅ Downloaded ${buffer.length} bytes`);
 
