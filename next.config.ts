@@ -1,17 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Optimización de rendimiento
-  compress: true,
-  poweredByHeader: false,
-
-  // Silenciar warnings de preload CSS (son informativos, no críticos)
-  logging: {
-    fetches: {
-      fullUrl: false,
-    },
-  },
-
   async headers() {
     return [
       {
