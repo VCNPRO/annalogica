@@ -133,18 +133,30 @@ export async function POST(request: NextRequest) {
         status: 'completed'
       });
     } catch (error: any) {
+      // Extraer mensaje de error de cualquier formato
+      const errorMessage = error?.message || error?.error || String(error) || 'Error desconocido';
+
       console.error('[ProcessDocument] Processing failed:', {
-        error: error.message,
-        stack: error.stack,
+        errorMessage,
+        errorType: typeof error,
+        error: error,
+        stack: error?.stack,
         jobId: job.id
       });
+
+      // Actualizar job como failed en DB
+      try {
+        await TranscriptionJobDB.updateStatus(job.id, 'failed');
+      } catch (dbError) {
+        console.error('[ProcessDocument] Failed to update job status:', dbError);
+      }
 
       return NextResponse.json({
         success: false,
         jobId: job.id,
-        message: 'Error procesando el documento',
+        message: errorMessage,
         status: 'failed',
-        error: error.message
+        error: errorMessage
       }, { status: 500 });
     }
 
