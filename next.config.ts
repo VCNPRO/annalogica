@@ -1,6 +1,35 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Optimización de rendimiento
+  compress: true,
+  poweredByHeader: false,
+
+  // Configuración de webpack para optimizar chunks CSS
+  webpack: (config, { dev, isServer }) => {
+    if (!dev && !isServer) {
+      // Optimizar la división de chunks de CSS para reducir preload warnings
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          ...config.optimization.splitChunks,
+          cacheGroups: {
+            ...config.optimization.splitChunks?.cacheGroups,
+            // Agrupar todos los estilos en un solo archivo
+            styles: {
+              name: 'styles',
+              test: /\.(css|scss|sass)$/,
+              chunks: 'all',
+              enforce: true,
+              priority: 10,
+            },
+          },
+        },
+      };
+    }
+    return config;
+  },
+
   async headers() {
     return [
       {
