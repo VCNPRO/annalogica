@@ -90,9 +90,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar que la API key esté configurada
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GEMINI_API_KEY ||
+        process.env.GEMINI_API_KEY === 'tu_gemini_api_key_aqui' ||
+        process.env.GEMINI_API_KEY === 'tu_api_key_aqui') {
       return NextResponse.json(
-        { error: 'GEMINI_API_KEY no configurada' },
+        {
+          error: 'GEMINI_API_KEY no configurada correctamente',
+          message: 'Por favor, configura tu API key de Gemini en las variables de entorno. Obtén una gratis en: https://aistudio.google.com/app/apikey'
+        },
         { status: 500 }
       );
     }
