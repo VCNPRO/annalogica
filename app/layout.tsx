@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Orbitron } from 'next/font/google';
 import './globals.css';
 import I18nProvider from './providers/I18nProvider';
+import { ChatWidget } from '@/components/AIAssistant';
 
 // Configurar fuente Orbitron desde Google Fonts
 const orbitron = Orbitron({
@@ -19,11 +20,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const locale: 'es' | 'en' = 'es';
+  const showAIAssistant = process.env.NEXT_PUBLIC_ENABLE_AI_ASSISTANT === 'true';
 
   return (
     <html lang={locale} className={orbitron.variable}>
       <body>
-        <I18nProvider locale={locale}>{children}</I18nProvider>
+        <I18nProvider locale={locale}>
+          {children}
+          {showAIAssistant && <ChatWidget />}
+        </I18nProvider>
       </body>
     </html>
   );
