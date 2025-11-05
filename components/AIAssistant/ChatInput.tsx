@@ -32,17 +32,17 @@ export function ChatInput({ onSend, isLoading }: ChatInputProps) {
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyPress={handleKeyPress}
-        placeholder="Escribe tu pregunta..."
+        placeholder="Pregunta algo..."
         disabled={isLoading}
-        className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="flex-1 bg-black border border-zinc-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-zinc-800 disabled:cursor-not-allowed placeholder-zinc-600"
       />
       <button
         onClick={handleSend}
         disabled={!input.trim() || isLoading}
-        className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg px-4 py-2 transition-colors"
+        className="bg-orange-500 hover:bg-orange-600 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded-lg px-3 py-2 transition-colors"
         aria-label="Enviar mensaje"
       >
-        <Send className="w-5 h-5" />
+        <Send className="w-4 h-4" />
       </button>
     </div>
   );
