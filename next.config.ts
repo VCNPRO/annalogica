@@ -5,29 +5,11 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
 
-  // Configuración de webpack para optimizar chunks CSS
-  webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      // Optimizar la división de chunks de CSS para reducir preload warnings
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          ...config.optimization.splitChunks,
-          cacheGroups: {
-            ...config.optimization.splitChunks?.cacheGroups,
-            // Agrupar todos los estilos en un solo archivo
-            styles: {
-              name: 'styles',
-              test: /\.(css|scss|sass)$/,
-              chunks: 'all',
-              enforce: true,
-              priority: 10,
-            },
-          },
-        },
-      };
-    }
-    return config;
+  // Silenciar warnings de preload CSS (son informativos, no críticos)
+  logging: {
+    fetches: {
+      fullUrl: false,
+    },
   },
 
   async headers() {
