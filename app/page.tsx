@@ -83,15 +83,8 @@ export default function Dashboard() {
       if (savedFiles) {
         const parsedFiles: UploadedFile[] = JSON.parse(savedFiles);
         const restoredFiles = parsedFiles.map(file => {
-          // Solo marcar como error archivos en 'uploading' (nunca llegaron al servidor)
-          // Los archivos en 'processing' se restauran y el polling verificará su estado real
-          if (file.status === 'uploading') {
+          if (file.status === 'uploading' || file.status === 'processing') {
             return { ...file, status: 'error' as FileStatus, uploadProgress: 0, processingProgress: 0 };
-          }
-          // Restaurar archivos en 'processing' para que el polling continúe
-          if (file.status === 'processing' && file.jobId) {
-            // Mantener el estado de processing para que el polling los verifique
-            return file;
           }
           return file;
         });
