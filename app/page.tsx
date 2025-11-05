@@ -535,9 +535,11 @@ export default function Dashboard() {
           console.log('[Process] Document API Response status:', processRes.status);
 
           if (!processRes.ok) {
-            const errorData = await processRes.json();
-            console.error('[Process] Document API Error:', errorData);
-            throw new Error(errorData.error || 'Error al procesar documento');
+            const errorData = await processRes.json().catch(() => ({}));
+            console.error('[Process] Document API Error (full):', JSON.stringify(errorData, null, 2));
+            console.error('[Process] Error message:', errorData.error);
+            console.error('[Process] Error details:', errorData);
+            throw new Error(errorData.error || errorData.message || 'Error al procesar documento');
           }
 
           const responseData = await processRes.json();
