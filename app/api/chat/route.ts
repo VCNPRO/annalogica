@@ -143,10 +143,25 @@ Instrucciones importantes:
     });
 
     // Convertir el historial al formato de Gemini
-    const geminiHistory = history.map((msg: any) => ({
+    // Filtrar para excluir el mensaje de bienvenida inicial del asistente
+    const filteredHistory = history.filter((msg: any, index: number) => {
+      // Excluir el primer mensaje si es del asistente (mensaje de bienvenida)
+      if (index === 0 && msg.role === 'assistant') {
+        return false;
+      }
+      return true;
+    });
+
+    const geminiHistory = filteredHistory.map((msg: any) => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }]
     }));
+
+    // Validar que si hay historial, el primer mensaje sea del usuario
+    if (geminiHistory.length > 0 && geminiHistory[0].role !== 'user') {
+      // Si el primer mensaje no es del usuario, limpiar el historial
+      geminiHistory.splice(0, geminiHistory.length);
+    }
 
     // Iniciar chat con historial
     const chat = model.startChat({
