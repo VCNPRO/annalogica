@@ -234,16 +234,25 @@ export async function parseDocumentFromURL(
 ): Promise<ParseResult> {
   console.log(`[DocumentParser] Fetching document from URL: ${url}`);
 
-  const MAX_RETRIES = 5;
-  const INITIAL_DELAY = 1000; // 1 second
+  const MAX_RETRIES = 10; // Increased from 5 to 10 for CDN propagation
+  const INITIAL_DELAY = 2000; // 2 seconds
+  const MAX_DELAY = 30000; // Cap at 30 seconds per retry
+  const INITIAL_WAIT = 3000; // Wait 3 seconds before first attempt for CDN propagation
   let lastError: Error | null = null;
+
+  // Wait before first attempt to give CDN time to propagate
+  if (INITIAL_WAIT > 0) {
+    console.log(`[DocumentParser] Waiting ${INITIAL_WAIT}ms for CDN propagation before first attempt...`);
+    await new Promise(resolve => setTimeout(resolve, INITIAL_WAIT));
+  }
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      // Add delay before retries (exponential backoff)
+      // Add delay before retries (exponential backoff with cap)
       if (attempt > 0) {
-        const delay = INITIAL_DELAY * Math.pow(2, attempt - 1); // 1s, 2s, 4s, 8s, 16s
-        console.log(`[DocumentParser] Retry attempt ${attempt}/${MAX_RETRIES} after ${delay}ms delay...`);
+        const exponentialDelay = INITIAL_DELAY * Math.pow(2, attempt - 1);
+        const delay = Math.min(exponentialDelay, MAX_DELAY); // Cap at MAX_DELAY
+        console.log(`[DocumentParser] Retry attempt ${attempt}/${MAX_RETRIES} after ${delay}ms delay (${(delay/1000).toFixed(1)}s)...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
@@ -369,16 +378,22 @@ export async function parseDocumentFromURL(
   }
 
   // If we exhausted all retries, throw the last error
-  console.error(`[DocumentParser] ❌ All ${MAX_RETRIES + 1} attempts failed`);
+  const totalWaitTime = INITIAL_WAIT + Array.from({length: MAX_RETRIES}, (_, i) => {
+    const exponentialDelay = INITIAL_DELAY * Math.pow(2, i);
+    return Math.min(exponentialDelay, MAX_DELAY);
+  }).reduce((a, b) => a + b, 0);
+
+  console.error(`[DocumentParser] ❌ All ${MAX_RETRIES + 1} attempts failed after ${(totalWaitTime/1000).toFixed(1)}s total wait time`);
   const finalErrorMessage = lastError instanceof Error ? lastError.message : String(lastError);
   throw {
-    error: `Error descargando documento después de ${MAX_RETRIES + 1} intentos: ${finalErrorMessage}`,
+    error: `Error descargando documento después de ${MAX_RETRIES + 1} intentos (${(totalWaitTime/1000).toFixed(1)}s): ${finalErrorMessage}`,
     attemptedMethods: ['fetch-with-retry'],
     suggestions: [
       'El archivo puede no estar disponible en Vercel Blob CDN',
       'Intenta subir el archivo nuevamente',
       'Verifica que la URL sea correcta',
-      'Puede haber un problema temporal con Vercel Blob'
+      'Puede haber un problema temporal con Vercel Blob',
+      `Se intentó durante ${(totalWaitTime/1000).toFixed(1)} segundos con ${MAX_RETRIES + 1} intentos`
     ]
   } as ParseError;
 }
