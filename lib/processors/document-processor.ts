@@ -25,10 +25,16 @@ export async function processDocumentFile(
     throw new Error('OpenAI API key not configured');
   }
 
+  const startTime = Date.now();
+  const timings: { [key: string]: number } = {};
+
   try {
     console.log('[DocumentProcessor] Starting processing for job:', jobId);
+    console.log('[DocumentProcessor] File:', filename, 'URL:', documentUrl);
 
+    const t0 = Date.now();
     const job = await getTranscriptionJob(jobId);
+    timings['db_get_job'] = Date.now() - t0;
     if (!job) {
       throw new Error('Job not found');
     }
@@ -38,7 +44,9 @@ export async function processDocumentFile(
     // Get user's client_id
     let clientId: number | undefined;
     try {
+      const t1 = Date.now();
       const userResult = await sql`SELECT client_id FROM users WHERE id = ${userId}`;
+      timings['db_get_client_id'] = Date.now() - t1;
       if (userResult.rows.length > 0) {
         clientId = userResult.rows[0].client_id;
         console.log('[DocumentProcessor] User client_id:', clientId);
@@ -49,19 +57,24 @@ export async function processDocumentFile(
     }
 
     // Update status to processing
+    const t2 = Date.now();
     await TranscriptionJobDB.updateStatus(jobId, 'processing');
+    timings['db_update_status'] = Date.now() - t2;
 
     // Extract text from document
-    console.log('[DocumentProcessor] Extracting text from document...');
+    console.log('[DocumentProcessor] ⏱️  Starting text extraction...');
+    const t3 = Date.now();
     const { parseDocumentFromURL } = await import('@/lib/document-parser');
     const { text: extractedText, metadata: parseMetadata } = await parseDocumentFromURL(
       documentUrl,
       filename
     );
+    timings['text_extraction'] = Date.now() - t3;
 
-    console.log('[DocumentProcessor] Text extracted:', {
+    console.log('[DocumentProcessor] ✅ Text extracted:', {
       length: extractedText.length,
-      metadata: parseMetadata
+      metadata: parseMetadata,
+      timeMs: timings['text_extraction']
     });
 
     // Validate PDF page count if applicable
@@ -90,7 +103,8 @@ export async function processDocumentFile(
 
     // Generate summary and tags if requested
     if (actions.includes('Resumir') || actions.includes('Etiquetas')) {
-      console.log('[DocumentProcessor] Generating summary and tags...');
+      console.log('[DocumentProcessor] ⏱️  Generating summary and tags with OpenAI...');
+      const t4 = Date.now();
 
       const prompt = `Analiza el texto de un documento. ${
         actions.includes('Resumir')
@@ -113,7 +127,8 @@ export async function processDocumentFile(
       summary = aiResult.summary || '';
       tags = aiResult.tags || [];
 
-      console.log('[DocumentProcessor] Summary and tags generated');
+      timings['openai_summary_tags'] = Date.now() - t4;
+      console.log('[DocumentProcessor] ✅ Summary and tags generated in', timings['openai_summary_tags'], 'ms');
     }
 
     // 🎤 TTS: Generate audio narration if requested
@@ -196,9 +211,10 @@ export async function processDocumentFile(
     }
 
     // Generate output files (Excel, PDF, TXT)
-    console.log('[DocumentProcessor] Generating output files (Excel, PDF, TXT)...');
+    console.log('[DocumentProcessor] ⏱️  Generating output files (Excel, PDF, TXT)...');
 
     // Generate Excel file with all data
+    const t5 = Date.now();
     const { generateDocumentExcel } = await import('@/lib/excel-generator');
     const excelBuffer = await generateDocumentExcel({
       clientId,
@@ -212,18 +228,22 @@ export async function processDocumentFile(
       language,
       processingDate: new Date()
     });
+    timings['excel_generation'] = Date.now() - t5;
 
+    const t6 = Date.now();
     const excelBlob = await put(
       `documents/${jobId}.xlsx`,
       excelBuffer,
       { access: 'public', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', addRandomSuffix: true }
     );
+    timings['excel_upload'] = Date.now() - t6;
 
-    console.log('[DocumentProcessor] Excel generated');
+    console.log('[DocumentProcessor] ✅ Excel generated and uploaded in', timings['excel_generation'] + timings['excel_upload'], 'ms');
 
     // Generate PDF with all data (with error handling)
     let pdfBlob: any = null;
     try {
+      const t7 = Date.now();
       const { generateDocumentPDF } = await import('@/lib/results-pdf-generator');
       const pdfBuffer = await generateDocumentPDF({
         clientId,
@@ -237,16 +257,19 @@ export async function processDocumentFile(
         language,
         processingDate: new Date()
       });
+      timings['pdf_generation'] = Date.now() - t7;
 
+      const t8 = Date.now();
       pdfBlob = await put(
         `documents/${jobId}.pdf`,
         pdfBuffer,
         { access: 'public', contentType: 'application/pdf', addRandomSuffix: true }
       );
+      timings['pdf_upload'] = Date.now() - t8;
 
-      console.log('[DocumentProcessor] PDF generated');
+      console.log('[DocumentProcessor] ✅ PDF generated and uploaded in', timings['pdf_generation'] + timings['pdf_upload'], 'ms');
     } catch (pdfError: any) {
-      console.error('[DocumentProcessor] PDF generation failed (non-fatal):', pdfError.message);
+      console.error('[DocumentProcessor] ⚠️  PDF generation failed (non-fatal):', pdfError.message);
       // PDF generation is not critical, continue without it
     }
 
@@ -301,7 +324,30 @@ export async function processDocumentFile(
       console.error('[DocumentProcessor] URL:', documentUrl);
     }
 
-    console.log('[DocumentProcessor] Processing completed successfully:', jobId);
+    // Calculate total time and log detailed timings
+    const totalTime = Date.now() - startTime;
+    timings['total'] = totalTime;
+
+    console.log('[DocumentProcessor] ✅ Processing completed successfully:', jobId);
+    console.log('[DocumentProcessor] ⏱️  DETAILED TIMINGS:');
+    console.log('  - DB get job:', timings['db_get_job'] || 0, 'ms');
+    console.log('  - DB get client_id:', timings['db_get_client_id'] || 0, 'ms');
+    console.log('  - DB update status:', timings['db_update_status'] || 0, 'ms');
+    console.log('  - 📄 TEXT EXTRACTION:', timings['text_extraction'] || 0, 'ms', '← CRITICAL');
+    console.log('  - 🤖 OpenAI (summary+tags):', timings['openai_summary_tags'] || 0, 'ms');
+    console.log('  - 📊 Excel generation:', timings['excel_generation'] || 0, 'ms');
+    console.log('  - 📊 Excel upload:', timings['excel_upload'] || 0, 'ms');
+    console.log('  - 📄 PDF generation:', timings['pdf_generation'] || 0, 'ms');
+    console.log('  - 📄 PDF upload:', timings['pdf_upload'] || 0, 'ms');
+    console.log('  - 🕐 TOTAL TIME:', totalTime, 'ms (', (totalTime / 1000).toFixed(2), 'seconds )');
+
+    // Highlight slow operations
+    if (timings['text_extraction'] > 10000) {
+      console.warn('[DocumentProcessor] ⚠️  TEXT EXTRACTION is SLOW (>10s)! Consider optimization.');
+    }
+    if (totalTime > 60000) {
+      console.warn('[DocumentProcessor] ⚠️  TOTAL TIME is SLOW (>60s)! User experience degraded.');
+    }
 
   } catch (error: any) {
     console.error('[DocumentProcessor] Error processing document:', error);
