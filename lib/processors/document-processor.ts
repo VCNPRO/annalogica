@@ -5,6 +5,7 @@ import { put, del } from '@vercel/blob';
 import { sql } from '@vercel/postgres';
 import { getTranscriptionJob } from '@/lib/db/transcriptions';
 import { TranscriptionJobDB } from '@/lib/db';
+import { trackError } from '@/lib/error-tracker';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -51,35 +52,105 @@ export async function processDocumentFile(
     // Update status to processing
     await TranscriptionJobDB.updateStatus(jobId, 'processing');
 
-    // Extract text from document
+    // STEP 1: Extract text from document
     console.log('[DocumentProcessor] Extracting text from document...');
-    const { parseDocumentFromURL } = await import('@/lib/document-parser');
-    const { text: extractedText, metadata: parseMetadata } = await parseDocumentFromURL(
-      documentUrl,
-      filename
-    );
+    let extractedText: string;
+    let parseMetadata: any;
 
-    console.log('[DocumentProcessor] Text extracted:', {
-      length: extractedText.length,
-      metadata: parseMetadata
-    });
+    try {
+      const { parseDocumentFromURL } = await import('@/lib/document-parser');
+      const parseResult = await parseDocumentFromURL(documentUrl, filename);
 
-    // Validate PDF page count if applicable
-    if (parseMetadata.pages && parseMetadata.method === 'unpdf') {
-      const { validatePdfPages } = await import('@/lib/subscription-guard-v2');
-      const pageValidation = await validatePdfPages(userId, parseMetadata.pages);
+      extractedText = parseResult.text;
+      parseMetadata = parseResult.metadata;
 
-      if (!pageValidation.allowed) {
-        throw new Error(
-          pageValidation.message ||
-          `PDF tiene ${parseMetadata.pages} páginas. Límite: ${pageValidation.maxPages} páginas.`
-        );
-      }
-
-      console.log('[DocumentProcessor] PDF page count validated:', {
-        pages: parseMetadata.pages,
-        maxPages: pageValidation.maxPages
+      console.log('[DocumentProcessor] ✅ Text extracted:', {
+        length: extractedText.length,
+        metadata: parseMetadata
       });
+    } catch (error: any) {
+      const errorMsg = `Document text extraction failed: ${error.message}`;
+      await trackError(
+        'document_extraction_error',
+        'critical',
+        errorMsg,
+        error,
+        {
+          userId,
+          metadata: {
+            jobId,
+            fileName: filename,
+            documentUrl: documentUrl.substring(0, 100),
+            step: 'STEP 1: Document Text Extraction',
+            errorType: error.constructor.name,
+            errorStack: error.stack
+          }
+        }
+      );
+      await TranscriptionJobDB.updateStatus(jobId, 'failed');
+      await TranscriptionJobDB.updateResults(jobId, {
+        metadata: { ...metadata, error: errorMsg }
+      });
+      throw new Error(errorMsg);
+    }
+
+    // STEP 2: Validate PDF page count if applicable
+    if (parseMetadata.pages && parseMetadata.method === 'unpdf') {
+      try {
+        const { validatePdfPages } = await import('@/lib/subscription-guard-v2');
+        const pageValidation = await validatePdfPages(userId, parseMetadata.pages);
+
+        if (!pageValidation.allowed) {
+          const errorMsg = pageValidation.message ||
+            `PDF tiene ${parseMetadata.pages} páginas. Límite: ${pageValidation.maxPages} páginas.`;
+
+          await trackError(
+            'pdf_page_limit_exceeded',
+            'medium',
+            errorMsg,
+            new Error(errorMsg),
+            {
+              userId,
+              metadata: {
+                jobId,
+                fileName: filename,
+                pages: parseMetadata.pages,
+                maxPages: pageValidation.maxPages,
+                step: 'STEP 2: PDF Page Validation'
+              }
+            }
+          );
+
+          throw new Error(errorMsg);
+        }
+
+        console.log('[DocumentProcessor] ✅ PDF page count validated:', {
+          pages: parseMetadata.pages,
+          maxPages: pageValidation.maxPages
+        });
+      } catch (error: any) {
+        if (error.message.includes('Límite')) {
+          throw error; // Re-throw quota errors
+        }
+
+        await trackError(
+          'pdf_page_validation_error',
+          'high',
+          `PDF page validation failed: ${error.message}`,
+          error,
+          {
+            userId,
+            metadata: {
+              jobId,
+              fileName: filename,
+              pages: parseMetadata.pages,
+              step: 'STEP 2: PDF Page Validation',
+              errorType: error.constructor.name
+            }
+          }
+        );
+        throw error;
+      }
     }
 
     // Prepare for output files
@@ -88,35 +159,63 @@ export async function processDocumentFile(
     let summary: string | undefined;
     let tags: string[] | undefined;
 
-    // Generate summary and tags if requested
+    // STEP 3: Generate summary and tags if requested
     if (actions.includes('Resumir') || actions.includes('Etiquetas')) {
       console.log('[DocumentProcessor] Generating summary and tags...');
 
-      const prompt = `Analiza el texto de un documento. ${
-        actions.includes('Resumir')
-          ? `Genera un resumen tipo "${summaryType}".`
-          : ''
-      } ${
-        actions.includes('Etiquetas') ? 'Genera 5-10 etiquetas clave.' : ''
-      } Responde en JSON con claves "summary" y "tags".`;
+      try {
+        const prompt = `Analiza el texto de un documento. ${
+          actions.includes('Resumir')
+            ? `Genera un resumen tipo "${summaryType}".`
+            : ''
+        } ${
+          actions.includes('Etiquetas') ? 'Genera 5-10 etiquetas clave.' : ''
+        } Responde en JSON con claves "summary" y "tags".`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "user", content: prompt },
-          { role: "system", content: `Texto:\n---\n${extractedText}` }
-        ],
-        response_format: { type: "json_object" }
-      });
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "user", content: prompt },
+            { role: "system", content: `Texto:\n---\n${extractedText}` }
+          ],
+          response_format: { type: "json_object" }
+        });
 
-      const aiResult = JSON.parse(completion.choices[0].message.content || '{}');
-      summary = aiResult.summary || '';
-      tags = aiResult.tags || [];
+        const aiResult = JSON.parse(completion.choices[0].message.content || '{}');
+        summary = aiResult.summary || '';
+        tags = aiResult.tags || [];
 
-      console.log('[DocumentProcessor] Summary and tags generated');
+        console.log('[DocumentProcessor] ✅ Summary and tags generated:', {
+          summaryLength: summary?.length || 0,
+          tagsCount: tags?.length || 0
+        });
+      } catch (error: any) {
+        const errorMsg = `Summary/tags generation failed: ${error.message}`;
+        await trackError(
+          'document_ai_processing_error',
+          'high',
+          errorMsg,
+          error,
+          {
+            userId,
+            metadata: {
+              jobId,
+              fileName: filename,
+              actions,
+              summaryType,
+              textLength: extractedText.length,
+              step: 'STEP 3: Summary/Tags Generation',
+              errorType: error.constructor.name,
+              openAIError: error.response?.data || error.message
+            }
+          }
+        );
+        // Continue without summary/tags (non-fatal)
+        console.error('[DocumentProcessor] Summary/tags generation failed (non-fatal):', error.message);
+      }
     }
 
-    // 🎤 TTS: Generate audio narration if requested
+    // STEP 4: TTS - Generate audio narration if requested
     let ttsUrl: string | undefined;
     if (actions.includes('GenerarAudio') || actions.includes('TTS')) {
       console.log('[DocumentProcessor] Generating audio with TTS...');
@@ -152,7 +251,6 @@ export async function processDocumentFile(
         });
 
         // Upload to Vercel Blob
-        const timestamp = Date.now();
         const audioFilename = `tts/${timestamp}-${filename.replace(/\.[^/.]+$/, '')}.mp3`;
 
         const ttsBlob = await put(audioFilename, buffer, {
@@ -162,7 +260,7 @@ export async function processDocumentFile(
         });
 
         ttsUrl = ttsBlob.url;
-        console.log('[DocumentProcessor] TTS audio uploaded:', ttsUrl);
+        console.log('[DocumentProcessor] ✅ TTS audio uploaded:', ttsUrl);
 
         // Log usage for analytics
         try {
@@ -190,38 +288,79 @@ export async function processDocumentFile(
         }
 
       } catch (ttsError: any) {
+        const errorMsg = `TTS generation failed: ${ttsError.message}`;
+        await trackError(
+          'document_tts_error',
+          'medium',
+          errorMsg,
+          ttsError,
+          {
+            userId,
+            metadata: {
+              jobId,
+              fileName: filename,
+              textLength: extractedText.length,
+              step: 'STEP 4: TTS Generation',
+              errorType: ttsError.constructor.name,
+              openAIError: ttsError.response?.data || ttsError.message
+            }
+          }
+        );
+        // Continue processing even if TTS fails (non-fatal)
         console.error('[DocumentProcessor] TTS generation failed (non-fatal):', ttsError.message);
-        // Continue processing even if TTS fails
       }
     }
 
-    // Generate output files (Excel, PDF, TXT)
-    console.log('[DocumentProcessor] Generating output files (Excel, PDF, TXT)...');
+    // STEP 5: Generate Excel file
+    console.log('[DocumentProcessor] Generating Excel file...');
+    let excelBlob: any;
 
-    // Generate Excel file with all data
-    const { generateDocumentExcel } = await import('@/lib/excel-generator');
-    const excelBuffer = await generateDocumentExcel({
-      clientId,
-      filename,
-      title: undefined, // Could extract from first lines of text
-      documentType: parseMetadata.method === 'unpdf' ? 'PDF' : parseMetadata.method === 'mammoth' ? 'DOCX' : 'TXT',
-      pageCount: parseMetadata.pages,
-      extractedText,
-      summary,
-      tags,
-      language,
-      processingDate: new Date()
-    });
+    try {
+      const { generateDocumentExcel } = await import('@/lib/excel-generator');
+      const excelBuffer = await generateDocumentExcel({
+        clientId,
+        filename,
+        title: undefined,
+        documentType: parseMetadata.method === 'unpdf' ? 'PDF' : parseMetadata.method === 'mammoth' ? 'DOCX' : 'TXT',
+        pageCount: parseMetadata.pages,
+        extractedText,
+        summary,
+        tags,
+        language,
+        processingDate: new Date()
+      });
 
-    const excelBlob = await put(
-      `documents/${jobId}.xlsx`,
-      excelBuffer,
-      { access: 'public', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', addRandomSuffix: true }
-    );
+      excelBlob = await put(
+        `documents/${jobId}.xlsx`,
+        excelBuffer,
+        { access: 'public', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', addRandomSuffix: true }
+      );
 
-    console.log('[DocumentProcessor] Excel generated');
+      console.log('[DocumentProcessor] ✅ Excel generated');
+    } catch (error: any) {
+      const errorMsg = `Excel generation failed: ${error.message}`;
+      await trackError(
+        'document_excel_generation_error',
+        'high',
+        errorMsg,
+        error,
+        {
+          userId,
+          metadata: {
+            jobId,
+            fileName: filename,
+            documentType: parseMetadata.method,
+            pageCount: parseMetadata.pages,
+            step: 'STEP 5: Excel Generation',
+            errorType: error.constructor.name
+          }
+        }
+      );
+      throw new Error(errorMsg);
+    }
 
-    // Generate PDF with all data (with error handling)
+    // STEP 6: Generate PDF with all data (with error handling)
+    console.log('[DocumentProcessor] Generating PDF file...');
     let pdfBlob: any = null;
     try {
       const { generateDocumentPDF } = await import('@/lib/results-pdf-generator');
@@ -244,29 +383,72 @@ export async function processDocumentFile(
         { access: 'public', contentType: 'application/pdf', addRandomSuffix: true }
       );
 
-      console.log('[DocumentProcessor] PDF generated');
+      console.log('[DocumentProcessor] ✅ PDF generated');
     } catch (pdfError: any) {
-      console.error('[DocumentProcessor] PDF generation failed (non-fatal):', pdfError.message);
+      const errorMsg = `PDF generation failed: ${pdfError.message}`;
+      await trackError(
+        'document_pdf_generation_error',
+        'low',
+        errorMsg,
+        pdfError,
+        {
+          userId,
+          metadata: {
+            jobId,
+            fileName: filename,
+            step: 'STEP 6: PDF Generation',
+            errorType: pdfError.constructor.name
+          }
+        }
+      );
       // PDF generation is not critical, continue without it
+      console.error('[DocumentProcessor] PDF generation failed (non-fatal):', pdfError.message);
     }
 
-    // Save extracted text (TXT)
-    const txtFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-extracted.txt`;
-    const txtBlob = await put(txtFilename, Buffer.from(extractedText, 'utf-8'), {
-      access: 'public',
-      contentType: 'text/plain; charset=utf-8',
-      addRandomSuffix: true
-    });
+    // STEP 7: Save text files
+    console.log('[DocumentProcessor] Saving text files...');
+    let txtBlob: any;
 
-    // Save summary if generated
-    if (summary) {
-      const summaryFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-summary.txt`;
-      const summaryBlob = await put(summaryFilename, Buffer.from(summary, 'utf-8'), {
+    try {
+      // Save extracted text (TXT)
+      const txtFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-extracted.txt`;
+      txtBlob = await put(txtFilename, Buffer.from(extractedText, 'utf-8'), {
         access: 'public',
         contentType: 'text/plain; charset=utf-8',
         addRandomSuffix: true
       });
-      summaryUrl = summaryBlob.url;
+
+      // Save summary if generated
+      if (summary) {
+        const summaryFilename = `${timestamp}-${filename.replace(/\.[^/.]+$/, '')}-summary.txt`;
+        const summaryBlob = await put(summaryFilename, Buffer.from(summary, 'utf-8'), {
+          access: 'public',
+          contentType: 'text/plain; charset=utf-8',
+          addRandomSuffix: true
+        });
+        summaryUrl = summaryBlob.url;
+      }
+
+      console.log('[DocumentProcessor] ✅ Text files saved');
+    } catch (error: any) {
+      const errorMsg = `Text file upload failed: ${error.message}`;
+      await trackError(
+        'document_file_upload_error',
+        'critical',
+        errorMsg,
+        error,
+        {
+          userId,
+          metadata: {
+            jobId,
+            fileName: filename,
+            textLength: extractedText.length,
+            step: 'STEP 7: File Upload',
+            errorType: error.constructor.name
+          }
+        }
+      );
+      throw new Error(errorMsg);
     }
 
     console.log('[DocumentProcessor] All output files saved');
@@ -283,8 +465,8 @@ export async function processDocumentFile(
         isDocument: true,
         tags,
         excelUrl: excelBlob.url,
-        pdfUrl: pdfBlob?.url || null, // 🔥 FIX: pdfBlob puede ser null si la generación falla
-        ttsUrl: ttsUrl || null // 🎤 URL del audio narrado (si se generó)
+        pdfUrl: pdfBlob?.url || null,
+        ttsUrl: ttsUrl || null
       }
     });
 
@@ -305,6 +487,24 @@ export async function processDocumentFile(
 
   } catch (error: any) {
     console.error('[DocumentProcessor] Error processing document:', error);
+
+    // Track general processing error
+    await trackError(
+      'document_processing_general_error',
+      'critical',
+      `Document processing failed: ${error.message}`,
+      error,
+      {
+        metadata: {
+          jobId,
+          fileName: filename,
+          documentUrl: documentUrl.substring(0, 100),
+          actions,
+          errorType: error.constructor.name
+        }
+      }
+    );
+
     const job = await getTranscriptionJob(jobId);
     await TranscriptionJobDB.updateStatus(jobId, 'failed');
     await TranscriptionJobDB.updateResults(jobId, {
