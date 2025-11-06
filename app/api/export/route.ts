@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     let jobs;
     if (jobId) {
       // Export single file
-      const job = await TranscriptionJobDB.findByJobId(jobId);
+      const job = await TranscriptionJobDB.findById(jobId);
       if (!job || job.user_id !== auth.userId) {
         return NextResponse.json(
           { error: 'Archivo no encontrado o no autorizado' },
