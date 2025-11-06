@@ -222,7 +222,11 @@ export async function parseDocument(
 }
 
 /**
- * Fetch document from URL and parse
+ * Fetch document from URL and parse with retry logic
+ *
+ * Vercel Blob uses a CDN with eventual consistency, which means files
+ * may not be immediately available after upload. This function retries
+ * with exponential backoff to handle this.
  */
 export async function parseDocumentFromURL(
   url: string,
@@ -230,85 +234,129 @@ export async function parseDocumentFromURL(
 ): Promise<ParseResult> {
   console.log(`[DocumentParser] Fetching document from URL: ${url}`);
 
-  try {
-    // Fetch with proper error handling
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Annalogica Document Parser'
-      }
-    });
+  const MAX_RETRIES = 5;
+  const INITIAL_DELAY = 1000; // 1 second
+  let lastError: Error | null = null;
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => 'No error details');
-      console.error(`[DocumentParser] HTTP Error ${response.status}:`, errorText);
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    // Get response as arrayBuffer
-    const arrayBuffer = await response.arrayBuffer();
-
-    // Convert to Buffer with proper handling
-    let buffer: Buffer;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      if (arrayBuffer instanceof ArrayBuffer) {
-        buffer = Buffer.from(arrayBuffer);
-      } else if (Buffer.isBuffer(arrayBuffer)) {
-        buffer = arrayBuffer;
-      } else if (arrayBuffer && typeof arrayBuffer === 'object') {
-        // Handle case where arrayBuffer might be a Uint8Array or similar
-        buffer = Buffer.from(arrayBuffer as any);
-      } else {
-        throw new Error(`Invalid response type: ${typeof arrayBuffer}`);
+      // Add delay before retries (exponential backoff)
+      if (attempt > 0) {
+        const delay = INITIAL_DELAY * Math.pow(2, attempt - 1); // 1s, 2s, 4s, 8s, 16s
+        console.log(`[DocumentParser] Retry attempt ${attempt}/${MAX_RETRIES} after ${delay}ms delay...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-    } catch (conversionError: any) {
-      console.error('[DocumentParser] Buffer conversion error:', {
-        type: typeof arrayBuffer,
-        isArrayBuffer: arrayBuffer instanceof ArrayBuffer,
-        isBuffer: Buffer.isBuffer(arrayBuffer),
-        constructor: arrayBuffer?.constructor?.name,
-        error: conversionError.message
+
+      // Fetch with proper error handling
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Annalogica Document Parser'
+        }
       });
-      throw new Error(`No se pudo convertir la respuesta a Buffer: ${conversionError.message}`);
-    }
 
-    console.log(`[DocumentParser] ✅ Downloaded ${buffer.length} bytes`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'No error details');
 
-    return await parseDocument(buffer, filename);
+        // If it's a 404, it might be due to CDN propagation delay - retry
+        if (response.status === 404 && attempt < MAX_RETRIES) {
+          console.warn(`[DocumentParser] 404 on attempt ${attempt + 1}/${MAX_RETRIES + 1} - file may not be propagated to CDN yet`);
+          lastError = new Error(`HTTP ${response.status}: ${response.statusText}`);
+          continue; // Retry
+        }
 
-  } catch (error: any) {
-    // Extract error message properly
-    let errorMessage = 'Unknown error';
-
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    } else if (typeof error === 'string') {
-      errorMessage = error;
-    } else if (error?.message) {
-      errorMessage = error.message;
-    } else if (error?.cause) {
-      errorMessage = String(error.cause);
-    } else {
-      try {
-        errorMessage = JSON.stringify(error);
-      } catch {
-        errorMessage = String(error);
+        console.error(`[DocumentParser] HTTP Error ${response.status}:`, errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      // Get response as arrayBuffer
+      const arrayBuffer = await response.arrayBuffer();
+
+      // Convert to Buffer with proper handling
+      let buffer: Buffer;
+      try {
+        if (arrayBuffer instanceof ArrayBuffer) {
+          buffer = Buffer.from(arrayBuffer);
+        } else if (Buffer.isBuffer(arrayBuffer)) {
+          buffer = arrayBuffer;
+        } else if (arrayBuffer && typeof arrayBuffer === 'object') {
+          // Handle case where arrayBuffer might be a Uint8Array or similar
+          buffer = Buffer.from(arrayBuffer as any);
+        } else {
+          throw new Error(`Invalid response type: ${typeof arrayBuffer}`);
+        }
+      } catch (conversionError: any) {
+        console.error('[DocumentParser] Buffer conversion error:', {
+          type: typeof arrayBuffer,
+          isArrayBuffer: arrayBuffer instanceof ArrayBuffer,
+          isBuffer: Buffer.isBuffer(arrayBuffer),
+          constructor: arrayBuffer?.constructor?.name,
+          error: conversionError.message
+        });
+        throw new Error(`No se pudo convertir la respuesta a Buffer: ${conversionError.message}`);
+      }
+
+      console.log(`[DocumentParser] ✅ Downloaded ${buffer.length} bytes on attempt ${attempt + 1}`);
+
+      // Success! Parse and return
+      return await parseDocument(buffer, filename);
+
+    } catch (error: any) {
+      // Store the error for potential retry or final throw
+      lastError = error;
+
+      // If it's a retryable error and we have attempts left, continue loop
+      if (attempt < MAX_RETRIES && error.message?.includes('404')) {
+        console.warn(`[DocumentParser] Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed with 404, will retry...`);
+        continue;
+      }
+
+      // Otherwise, throw immediately (don't retry non-404 errors)
+      // Extract error message properly
+      let errorMessage = 'Unknown error';
+
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.cause) {
+        errorMessage = String(error.cause);
+      } else {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch {
+          errorMessage = String(error);
+        }
+      }
+
+      console.error('[DocumentParser] ❌ Failed to fetch document:', errorMessage);
+      console.error('[DocumentParser] Full error object:', error);
+
+      throw {
+        error: `Error descargando documento: ${errorMessage}`,
+        attemptedMethods: ['fetch'],
+        suggestions: [
+          'Verifica que la URL sea válida y accesible',
+          'El archivo puede haber sido eliminado de Vercel Blob',
+          'Puede haber un problema de conectividad de red'
+        ]
+      } as ParseError;
     }
-
-    console.error('[DocumentParser] ❌ Failed to fetch document:', errorMessage);
-    console.error('[DocumentParser] Full error object:', error);
-    console.error('[DocumentParser] Error type:', typeof error);
-    console.error('[DocumentParser] Error keys:', error ? Object.keys(error) : 'none');
-
-    throw {
-      error: `Error descargando documento: ${errorMessage}`,
-      attemptedMethods: ['fetch'],
-      suggestions: [
-        'Verifica que la URL sea válida y accesible',
-        'El archivo puede haber sido eliminado de Vercel Blob',
-        'Puede haber un problema de conectividad de red'
-      ]
-    } as ParseError;
   }
+
+  // If we exhausted all retries, throw the last error
+  console.error(`[DocumentParser] ❌ All ${MAX_RETRIES + 1} attempts failed`);
+  const finalErrorMessage = lastError instanceof Error ? lastError.message : String(lastError);
+  throw {
+    error: `Error descargando documento después de ${MAX_RETRIES + 1} intentos: ${finalErrorMessage}`,
+    attemptedMethods: ['fetch-with-retry'],
+    suggestions: [
+      'El archivo puede no estar disponible en Vercel Blob CDN',
+      'Intenta subir el archivo nuevamente',
+      'Verifica que la URL sea correcta',
+      'Puede haber un problema temporal con Vercel Blob'
+    ]
+  } as ParseError;
 }
