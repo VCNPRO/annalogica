@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "generate-guide": "node scripts/generate-user-guide.js",
+    "generate-informe": "node scripts/generate-informe-pdf.js",
     "migrate:admin": "node scripts/apply-admin-migration.js",
     "migrate:language": "node scripts/apply-language-migration.js",
     "postinstall": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs', 'public/pdf.worker.min.mjs')\"",
