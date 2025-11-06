@@ -83,8 +83,14 @@ export default function Dashboard() {
       if (savedFiles) {
         const parsedFiles: UploadedFile[] = JSON.parse(savedFiles);
         const restoredFiles = parsedFiles.map(file => {
+          // Solo marcar como error los archivos que estaban en proceso al cerrar
+          // Los archivos completados se mantienen como completados
           if (file.status === 'uploading' || file.status === 'processing') {
             return { ...file, status: 'error' as FileStatus, uploadProgress: 0, processingProgress: 0 };
+          }
+          // Los archivos completados se mantienen sin cambios
+          if (file.status === 'completed') {
+            return file;
           }
           return file;
         });
@@ -227,8 +233,9 @@ export default function Dashboard() {
         try {
           const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
           if (!res.ok) {
-            if (res.status === 404) {
-              setUploadedFiles(prev => prev.map(f => f.id === file.id ? { ...f, status: 'error' } : f));
+            // Si el archivo ya está completado, no marcar como error
+            if (res.status === 404 && file.status !== 'completed') {
+              setUploadedFiles(prev => prev.map(f => f.id === file.id && f.status !== 'completed' ? { ...f, status: 'error' } : f));
             }
             continue;
           }
@@ -1248,7 +1255,7 @@ export default function Dashboard() {
               {/* Fila 4: Etiquetas + Archivos Procesados */}
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleApplyAction('Etiquetas')}
+                  onClick={() => handleApplyAction('Aplicar Tags')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
                   title={t('dashboard.tags')}
                 >

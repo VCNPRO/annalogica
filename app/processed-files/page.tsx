@@ -1112,6 +1112,44 @@ export default function ProcessedFilesPage() {
                                         🎤
                                       </a>
                                     )}
+
+                                    {/* Exportar archivo individual a CSV */}
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          const res = await fetch(`/api/export?format=csv&jobId=${job.id}`, { credentials: 'include' });
+                                          if (!res.ok) throw new Error('Error al exportar');
+                                          const blob = await res.blob();
+                                          triggerDownload(blob, `${baseFilename}.csv`);
+                                          showNotification('CSV descargado correctamente', 'success');
+                                        } catch (error) {
+                                          showNotification('Error al exportar CSV', 'error');
+                                        }
+                                      }}
+                                      className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
+                                      title="Exportar archivo a CSV"
+                                    >
+                                      <Download className="h-3 w-3 mr-1" /> 📄 CSV
+                                    </button>
+
+                                    {/* Exportar archivo individual a Excel */}
+                                    <button
+                                      onClick={async () => {
+                                        try {
+                                          const res = await fetch(`/api/export?format=excel&jobId=${job.id}`, { credentials: 'include' });
+                                          if (!res.ok) throw new Error('Error al exportar');
+                                          const blob = await res.blob();
+                                          triggerDownload(blob, `${baseFilename}.xlsx`);
+                                          showNotification('Excel descargado correctamente', 'success');
+                                        } catch (error) {
+                                          showNotification('Error al exportar Excel', 'error');
+                                        }
+                                      }}
+                                      className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
+                                      title="Exportar archivo a Excel"
+                                    >
+                                      <Download className="h-3 w-3 mr-1" /> 📊 Excel
+                                    </button>
                                   </>
                                 );
                               })()}
