@@ -21,7 +21,7 @@ const checks = [
 let allGood = true;
 
 checks.forEach(check => {
-  const isConfigured = check.value && check.value !== 'tu_api_key_aqui';
+  const isConfigured = check.value && check.value !== 'tu_api_key_aqui' && check.value !== 'tu_gemini_api_key_aqui';
   const status = isConfigured ? '✅' : '❌';
 
   console.log(`${status} ${check.name}:`);

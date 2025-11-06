@@ -1,8 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Inicializar el cliente de Gemini con la API key del servidor
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Función para inicializar el cliente de Gemini
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'tu_gemini_api_key_aqui' || apiKey === 'tu_api_key_aqui') {
+    throw new Error('GEMINI_API_KEY no está configurada correctamente');
+  }
+  return new GoogleGenerativeAI(apiKey);
+}
 
 // Guía de usuario de annalogica
 const USER_GUIDE = `
@@ -90,9 +96,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar que la API key esté configurada
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GEMINI_API_KEY ||
+        process.env.GEMINI_API_KEY === 'tu_gemini_api_key_aqui' ||
+        process.env.GEMINI_API_KEY === 'tu_api_key_aqui') {
       return NextResponse.json(
-        { error: 'GEMINI_API_KEY no configurada' },
+        {
+          error: 'GEMINI_API_KEY no configurada correctamente',
+          message: 'Por favor, configura tu API key de Gemini en las variables de entorno. Obtén una gratis en: https://aistudio.google.com/app/apikey'
+        },
         { status: 500 }
       );
     }
@@ -106,10 +117,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Crear el modelo con el contexto de la guía de usuario
+    // Inicializar cliente y crear el modelo con el contexto de la guía de usuario
+    const genAI = getGeminiClient();
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.0-flash-exp',
-      systemInstruction: `Eres un asistente virtual amigable y útil para annalogica, una aplicación de transcripción de audio y video.
+      systemInstruction: `Eres anna, el asistente virtual de annalogica, una aplicación de transcripción de audio y video.
 
 Tu función es ayudar a los usuarios a:
 - Entender cómo usar la aplicación
@@ -123,7 +135,8 @@ ${USER_GUIDE}
 
 Instrucciones importantes:
 - Sé breve, claro y directo
-- Usa un tono amigable y profesional
+- Usa un tono amigable, cercano y natural
+- Te llamas "anna" (en minúsculas)
 - Si no sabes algo, admítelo y sugiere contactar con soporte
 - Estructura tus respuestas con listas y secciones cuando sea apropiado
 - Responde en el mismo idioma en que te pregunten (principalmente español)
@@ -131,10 +144,25 @@ Instrucciones importantes:
     });
 
     // Convertir el historial al formato de Gemini
-    const geminiHistory = history.map((msg: any) => ({
+    // Filtrar para excluir el mensaje de bienvenida inicial del asistente
+    const filteredHistory = history.filter((msg: any, index: number) => {
+      // Excluir el primer mensaje si es del asistente (mensaje de bienvenida)
+      if (index === 0 && msg.role === 'assistant') {
+        return false;
+      }
+      return true;
+    });
+
+    const geminiHistory = filteredHistory.map((msg: any) => ({
       role: msg.role === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }]
     }));
+
+    // Validar que si hay historial, el primer mensaje sea del usuario
+    if (geminiHistory.length > 0 && geminiHistory[0].role !== 'user') {
+      // Si el primer mensaje no es del usuario, limpiar el historial
+      geminiHistory.splice(0, geminiHistory.length);
+    }
 
     // Iniciar chat con historial
     const chat = model.startChat({
@@ -153,8 +181,26 @@ Instrucciones importantes:
 
   } catch (error: any) {
     console.error('Error en chat API:', error);
+
+    // Mensajes de error más específicos
+    let errorMessage = 'Error procesando solicitud';
+
+    if (error.message?.includes('API key')) {
+      errorMessage = 'API key de Gemini inválida. Por favor, verifica tu configuración.';
+    } else if (error.message?.includes('quota') || error.message?.includes('limit')) {
+      errorMessage = 'Límite de uso de API alcanzado. Intenta de nuevo más tarde.';
+    } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+      errorMessage = 'Error de conexión con el servicio de IA. Verifica tu conexión a internet.';
+    } else if (error.message) {
+      errorMessage = `Error: ${error.message}`;
+    }
+
     return NextResponse.json(
-      { error: 'Error procesando solicitud', details: error.message },
+      {
+        error: errorMessage,
+        message: errorMessage,
+        details: error.message
+      },
       { status: 500 }
     );
   }
