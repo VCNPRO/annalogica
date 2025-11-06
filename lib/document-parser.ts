@@ -284,7 +284,7 @@ export async function parseDocumentFromURL(
           console.error('[DocumentParser] Response is not an ArrayBuffer:', {
             type: typeof rawArrayBuffer,
             constructor: (rawArrayBuffer as any)?.constructor?.name,
-            isArrayBuffer: rawArrayBuffer instanceof ArrayBuffer
+            isArrayBuffer: (rawArrayBuffer as any) instanceof ArrayBuffer
           });
           throw new Error(`Expected ArrayBuffer, got ${typeof rawArrayBuffer}`);
         }
