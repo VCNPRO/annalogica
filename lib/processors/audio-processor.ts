@@ -9,6 +9,7 @@ import {
   markTranscriptionError,
   getTranscriptionJob
 } from '@/lib/db/transcriptions';
+import { trackError } from '@/lib/error-tracker';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -72,62 +73,133 @@ export async function processAudioFile(jobId: string): Promise<void> {
 
     // STEP 1: Download audio
     console.log('[AudioProcessor] Downloading audio:', fileName);
-    const response = await fetch(audioUrl);
-    if (!response.ok) {
-      throw new Error(`Error downloading audio: ${response.status}`);
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = Buffer.from(arrayBuffer);
-
-    // Use Node.js 18+ File API for OpenAI compatibility
-    const { File } = await import('node:buffer');
-    const audioFileForWhisper = new File(
-      [audioBuffer],
-      fileName,
-      {
-        type: response.headers.get('content-type') || 'audio/mpeg'
+    let audioFileForWhisper: any;
+    try {
+      const response = await fetch(audioUrl);
+      if (!response.ok) {
+        const errorMsg = `Failed to download audio: HTTP ${response.status} ${response.statusText}`;
+        await trackError(
+          'audio_download_failed',
+          'high',
+          errorMsg,
+          new Error(errorMsg),
+          {
+            userId,
+            metadata: {
+              jobId,
+              fileName,
+              audioUrl: audioUrl.substring(0, 100),
+              httpStatus: response.status,
+              httpStatusText: response.statusText,
+              step: 'STEP 1: Download Audio'
+            }
+          }
+        );
+        throw new Error(errorMsg);
       }
-    );
 
-    console.log('[AudioProcessor] Audio downloaded:', {
-      size: `${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB`,
-      type: audioFileForWhisper.type
-    });
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = Buffer.from(arrayBuffer);
 
-    await updateTranscriptionProgress(jobId, 20);
+      // Use Node.js 18+ File API for OpenAI compatibility
+      const { File } = await import('node:buffer');
+      audioFileForWhisper = new File(
+        [audioBuffer],
+        fileName,
+        {
+          type: response.headers.get('content-type') || 'audio/mpeg'
+        }
+      );
+
+      const audioSizeMB = (audioBuffer.length / 1024 / 1024).toFixed(2);
+      console.log('[AudioProcessor] ✅ Audio downloaded:', {
+        size: `${audioSizeMB} MB`,
+        type: audioFileForWhisper.type
+      });
+
+      await updateTranscriptionProgress(jobId, 20);
+    } catch (error: any) {
+      const errorMsg = `Audio download failed: ${error.message}`;
+      await trackError(
+        'audio_download_error',
+        'critical',
+        errorMsg,
+        error,
+        {
+          userId,
+          metadata: {
+            jobId,
+            fileName,
+            audioUrl: audioUrl.substring(0, 100),
+            step: 'STEP 1: Download Audio',
+            errorType: error.constructor.name
+          }
+        }
+      );
+      await markTranscriptionError(jobId, errorMsg);
+      throw new Error(errorMsg);
+    }
 
     // STEP 2: Transcribe with Whisper
     console.log('[AudioProcessor] Starting Whisper transcription...');
+    let transcriptionText: string;
+    let transcriptionDuration: number;
+    let transcriptionSegments: any[];
 
-    // Build transcription params
-    const transcriptionParams: any = {
-      file: audioFileForWhisper,
-      model: "whisper-1",
-      response_format: "verbose_json",
-      timestamp_granularities: ["segment", "word"]
-    };
+    try {
+      // Build transcription params
+      const transcriptionParams: any = {
+        file: audioFileForWhisper,
+        model: "whisper-1",
+        response_format: "verbose_json",
+        timestamp_granularities: ["segment", "word"]
+      };
 
-    // Only add language if not auto-detection
-    if (jobLanguage && jobLanguage !== 'auto') {
-      transcriptionParams.language = jobLanguage;
-      console.log('[AudioProcessor] Using specified language:', jobLanguage);
-    } else {
-      console.log('[AudioProcessor] Using automatic language detection');
+      // Only add language if not auto-detection
+      if (jobLanguage && jobLanguage !== 'auto') {
+        transcriptionParams.language = jobLanguage;
+        console.log('[AudioProcessor] Using specified language:', jobLanguage);
+      } else {
+        console.log('[AudioProcessor] Using automatic language detection');
+      }
+
+      const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams) as any;
+
+      transcriptionText = transcriptionResponse.text;
+      transcriptionDuration = transcriptionResponse.duration;
+      transcriptionSegments = transcriptionResponse.segments;
+
+      console.log('[AudioProcessor] ✅ Transcription completed:', {
+        duration: `${transcriptionDuration}s`,
+        segments: transcriptionSegments?.length || 0,
+        textLength: transcriptionText.length
+      });
+
+      await updateTranscriptionProgress(jobId, 50);
+    } catch (error: any) {
+      const errorMsg = `Whisper transcription failed: ${error.message}`;
+      await trackError(
+        'whisper_transcription_error',
+        'critical',
+        errorMsg,
+        error,
+        {
+          userId,
+          metadata: {
+            jobId,
+            fileName,
+            audioSizeMB: audioFileForWhisper?.size ? (audioFileForWhisper.size / 1024 / 1024).toFixed(2) : 'unknown',
+            audioType: audioFileForWhisper?.type,
+            language: jobLanguage,
+            step: 'STEP 2: Whisper Transcription',
+            errorType: error.constructor.name,
+            openAIError: error.response?.data || error.message
+          }
+        }
+      );
+      await markTranscriptionError(jobId, errorMsg);
+      throw new Error(errorMsg);
     }
-
-    const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams) as any;
-
-    const transcriptionText = transcriptionResponse.text;
-    const transcriptionDuration = transcriptionResponse.duration;
-    const transcriptionSegments = transcriptionResponse.segments;
-
-    console.log('[AudioProcessor] Transcription completed:', {
-      duration: `${transcriptionDuration}s`,
-      segments: transcriptionSegments?.length || 0
-    });
-
-    await updateTranscriptionProgress(jobId, 50);
 
     // STEP 3: Identify speakers
     console.log('[AudioProcessor] Identifying speakers...');
