@@ -256,12 +256,19 @@ export async function parseDocumentFromURL(
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      // Fetch with proper error handling
+      // Fetch with proper error handling and authentication
+      const headers: HeadersInit = {
+        'User-Agent': 'Annalogica Document Parser'
+      };
+
+      // Add Vercel Blob token for authentication if available
+      if (process.env.BLOB_READ_WRITE_TOKEN) {
+        headers['Authorization'] = `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`;
+      }
+
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'User-Agent': 'Annalogica Document Parser'
-        }
+        headers
       });
 
       // Check response status FIRST
