@@ -14,6 +14,10 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+// CHUNKING CONSTANTS
+const MAX_WHISPER_FILE_SIZE = 23 * 1024 * 1024; // 23MB (safe margin below OpenAI's 25MB limit)
+const CHUNK_DURATION_SECONDS = 600; // 10 minutes per chunk (conservative)
+
 // Helper functions for subtitles
 function formatTimeSRT(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
@@ -31,6 +35,173 @@ function formatTimeVTT(seconds: number): string {
   const millis = Math.floor((seconds % 1) * 1000);
 
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
+/**
+ * Split large audio buffer into chunks using simple byte splitting
+ * This is a fallback method that works in serverless environments without FFmpeg
+ */
+async function splitAudioIntoChunks(
+  audioBuffer: Buffer,
+  fileName: string,
+  contentType: string
+): Promise<Array<{ buffer: Buffer; index: number; startTime: number }>> {
+  const fileSize = audioBuffer.length;
+
+  if (fileSize <= MAX_WHISPER_FILE_SIZE) {
+    // No need to split
+    return [{
+      buffer: audioBuffer,
+      index: 0,
+      startTime: 0
+    }];
+  }
+
+  console.log(`[AudioChunking] File size ${(fileSize / 1024 / 1024).toFixed(2)}MB exceeds limit. Splitting into chunks...`);
+
+  const chunks: Array<{ buffer: Buffer; index: number; startTime: number }> = [];
+  const chunkSize = MAX_WHISPER_FILE_SIZE;
+  let offset = 0;
+  let chunkIndex = 0;
+
+  // Estimate duration per chunk (rough estimation: 1MB ~= 1 minute for MP3 at 128kbps)
+  const estimatedBytesPerSecond = fileSize / (CHUNK_DURATION_SECONDS * (Math.ceil(fileSize / MAX_WHISPER_FILE_SIZE)));
+
+  while (offset < fileSize) {
+    const end = Math.min(offset + chunkSize, fileSize);
+    const chunkBuffer = audioBuffer.subarray(offset, end);
+
+    const startTime = chunkIndex * CHUNK_DURATION_SECONDS;
+
+    chunks.push({
+      buffer: chunkBuffer,
+      index: chunkIndex,
+      startTime
+    });
+
+    console.log(`[AudioChunking] Chunk ${chunkIndex}: ${(chunkBuffer.length / 1024 / 1024).toFixed(2)}MB, startTime: ${startTime}s`);
+
+    offset = end;
+    chunkIndex++;
+  }
+
+  console.log(`[AudioChunking] Split into ${chunks.length} chunks`);
+  return chunks;
+}
+
+/**
+ * Transcribe audio file with automatic chunking for files >25MB
+ */
+async function transcribeWithChunking(
+  audioBuffer: Buffer,
+  fileName: string,
+  contentType: string,
+  language?: string
+): Promise<{
+  text: string;
+  duration: number;
+  segments: any[];
+}> {
+  if (!openai) {
+    throw new Error('OpenAI API key not configured');
+  }
+
+  const fileSize = audioBuffer.length;
+
+  // If file is small enough, process normally
+  if (fileSize <= MAX_WHISPER_FILE_SIZE) {
+    console.log('[AudioTranscription] File within size limit, processing normally');
+
+    const { File } = await import('node:buffer');
+    const audioFile = new File([audioBuffer], fileName, { type: contentType });
+
+    const transcriptionParams: any = {
+      file: audioFile,
+      model: "whisper-1",
+      response_format: "verbose_json",
+      timestamp_granularities: ["segment", "word"]
+    };
+
+    if (language && language !== 'auto') {
+      transcriptionParams.language = language;
+    }
+
+    const response = await openai.audio.transcriptions.create(transcriptionParams) as any;
+
+    return {
+      text: response.text,
+      duration: response.duration,
+      segments: response.segments || []
+    };
+  }
+
+  // File is >25MB - use chunking
+  console.log('[AudioTranscription] File exceeds 25MB limit, using chunking strategy');
+
+  const chunks = await splitAudioIntoChunks(audioBuffer, fileName, contentType);
+
+  let fullText = '';
+  let totalDuration = 0;
+  const allSegments: any[] = [];
+
+  const { File } = await import('node:buffer');
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+
+    console.log(`[AudioTranscription] Processing chunk ${i + 1}/${chunks.length}...`);
+
+    const chunkFileName = `${fileName.replace(/\.[^.]+$/, '')}_chunk${i}${fileName.match(/\.[^.]+$/)?.[0] || '.mp3'}`;
+    const chunkFile = new File([chunk.buffer], chunkFileName, { type: contentType });
+
+    const transcriptionParams: any = {
+      file: chunkFile,
+      model: "whisper-1",
+      response_format: "verbose_json",
+      timestamp_granularities: ["segment", "word"]
+    };
+
+    if (language && language !== 'auto') {
+      transcriptionParams.language = language;
+    }
+
+    try {
+      const response = await openai.audio.transcriptions.create(transcriptionParams) as any;
+
+      // Concatenate text
+      fullText += (fullText ? ' ' : '') + response.text;
+
+      // Adjust timestamps and concatenate segments
+      const timeOffset = chunk.startTime;
+      const adjustedSegments = (response.segments || []).map((seg: any) => ({
+        ...seg,
+        start: seg.start + timeOffset,
+        end: seg.end + timeOffset
+      }));
+
+      allSegments.push(...adjustedSegments);
+
+      // Update total duration
+      if (response.duration) {
+        totalDuration = Math.max(totalDuration, timeOffset + response.duration);
+      }
+
+      console.log(`[AudioTranscription] Chunk ${i + 1} completed: ${response.text?.length || 0} chars`);
+
+    } catch (error: any) {
+      console.error(`[AudioTranscription] Error processing chunk ${i}:`, error);
+      throw new Error(`Failed to process chunk ${i + 1}/${chunks.length}: ${error.message}`);
+    }
+  }
+
+  console.log(`[AudioTranscription] All ${chunks.length} chunks processed successfully`);
+  console.log(`[AudioTranscription] Total text length: ${fullText.length} chars, duration: ${totalDuration}s`);
+
+  return {
+    text: fullText,
+    duration: totalDuration,
+    segments: allSegments
+  };
 }
 
 /**
@@ -79,44 +250,25 @@ export async function processAudioFile(jobId: string): Promise<void> {
 
     const arrayBuffer = await response.arrayBuffer();
     const audioBuffer = Buffer.from(arrayBuffer);
-
-    // Use Node.js 18+ File API for OpenAI compatibility
-    const { File } = await import('node:buffer');
-    const audioFileForWhisper = new File(
-      [audioBuffer],
-      fileName,
-      {
-        type: response.headers.get('content-type') || 'audio/mpeg'
-      }
-    );
+    const contentType = response.headers.get('content-type') || 'audio/mpeg';
 
     console.log('[AudioProcessor] Audio downloaded:', {
       size: `${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB`,
-      type: audioFileForWhisper.type
+      type: contentType,
+      willUseChunking: audioBuffer.length > MAX_WHISPER_FILE_SIZE
     });
 
     await updateTranscriptionProgress(jobId, 20);
 
-    // STEP 2: Transcribe with Whisper
+    // STEP 2: Transcribe with Whisper (automatic chunking for large files)
     console.log('[AudioProcessor] Starting Whisper transcription...');
 
-    // Build transcription params
-    const transcriptionParams: any = {
-      file: audioFileForWhisper,
-      model: "whisper-1",
-      response_format: "verbose_json",
-      timestamp_granularities: ["segment", "word"]
-    };
-
-    // Only add language if not auto-detection
-    if (jobLanguage && jobLanguage !== 'auto') {
-      transcriptionParams.language = jobLanguage;
-      console.log('[AudioProcessor] Using specified language:', jobLanguage);
-    } else {
-      console.log('[AudioProcessor] Using automatic language detection');
-    }
-
-    const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams) as any;
+    const transcriptionResponse = await transcribeWithChunking(
+      audioBuffer,
+      fileName,
+      contentType,
+      jobLanguage && jobLanguage !== 'auto' ? jobLanguage : undefined
+    );
 
     const transcriptionText = transcriptionResponse.text;
     const transcriptionDuration = transcriptionResponse.duration;
@@ -124,7 +276,8 @@ export async function processAudioFile(jobId: string): Promise<void> {
 
     console.log('[AudioProcessor] Transcription completed:', {
       duration: `${transcriptionDuration}s`,
-      segments: transcriptionSegments?.length || 0
+      segments: transcriptionSegments?.length || 0,
+      textLength: transcriptionText.length
     });
 
     await updateTranscriptionProgress(jobId, 50);

@@ -75,18 +75,23 @@ export const PROCESSING_CONSTANTS = {
 
 export const FILE_CONSTANTS = {
   /**
-   * Maximum file size (bytes) - OPTIMIZADO PARA BETA
-   * Audio: 100MB (~100 min), Video: 200MB (~200 min)
+   * Maximum file size (bytes) - CON CHUNKING IMPLEMENTADO
+   * Audio: 500MB con chunking automático (~500 min)
+   * Video: 500MB con chunking automático (~500 min)
+   * Documentos: 50MB
+   *
+   * NOTA: OpenAI Whisper tiene límite de 25MB por request, pero usamos
+   * chunking automático para archivos grandes (dividir en partes <25MB)
    */
-  MAX_FILE_SIZE_AUDIO_BYTES: 100 * 1024 * 1024,
-  MAX_FILE_SIZE_VIDEO_BYTES: 200 * 1024 * 1024,
+  MAX_FILE_SIZE_AUDIO_BYTES: 500 * 1024 * 1024,
+  MAX_FILE_SIZE_VIDEO_BYTES: 500 * 1024 * 1024,
   MAX_FILE_SIZE_DOCUMENT_BYTES: 50 * 1024 * 1024,
 
   /**
    * Maximum file size (MB) for display
    */
-  MAX_FILE_SIZE_AUDIO_MB: 100,
-  MAX_FILE_SIZE_VIDEO_MB: 200,
+  MAX_FILE_SIZE_AUDIO_MB: 500,
+  MAX_FILE_SIZE_VIDEO_MB: 500,
   MAX_FILE_SIZE_DOCUMENT_MB: 50,
 
   /**
