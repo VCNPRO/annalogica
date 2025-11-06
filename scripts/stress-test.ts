@@ -394,4 +394,5 @@ if (require.main === module) {
   main();
 }
 
-export { StressTestRunner, TestMetrics, StressTestResult };
+export { StressTestRunner };
+export type { TestMetrics, StressTestResult };
