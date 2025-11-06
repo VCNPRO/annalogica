@@ -255,6 +255,7 @@ export async function parseDocumentFromURL(
         }
       });
 
+      // Check response status FIRST
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'No error details');
 
@@ -269,34 +270,55 @@ export async function parseDocumentFromURL(
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Get response as arrayBuffer
-      const arrayBuffer = await response.arrayBuffer();
+      // Verify content type
+      const contentType = response.headers.get('content-type') || '';
+      console.log(`[DocumentParser] Response content-type: ${contentType}, size: ${response.headers.get('content-length') || 'unknown'}`);
 
-      // Convert to Buffer with proper handling
-      let buffer: Buffer;
+      // Get response as arrayBuffer with validation
+      let arrayBuffer: ArrayBuffer;
       try {
-        if (arrayBuffer instanceof ArrayBuffer) {
-          buffer = Buffer.from(arrayBuffer);
-        } else if (Buffer.isBuffer(arrayBuffer)) {
-          buffer = arrayBuffer;
-        } else if (arrayBuffer && typeof arrayBuffer === 'object') {
-          // Handle case where arrayBuffer might be a Uint8Array or similar
-          buffer = Buffer.from(arrayBuffer as any);
-        } else {
-          throw new Error(`Invalid response type: ${typeof arrayBuffer}`);
+        const rawArrayBuffer = await response.arrayBuffer();
+
+        // Validate that it's actually an ArrayBuffer
+        if (!(rawArrayBuffer instanceof ArrayBuffer)) {
+          console.error('[DocumentParser] Response is not an ArrayBuffer:', {
+            type: typeof rawArrayBuffer,
+            constructor: rawArrayBuffer?.constructor?.name,
+            isArrayBuffer: rawArrayBuffer instanceof ArrayBuffer
+          });
+          throw new Error(`Expected ArrayBuffer, got ${typeof rawArrayBuffer}`);
         }
-      } catch (conversionError: any) {
-        console.error('[DocumentParser] Buffer conversion error:', {
-          type: typeof arrayBuffer,
-          isArrayBuffer: arrayBuffer instanceof ArrayBuffer,
-          isBuffer: Buffer.isBuffer(arrayBuffer),
-          constructor: arrayBuffer?.constructor?.name,
-          error: conversionError.message
-        });
-        throw new Error(`No se pudo convertir la respuesta a Buffer: ${conversionError.message}`);
+
+        arrayBuffer = rawArrayBuffer;
+
+        // Check if empty
+        if (arrayBuffer.byteLength === 0) {
+          throw new Error('Downloaded file is empty (0 bytes)');
+        }
+
+      } catch (arrayBufferError: any) {
+        console.error('[DocumentParser] Failed to get arrayBuffer:', arrayBufferError);
+        throw new Error(`Error al descargar documento: ${arrayBufferError.message}`);
       }
 
-      console.log(`[DocumentParser] ✅ Downloaded ${buffer.length} bytes on attempt ${attempt + 1}`);
+      // Convert ArrayBuffer to Node.js Buffer
+      let buffer: Buffer;
+      try {
+        buffer = Buffer.from(arrayBuffer);
+
+        if (buffer.length === 0) {
+          throw new Error('Buffer conversion resulted in 0 bytes');
+        }
+
+        console.log(`[DocumentParser] ✅ Downloaded ${buffer.length} bytes (${(buffer.length / 1024).toFixed(2)} KB) on attempt ${attempt + 1}`);
+
+      } catch (conversionError: any) {
+        console.error('[DocumentParser] Buffer conversion failed:', {
+          arrayBufferByteLength: arrayBuffer?.byteLength,
+          error: conversionError.message
+        });
+        throw new Error(`No se pudo convertir a Buffer: ${conversionError.message}`);
+      }
 
       // Success! Parse and return
       return await parseDocument(buffer, filename);
