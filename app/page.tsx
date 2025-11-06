@@ -83,15 +83,17 @@ export default function Dashboard() {
       if (savedFiles) {
         const parsedFiles: UploadedFile[] = JSON.parse(savedFiles);
         const restoredFiles = parsedFiles.map(file => {
-          // Solo marcar como error los archivos que estaban en proceso al cerrar
-          // Los archivos completados se mantienen como completados
-          if (file.status === 'uploading' || file.status === 'processing') {
-            return { ...file, status: 'error' as FileStatus, uploadProgress: 0, processingProgress: 0 };
+          // 🔥 FIX: NO marcar como error automáticamente al navegar entre páginas
+          // El polling verificará el estado real de los archivos en procesamiento
+
+          // Solo marcar como error los archivos que estaban SUBIENDO (uploading)
+          // ya que la subida no puede continuar después de navegar
+          if (file.status === 'uploading') {
+            return { ...file, status: 'pending' as FileStatus, uploadProgress: 100 };
           }
-          // Los archivos completados se mantienen sin cambios
-          if (file.status === 'completed') {
-            return file;
-          }
+
+          // Los archivos en processing/pending/completed se mantienen como están
+          // El polling se encargará de actualizar su estado real
           return file;
         });
         setUploadedFiles(restoredFiles);
