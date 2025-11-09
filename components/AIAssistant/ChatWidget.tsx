@@ -92,7 +92,7 @@ export function ChatWidget() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg transition-all duration-200 hover:scale-110 z-50"
+        className="fixed bottom-6 right-6 bg-orange-600 hover:bg-orange-700 text-white rounded-full p-4 shadow-lg transition-all duration-200 hover:scale-110 z-50"
         aria-label="Abrir chat de ayuda"
       >
         <MessageCircle className="w-6 h-6" />
@@ -107,7 +107,7 @@ export function ChatWidget() {
       }`}
     >
       {/* Header */}
-      <div className="bg-blue-600 text-white p-4 rounded-t-lg flex items-center justify-between">
+      <div className="bg-orange-600 text-white p-4 rounded-t-lg flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MessageCircle className="w-5 h-5" />
           <h3 className="font-semibold">Asistente annalogica</h3>
@@ -115,14 +115,14 @@ export function ChatWidget() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsMinimized(!isMinimized)}
-            className="hover:bg-blue-700 p-1 rounded transition-colors"
+            className="hover:bg-orange-700 p-1 rounded transition-colors"
             aria-label={isMinimized ? 'Maximizar' : 'Minimizar'}
           >
             <Minimize2 className="w-4 h-4" />
           </button>
           <button
             onClick={() => setIsOpen(false)}
-            className="hover:bg-blue-700 p-1 rounded transition-colors"
+            className="hover:bg-orange-700 p-1 rounded transition-colors"
             aria-label="Cerrar chat"
           >
             <X className="w-4 h-4" />
