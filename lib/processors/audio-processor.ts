@@ -9,6 +9,12 @@ import {
   markTranscriptionError,
   getTranscriptionJob
 } from '@/lib/db/transcriptions';
+import {
+  getSpeakerIdentificationPrompt,
+  getSummaryPrompt,
+  getTagGenerationPrompt,
+  normalizeLanguageCode
+} from '@/lib/prompts/multilingual';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -52,7 +58,10 @@ export async function processAudioFile(jobId: string): Promise<void> {
 
     const { audio_url: audioUrl, filename: fileName, language: jobLanguage, user_id: userId } = job;
 
-    console.log('[AudioProcessor] Job found:', { jobId, fileName, language: jobLanguage });
+    // Normalize language for prompts
+    const promptLanguage = normalizeLanguageCode(jobLanguage);
+
+    console.log('[AudioProcessor] Job found:', { jobId, fileName, language: jobLanguage, promptLanguage });
 
     // Get user's client_id
     let clientId: number | undefined;
@@ -129,111 +138,76 @@ export async function processAudioFile(jobId: string): Promise<void> {
 
     await updateTranscriptionProgress(jobId, 50);
 
-    // STEP 3: Identify speakers
-    console.log('[AudioProcessor] Identifying speakers...');
-    const speakersCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `Eres un asistente experto en analisis de transcripciones.
-Identifica a todos los intervinientes/oradores en la transcripcion.
-
-Para cada interviniente, extrae:
-- Nombre completo
-- Cargo/rol/descripcion (si se menciona)
-
-Responde SOLO con un JSON array:
-{"speakers": [
-  {"name": "Juan Perez", "role": "Director General"},
-  {"name": "Maria Garcia", "role": "Responsable de Marketing"}
-]}
-
-Si no se menciona el cargo, usa "Interviniente" como role.
-Si no hay indicadores claros de speakers, devuelve array vacio.`
-        },
-        {
-          role: "user",
-          content: `Transcripcion:\n\n${transcriptionText}`
-        }
-      ],
-      temperature: 0.3,
-      response_format: { type: "json_object" }
-    });
-
-    const speakersResult = JSON.parse(speakersCompletion.choices[0].message.content || '{}');
-    const speakers = speakersResult.speakers || [];
-
-    console.log('[AudioProcessor] Speakers identified:', speakers.length);
-    await updateTranscriptionProgress(jobId, 65);
-
-    // STEP 4: Generate summary
-    console.log('[AudioProcessor] Generating summary...');
+    // STEP 3-5: Process speakers, summary, and tags in PARALLEL (optimization)
+    console.log('[AudioProcessor] Processing speakers, summary, and tags in parallel...', { language: promptLanguage });
     const summaryType = job.metadata?.summaryType || 'detailed';
-    const summaryPrompt = summaryType === 'short'
-      ? 'Genera un resumen ejecutivo muy breve (maximo 3 parrafos) de esta transcripcion.'
-      : 'Genera un resumen detallado y estructurado de esta transcripcion, incluyendo todos los puntos clave discutidos.';
+    const { systemPrompt } = getSummaryPrompt(promptLanguage, summaryType);
 
-    const summaryCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `Eres un asistente experto en generar resumenes de transcripciones.
-${summaryPrompt}
+    const [speakersResult, summaryResult, tagsResult] = await Promise.all([
+      // 3a. Identify speakers
+      openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: getSpeakerIdentificationPrompt(promptLanguage)
+          },
+          {
+            role: "user",
+            content: `Transcripcion:\n\n${transcriptionText}`
+          }
+        ],
+        temperature: 0.3,
+        response_format: { type: "json_object" }
+      }),
 
-El resumen debe:
-- Ser claro y bien estructurado
-- Mantener los puntos clave
-- Usar lenguaje profesional
-- Respetar el contexto original`
-        },
-        {
-          role: "user",
-          content: `Transcripcion:\n\n${transcriptionText}`
-        }
-      ],
-      temperature: 0.5,
-      max_tokens: summaryType === 'short' ? 500 : 2000
+      // 4a. Generate summary
+      openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: `Transcripcion:\n\n${transcriptionText}`
+          }
+        ],
+        temperature: 0.5,
+        max_tokens: summaryType === 'short' ? 500 : 2000
+      }),
+
+      // 5a. Generate tags
+      openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: getTagGenerationPrompt(promptLanguage)
+          },
+          {
+            role: "user",
+            content: `Transcripcion:\n\n${transcriptionText}`
+          }
+        ],
+        temperature: 0.3,
+        response_format: { type: "json_object" }
+      })
+    ]);
+
+    // Extract results
+    const speakersData = JSON.parse(speakersResult.choices[0].message.content || '{}');
+    const speakers = speakersData.speakers || [];
+    const summary = summaryResult.choices[0].message.content || '';
+    const tagsData = JSON.parse(tagsResult.choices[0].message.content || '{}');
+    const tags = tagsData.tags || [];
+
+    console.log('[AudioProcessor] Parallel processing completed:', {
+      speakers: speakers.length,
+      summaryLength: summary.length,
+      tags: tags.length
     });
-
-    const summary = summaryCompletion.choices[0].message.content || '';
-
-    console.log('[AudioProcessor] Summary generated');
-    await updateTranscriptionProgress(jobId, 75);
-
-    // STEP 5: Generate tags
-    console.log('[AudioProcessor] Generating tags...');
-    const tagsCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `Eres un asistente experto en categorizacion.
-Analiza la transcripcion y genera entre 5 y 10 tags relevantes.
-
-Los tags deben ser:
-- Palabras clave o frases cortas (1-3 palabras)
-- Relevantes al contenido principal
-- En espanol
-- Sin simbolos especiales
-
-Responde SOLO con JSON:
-{"tags": ["tag1", "tag2", "tag3"]}`
-        },
-        {
-          role: "user",
-          content: `Transcripcion:\n\n${transcriptionText}`
-        }
-      ],
-      temperature: 0.3,
-      response_format: { type: "json_object" }
-    });
-
-    const tagsResult = JSON.parse(tagsCompletion.choices[0].message.content || '{}');
-    const tags = tagsResult.tags || [];
-
-    console.log('[AudioProcessor] Tags generated:', tags);
     await updateTranscriptionProgress(jobId, 85);
 
     // STEP 6: Generate subtitles (SRT and VTT)
@@ -307,7 +281,7 @@ Responde SOLO con JSON:
         summary,
         speakers,
         tags,
-        language: 'es',
+        language: jobLanguage || 'auto',
         processingDate: new Date()
       });
 
@@ -360,7 +334,8 @@ Responde SOLO con JSON:
       metadata: {
         speakers: speakers,
         segments: transcriptionSegments?.length || 0,
-        language: 'es',
+        language: jobLanguage || 'auto',
+        promptLanguage: promptLanguage,
         excelUrl: excelBlob.url,
         pdfUrl: pdfBlob?.url || null
       }

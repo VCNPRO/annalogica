@@ -5,6 +5,7 @@ import { put, del } from '@vercel/blob';
 import { sql } from '@vercel/postgres';
 import { getTranscriptionJob } from '@/lib/db/transcriptions';
 import { TranscriptionJobDB } from '@/lib/db';
+import { getDocumentAnalysisPrompt, normalizeLanguageCode } from '@/lib/prompts/multilingual';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -90,15 +91,11 @@ export async function processDocumentFile(
 
     // Generate summary and tags if requested
     if (actions.includes('Resumir') || actions.includes('Etiquetas')) {
-      console.log('[DocumentProcessor] Generating summary and tags...');
+      console.log('[DocumentProcessor] Generating summary and tags...', { language });
 
-      const prompt = `Analiza el texto de un documento. ${
-        actions.includes('Resumir')
-          ? `Genera un resumen tipo "${summaryType}".`
-          : ''
-      } ${
-        actions.includes('Etiquetas') ? 'Genera 5-10 etiquetas clave.' : ''
-      } Responde en JSON con claves "summary" y "tags".`;
+      // Normalize language for prompts
+      const promptLanguage = normalizeLanguageCode(language);
+      const prompt = getDocumentAnalysisPrompt(promptLanguage, actions, summaryType as 'short' | 'detailed');
 
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",

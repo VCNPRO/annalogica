@@ -9,6 +9,12 @@ import {
 } from '@/lib/db/transcriptions';
 import { TranscriptionJobDB } from '@/lib/db';
 import { trackError } from '@/lib/error-tracker';
+import {
+  getSpeakerIdentificationPrompt,
+  getSummaryPrompt,
+  getTagGenerationPrompt,
+  normalizeLanguageCode
+} from '@/lib/prompts/multilingual';
 
 // Inicializacion segura de OpenAI (solo si la key existe)
 const openai = process.env.OPENAI_API_KEY
@@ -65,13 +71,17 @@ const transcribeFile = inngest.createFunction(
         audioUrl: job.audio_url,
         fileName: job.filename,
         userId: job.user_id,
-        summaryType: job.metadata?.summaryType || 'detailed'
+        summaryType: job.metadata?.summaryType || 'detailed',
+        language: job.language || 'auto'
       };
     });
 
-    const { audioUrl, fileName, userId, summaryType } = jobData;
+    const { audioUrl, fileName, userId, summaryType, language } = jobData;
 
-    console.log('[transcribe] Iniciando transcripcion:', { jobId, fileName, userId });
+    // Normalizar idioma para los prompts (si es 'auto', usamos 'es' como default para prompts)
+    const promptLanguage = normalizeLanguageCode(language);
+
+    console.log('[transcribe] Iniciando transcripcion:', { jobId, fileName, userId, language, promptLanguage });
 
     try {
       // ============================================
@@ -115,15 +125,25 @@ const transcribeFile = inngest.createFunction(
           }
         );
 
-        console.log('[transcribe] Iniciando transcripcion con Whisper...');
+        console.log('[transcribe] Iniciando transcripcion con Whisper...', { language });
 
-        const transcriptionResponse = await openai.audio.transcriptions.create({
+        // Configurar parámetros de transcripción
+        const transcriptionParams = {
           file: audioFile,
           model: "whisper-1",
-          language: "es",
           response_format: "verbose_json",
           timestamp_granularities: ["segment", "word"]
-        });
+        };
+
+        // Solo añadir idioma si no es 'auto' (detección automática)
+        if (language && language !== 'auto') {
+          transcriptionParams.language = language;
+          console.log('[transcribe] Usando idioma especificado:', language);
+        } else {
+          console.log('[transcribe] Usando deteccion automatica de idioma');
+        }
+
+        const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams);
 
         console.log('[transcribe] Transcripcion completada:', {
           duration: `${transcriptionResponse.duration}s`,
@@ -151,28 +171,14 @@ const transcribeFile = inngest.createFunction(
       // PASO 3: Identificar speakers
       // ============================================
       const speakersResult = await step.run('identify-speakers', async () => {
-        console.log('[transcribe] Identificando intervinientes...');
+        console.log('[transcribe] Identificando intervinientes...', { language: promptLanguage });
 
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
-              content: `Eres un asistente experto en analisis de transcripciones.
-Identifica a todos los intervinientes/oradores en la transcripcion.
-
-Para cada interviniente, extrae:
-- Nombre completo
-- Cargo/rol/descripcion (si se menciona)
-
-Responde SOLO con un JSON array:
-{"speakers": [
-  {"name": "Juan Perez", "role": "Director General"},
-  {"name": "Maria Garcia", "role": "Responsable de Marketing"}
-]}
-
-Si no se menciona el cargo, usa "Interviniente" como role.
-Si no hay indicadores claros de speakers, devuelve array vacio.`
+              content: getSpeakerIdentificationPrompt(promptLanguage)
             },
             {
               role: "user",
@@ -187,7 +193,7 @@ Si no hay indicadores claros de speakers, devuelve array vacio.`
         const speakers = result.speakers || [];
 
         console.log('[transcribe] Intervinientes identificados:', speakers.length);
-        return { speakers }; // 🔥 FIX: Retornar speakers
+        return { speakers };
       });
 
       const speakers = speakersResult.speakers;
@@ -200,25 +206,16 @@ Si no hay indicadores claros de speakers, devuelve array vacio.`
       // PASO 4: Generar resumen
       // ============================================
       const summaryResult = await step.run('generate-summary', async () => {
-        console.log('[transcribe] Generando resumen...');
+        console.log('[transcribe] Generando resumen...', { language: promptLanguage, summaryType });
 
-        const summaryPrompt = summaryType === 'short'
-          ? 'Genera un resumen ejecutivo muy breve (maximo 3 parrafos) de esta transcripcion.'
-          : 'Genera un resumen detallado y estructurado de esta transcripcion, incluyendo todos los puntos clave discutidos.';
+        const { systemPrompt } = getSummaryPrompt(promptLanguage, summaryType);
 
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
-              content: `Eres un asistente experto en generar resumenes de transcripciones.
-${summaryPrompt}
-
-El resumen debe:
-- Ser claro y bien estructurado
-- Mantener los puntos clave
-- Usar lenguaje profesional
-- Respetar el contexto original`
+              content: systemPrompt
             },
             {
               role: "user",
@@ -232,7 +229,7 @@ El resumen debe:
         const summary = completion.choices[0].message.content;
 
         console.log('[transcribe] Resumen generado');
-        return { summary }; // 🔥 FIX: Retornar summary
+        return { summary };
       });
 
       const summary = summaryResult.summary;
@@ -245,24 +242,14 @@ El resumen debe:
       // PASO 5: Generar tags
       // ============================================
       const tagsResult = await step.run('generate-tags', async () => {
-        console.log('[transcribe] Generando tags...');
+        console.log('[transcribe] Generando tags...', { language: promptLanguage });
 
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
           messages: [
             {
               role: "system",
-              content: `Eres un asistente experto en categorizacion.
-Analiza la transcripcion y genera entre 5 y 10 tags relevantes.
-
-Los tags deben ser:
-- Palabras clave o frases cortas (1-3 palabras)
-- Relevantes al contenido principal
-- En espanol
-- Sin simbolos especiales
-
-Responde SOLO con JSON:
-{"tags": ["tag1", "tag2", "tag3"]}`
+              content: getTagGenerationPrompt(promptLanguage)
             },
             {
               role: "user",
@@ -277,7 +264,7 @@ Responde SOLO con JSON:
         const tags = result.tags || [];
 
         console.log('[transcribe] Tags generados:', tags);
-        return { tags }; // 🔥 FIX: Retornar tags
+        return { tags };
       });
 
       const tags = tagsResult.tags;
@@ -396,7 +383,8 @@ Responde SOLO con JSON:
           metadata: {
             speakers: speakers,
             segments: transcriptionSegments?.length || 0,
-            language: 'es'
+            language: language || 'auto',
+            promptLanguage: promptLanguage
           }
         });
 

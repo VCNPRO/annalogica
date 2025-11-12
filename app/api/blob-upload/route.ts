@@ -6,6 +6,7 @@ import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { verifyRequestAuth } from '@/lib/auth';
 import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client'; // 👈 CORREGIDO (singular)
+import { sql } from '@vercel/postgres';
 
 // Tamaños máximos (bytes)
 // 🔥 LÍMITES OPTIMIZADOS PARA BETA: Garantizan procesamiento <15 min
@@ -39,6 +40,25 @@ const ALLOWED_DOCUMENT_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
 ];
+
+// Helper function to get user's preferred language
+async function getUserPreferredLanguage(userId: string): Promise<string> {
+  try {
+    const result = await sql`
+      SELECT preferred_language
+      FROM users
+      WHERE id = ${userId}
+    `;
+
+    if (result.rows.length > 0 && result.rows[0].preferred_language) {
+      return result.rows[0].preferred_language;
+    }
+  } catch (error) {
+    console.error('[blob-upload] Error fetching user preferred_language:', error);
+  }
+
+  return 'auto'; // Default fallback
+}
 
 export async function POST(request: NextRequest): Promise<Response> {
   // Autenticación
@@ -136,7 +156,7 @@ export async function POST(request: NextRequest): Promise<Response> {
 
         const userId = payload?.userId as string | undefined;
         const filename = String(payload?.filename ?? 'unknown');
-        const language = String(payload?.language ?? 'auto');
+        let language = String(payload?.language ?? 'auto');
 
         // Usamos los valores enviados en clientPayload
         const fileSizeBytes = Number(payload?.size ?? 0);
@@ -147,6 +167,15 @@ export async function POST(request: NextRequest): Promise<Response> {
         if (!userId) {
           console.error('[blob-upload] Falta userId en tokenPayload');
           return;
+        }
+
+        // If language is 'auto', try to get user's preferred language
+        if (language === 'auto') {
+          const preferredLanguage = await getUserPreferredLanguage(userId);
+          if (preferredLanguage && preferredLanguage !== 'auto') {
+            language = preferredLanguage;
+            console.log('[blob-upload] Using user preferred language:', language);
+          }
         }
 
         try {
