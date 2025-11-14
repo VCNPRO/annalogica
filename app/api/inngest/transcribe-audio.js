@@ -59,17 +59,18 @@ const transcribeFile = inngest.createFunction(
         throw new Error(`Job ${jobId} no encontrado en la base de datos`);
       }
 
-      console.log('[transcribe] Job encontrado:', { jobId, filename: job.filename });
+      console.log('[transcribe] Job encontrado:', { jobId, filename: job.filename, language: job.language });
 
       return {
         audioUrl: job.audio_url,
         fileName: job.filename,
         userId: job.user_id,
-        summaryType: job.metadata?.summaryType || 'detailed'
+        summaryType: job.metadata?.summaryType || 'detailed',
+        language: job.language || 'auto'  // ✅ FIX: Extraer language del job
       };
     });
 
-    const { audioUrl, fileName, userId, summaryType } = jobData;
+    const { audioUrl, fileName, userId, summaryType, language } = jobData;
 
     console.log('[transcribe] Iniciando transcripcion:', { jobId, fileName, userId });
 
@@ -117,13 +118,23 @@ const transcribeFile = inngest.createFunction(
 
         console.log('[transcribe] Iniciando transcripcion con Whisper...');
 
-        const transcriptionResponse = await openai.audio.transcriptions.create({
+        // ✅ FIX: Construir params condicionalmente según el idioma seleccionado
+        const transcriptionParams = {
           file: audioFile,
           model: "whisper-1",
-          language: "es",
           response_format: "verbose_json",
           timestamp_granularities: ["segment", "word"]
-        });
+        };
+
+        // Solo agregar language si NO es auto-detección
+        if (language && language !== 'auto') {
+          transcriptionParams.language = language;
+          console.log('[transcribe] Usando idioma especificado:', language);
+        } else {
+          console.log('[transcribe] Usando detección automática de idioma');
+        }
+
+        const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams);
 
         console.log('[transcribe] Transcripcion completada:', {
           duration: `${transcriptionResponse.duration}s`,
@@ -396,7 +407,7 @@ Responde SOLO con JSON:
           metadata: {
             speakers: speakers,
             segments: transcriptionSegments?.length || 0,
-            language: 'es'
+            language: language || 'auto'  // ✅ FIX: Usar language variable en vez de 'es' hardcoded
           }
         });
 

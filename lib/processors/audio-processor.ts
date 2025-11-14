@@ -379,7 +379,7 @@ Responde SOLO con JSON:
         summary,
         speakers,
         tags,
-        language: 'es',
+        language: jobLanguage || 'auto',  // ✅ FIX: Usar jobLanguage en vez de 'es' hardcoded
         processingDate: new Date()
       });
 
@@ -432,7 +432,7 @@ Responde SOLO con JSON:
       metadata: {
         speakers: speakers,
         segments: transcriptionSegments?.length || 0,
-        language: 'es',
+        language: jobLanguage || 'auto',  // ✅ FIX: Usar jobLanguage en vez de 'es' hardcoded
         excelUrl: excelBlob.url,
         pdfUrl: pdfBlob?.url || null
       }
