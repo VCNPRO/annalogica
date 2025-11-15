@@ -50,26 +50,10 @@ config:
     testEmail: "loadtest@annalogica.eu"
     testPassword: "LoadTest123!"
 
-  # Configuración de payloads
-  payload:
-    path: "./test-payloads.csv"
-    fields:
-      - "language"
-      - "summaryType"
-    skipHeader: true
-    order: sequence
-
   # Configuración HTTP
   http:
     timeout: 30
     pool: 50  # Conexiones concurrentes
-
-  # Plugins para métricas avanzadas
-  plugins:
-    metrics-by-endpoint:
-      # Agrupar métricas por endpoint
-      stripQueryString: true
-      ignoreUnknownEndpoints: false
 
   # Umbrales de éxito (SLA)
   ensure:

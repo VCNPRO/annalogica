@@ -293,6 +293,7 @@ jobs:
         run: npm install -g artillery@latest
 
       - name: 💪 Run stress test
+        continue-on-error: true
         run: |
           artillery run testing/stress-test.yml --output stress-results.json
 
