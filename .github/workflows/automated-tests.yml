@@ -202,8 +202,8 @@ jobs:
             echo "message=Algunos tests fallaron" >> $GITHUB_OUTPUT
           fi
 
-      - name: 📧 Send email notification (on failure)
-        if: steps.status.outputs.status == 'failure' || github.event_name == 'schedule'
+      - name: 📧 Send email notification
+        if: always()
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.resend.com
