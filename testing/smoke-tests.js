@@ -54,7 +54,7 @@ const TESTS = [
   {
     name: 'Admin redirect funciona',
     url: '/admin',
-    expectedStatus: [200, 302, 401, 403]
+    expectedStatus: [200, 302, 307, 401, 403]  // 307 = Temporary Redirect
   },
   {
     name: 'API requiere autenticación',
