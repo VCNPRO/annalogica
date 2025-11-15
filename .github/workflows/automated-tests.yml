@@ -1,0 +1,312 @@
+name: 🧪 Automated Tests & Monitoring
+
+# Ejecutar tests automáticamente en:
+# 1. Cada push a main
+# 2. Cada pull request
+# 3. Cada 6 horas (cron)
+# 4. Manualmente desde GitHub UI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Cada 6 horas: 00:00, 06:00, 12:00, 18:00 UTC
+    - cron: '0 */6 * * *'
+  workflow_dispatch:  # Permite ejecución manual
+
+env:
+  NODE_VERSION: '18'
+  ALERT_EMAIL: 'santi@annalogica.eu'
+
+jobs:
+  # ============================================
+  # JOB 1: SMOKE TESTS (Rápido - 1 min)
+  # ============================================
+  smoke-tests:
+    name: 🚀 Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci --only=production
+
+      - name: 🧪 Run smoke tests (Production)
+        id: smoke_tests
+        run: |
+          node testing/smoke-tests.js prod > smoke-results.txt 2>&1
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: 📊 Display results
+        if: always()
+        run: cat smoke-results.txt
+
+      - name: 📁 Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-results
+          path: smoke-results.txt
+          retention-days: 30
+
+      - name: ❌ Fail if tests failed
+        if: steps.smoke_tests.outputs.exit_code != '0'
+        run: |
+          echo "::error::Smoke tests failed!"
+          exit 1
+
+  # ============================================
+  # JOB 2: LANGUAGE FIX VERIFICATION
+  # ============================================
+  language-tests:
+    name: 🌍 Language Fix Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: smoke-tests  # Solo si smoke tests pasan
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🌍 Verify language parameter flow
+        run: |
+          echo "Verificando que el parámetro language se pase correctamente..."
+
+          # Verificar que NO hay 'language: "es"' hardcoded en transcribe-audio.js
+          if grep -n 'language: "es"' app/api/inngest/transcribe-audio.js; then
+            echo "::error::❌ CRÍTICO: Encontrado 'language: \"es\"' hardcoded en transcribe-audio.js"
+            exit 1
+          fi
+
+          # Verificar que NO hay 'language: 'es'' hardcoded en audio-processor.ts
+          if grep -n "language: 'es'" lib/processors/audio-processor.ts; then
+            echo "::error::❌ CRÍTICO: Encontrado language: 'es' hardcoded en audio-processor.ts"
+            exit 1
+          fi
+
+          echo "✅ No se encontraron idiomas hardcoded"
+
+      - name: ✅ Language fix verified
+        run: echo "✅ Fix de idiomas verificado correctamente"
+
+  # ============================================
+  # JOB 3: BUILD TEST
+  # ============================================
+  build-test:
+    name: 🏗️ Build Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗️ Build project
+        run: npm run build
+
+      - name: ✅ Build successful
+        run: echo "✅ Build completado sin errores"
+
+  # ============================================
+  # JOB 4: SECURITY AUDIT
+  # ============================================
+  security-audit:
+    name: 🔒 Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 🔒 Run npm audit
+        run: |
+          npm audit --audit-level=high --production > audit-results.txt 2>&1 || true
+          cat audit-results.txt
+
+      - name: 📊 Check for vulnerabilities
+        run: |
+          if grep -q "found 0 vulnerabilities" audit-results.txt; then
+            echo "✅ No se encontraron vulnerabilidades"
+          else
+            echo "⚠️ Se encontraron vulnerabilidades, revisar audit-results.txt"
+          fi
+
+      - name: 📁 Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-results
+          path: audit-results.txt
+          retention-days: 30
+
+  # ============================================
+  # JOB 5: NOTIFICACIÓN DE RESULTADOS
+  # ============================================
+  notify:
+    name: 📧 Notify Results
+    runs-on: ubuntu-latest
+    needs: [smoke-tests, language-tests, build-test, security-audit]
+    if: always()  # Ejecutar siempre, incluso si hay fallos
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📊 Determine status
+        id: status
+        run: |
+          if [ "${{ needs.smoke-tests.result }}" == "success" ] && \
+             [ "${{ needs.language-tests.result }}" == "success" ] && \
+             [ "${{ needs.build-test.result }}" == "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "message=Todos los tests pasaron correctamente" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "message=Algunos tests fallaron" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📧 Send email notification (on failure)
+        if: steps.status.outputs.status == 'failure' || github.event_name == 'schedule'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.resend.com
+          server_port: 465
+          secure: true
+          username: resend
+          password: ${{ secrets.RESEND_API_KEY }}
+          subject: "${{ steps.status.outputs.emoji }} Annalogica Tests - ${{ steps.status.outputs.status }}"
+          to: ${{ env.ALERT_EMAIL }}
+          from: Annalogica CI/CD <noreply@annalogica.eu>
+          body: |
+            Hola Santi,
+
+            Reporte de tests automáticos de Annalogica:
+
+            📊 RESUMEN:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Estado: ${{ steps.status.outputs.status }}
+            Trigger: ${{ github.event_name }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Autor: ${{ github.actor }}
+            Fecha: ${{ github.event.head_commit.timestamp }}
+
+            🧪 RESULTADOS DE TESTS:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Smoke Tests: ${{ needs.smoke-tests.result }}
+            Language Tests: ${{ needs.language-tests.result }}
+            Build Test: ${{ needs.build-test.result }}
+            Security Audit: ${{ needs.security-audit.result }}
+
+            🔗 ENLACES:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Ver detalles completos: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Commit: ${{ github.event.head_commit.url }}
+
+            ${{ steps.status.outputs.message }}
+
+            ---
+            Annalogica Automated Testing System
+            https://annalogica.eu
+
+      - name: 💬 Create GitHub comment (on PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.status.outputs.status }}';
+            const emoji = status === 'success' ? '✅' : '❌';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## ${emoji} Test Results
+
+              | Test | Status |
+              |------|--------|
+              | Smoke Tests | ${{ needs.smoke-tests.result }} |
+              | Language Tests | ${{ needs.language-tests.result }} |
+              | Build Test | ${{ needs.build-test.result }} |
+              | Security Audit | ${{ needs.security-audit.result }} |
+
+              [View full results](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+            })
+
+  # ============================================
+  # JOB 6: STRESS TEST (Solo manual o schedule)
+  # ============================================
+  stress-test:
+    name: 💪 Stress Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    needs: [smoke-tests]
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 📦 Install Artillery
+        run: npm install -g artillery@latest
+
+      - name: 💪 Run stress test
+        run: |
+          artillery run testing/stress-test.yml --output stress-results.json
+
+      - name: 📊 Generate report
+        if: always()
+        run: |
+          artillery report stress-results.json --output stress-report.html
+
+      - name: 📁 Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-results
+          path: |
+            stress-results.json
+            stress-report.html
+          retention-days: 30
