@@ -156,6 +156,11 @@ export async function POST(request: NextRequest): Promise<Response> {
             summaryType: summaryType || 'detailed'
           };
 
+          // Determinar el tipo de archivo basándose en el MIME type
+          const isAudio = fileType.startsWith('audio/');
+          const isVideo = fileType.startsWith('video/');
+          const isDocument = !isAudio && !isVideo;
+
           // Crea el job en DB (ahora acepta 7 parámetros incluyendo metadata)
           const jobRecord = await TranscriptionJobDB.create(
             userId,
