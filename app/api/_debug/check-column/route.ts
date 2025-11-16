@@ -13,8 +13,8 @@ export async function GET() {
     const columnExists = columnCheck.rows.length > 0;
 
     // Check sample users
-    let users = [];
-    let nullCount = 0;
+    let users: any[] = [];
+    let nullCount: number = 0;
 
     if (columnExists) {
       const usersResult = await sql`
