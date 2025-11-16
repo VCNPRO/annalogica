@@ -802,61 +802,7 @@ export default function ProcessedFilesPage() {
             </div>
           </div>
 
-          {/* Export CSV/Excel buttons */}
-          {filteredJobs.length > 0 && (
-            <div className="mb-4 p-4 bg-zinc-800/50 rounded-lg border border-zinc-700 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-zinc-400">{t('processedFiles.exportAll')}</span>
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch('/api/export?format=csv', { credentials: 'include' });
-                      if (!res.ok) throw new Error('Error al exportar');
-                      const blob = await res.blob();
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `annalogica-export-${Date.now()}.csv`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                      showNotification('Exportación CSV descargada correctamente', 'success');
-                    } catch (error) {
-                      showNotification('Error al exportar CSV', 'error');
-                    }
-                  }}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  📄 CSV
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch('/api/export?format=excel', { credentials: 'include' });
-                      if (!res.ok) throw new Error('Error al exportar');
-                      const blob = await res.blob();
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `annalogica-export-${Date.now()}.xlsx`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                      showNotification('Exportación Excel descargada correctamente', 'success');
-                    } catch (error) {
-                      showNotification('Error al exportar Excel', 'error');
-                    }
-                  }}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  📊 Excel
-                </button>
-              </div>
-              {downloadDirHandle && <span className="text-xs text-zinc-400">{t('processedFiles.folderLabel')} {downloadDirHandle.name}</span>}
-            </div>
-          )}
+          {/* Export buttons removed - CSV/Excel export no longer available */}
 
           {error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded p-3">
@@ -1113,43 +1059,7 @@ export default function ProcessedFilesPage() {
                                       </a>
                                     )}
 
-                                    {/* Exportar archivo individual a CSV */}
-                                    <button
-                                      onClick={async () => {
-                                        try {
-                                          const res = await fetch(`/api/export?format=csv&jobId=${job.id}`, { credentials: 'include' });
-                                          if (!res.ok) throw new Error('Error al exportar');
-                                          const blob = await res.blob();
-                                          triggerDownload(blob, `${baseFilename}.csv`);
-                                          showNotification('CSV descargado correctamente', 'success');
-                                        } catch (error) {
-                                          showNotification('Error al exportar CSV', 'error');
-                                        }
-                                      }}
-                                      className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500"
-                                      title="Exportar archivo a CSV"
-                                    >
-                                      <Download className="h-3 w-3 mr-1" /> 📄 CSV
-                                    </button>
-
-                                    {/* Exportar archivo individual a Excel */}
-                                    <button
-                                      onClick={async () => {
-                                        try {
-                                          const res = await fetch(`/api/export?format=excel&jobId=${job.id}`, { credentials: 'include' });
-                                          if (!res.ok) throw new Error('Error al exportar');
-                                          const blob = await res.blob();
-                                          triggerDownload(blob, `${baseFilename}.xlsx`);
-                                          showNotification('Excel descargado correctamente', 'success');
-                                        } catch (error) {
-                                          showNotification('Error al exportar Excel', 'error');
-                                        }
-                                      }}
-                                      className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500"
-                                      title="Exportar archivo a Excel"
-                                    >
-                                      <Download className="h-3 w-3 mr-1" /> 📊 Excel
-                                    </button>
+                                    {/* CSV/Excel export buttons removed */}
                                   </>
                                 );
                               })()}
