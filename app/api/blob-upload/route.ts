@@ -150,26 +150,13 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
 
         try {
-          // 🔥 FIX: Pasar metadata con actions y summaryType
-          const metadata = {
-            actions: actions || [],
-            summaryType: summaryType || 'detailed'
-          };
-
-          // Determinar el tipo de archivo basándose en el MIME type
-          const isAudio = fileType.startsWith('audio/');
-          const isVideo = fileType.startsWith('video/');
-          const isDocument = !isAudio && !isVideo;
-
-          // Crea el job en DB (ahora acepta 7 parámetros incluyendo metadata)
+          // Crea el job en DB (tu create acepta 3–5 args)
           const jobRecord = await TranscriptionJobDB.create(
             userId,
             filename,
             blob.url,        // URL del Blob (se procesará/transcribirá por URL)
             language,
-            fileSizeBytes,
-            isAudio || isVideo ? 'audio' : 'document', // fileType
-            metadata         // 🔥 NEW: Metadata con actions y summaryType
+            fileSizeBytes
           );
 
           // Obtiene el ID real del job desde el registro retornado
@@ -178,7 +165,7 @@ export async function POST(request: NextRequest): Promise<Response> {
             (jobRecord as any)?._id ||
             (jobRecord as any)?.jobId;
 
-          console.log('[blob-upload] Job creado', { userId, filename, url: blob.url, fileType, jobId, actions, summaryType });
+          console.log('[blob-upload] Job creado', { userId, filename, url: blob.url, fileType, jobId });
 
           // Dispara el evento correcto de Inngest para que empiece YA el procesamiento
           if (fileType.startsWith('audio/') || fileType.startsWith('video/')) {

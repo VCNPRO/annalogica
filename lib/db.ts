@@ -204,13 +204,11 @@ export const TranscriptionJobDB = {
     audioUrl: string,
     language: string = 'auto', // Default to auto-detection
     audioSizeBytes?: number,
-    fileType: 'audio' | 'document' = 'audio', // Default to audio
-    metadata?: any // 🔥 NEW: Accept metadata (actions, summaryType, etc.)
+    fileType: 'audio' | 'document' = 'audio' // Default to audio
   ): Promise<TranscriptionJob> => {
-    const metadataJson = metadata ? JSON.stringify(metadata) : null;
     const result = await sql<TranscriptionJob>`
-      INSERT INTO transcription_jobs (user_id, filename, audio_url, language, audio_size_bytes, file_type, status, metadata)
-      VALUES (${userId}, ${filename}, ${audioUrl}, ${language}, ${audioSizeBytes || null}, ${fileType}, 'pending', ${metadataJson})
+      INSERT INTO transcription_jobs (user_id, filename, audio_url, language, audio_size_bytes, file_type, status)
+      VALUES (${userId}, ${filename}, ${audioUrl}, ${language}, ${audioSizeBytes || null}, ${fileType}, 'pending')
       RETURNING *
     `;
     return result.rows[0];
