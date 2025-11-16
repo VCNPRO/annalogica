@@ -66,11 +66,21 @@ const transcribeFile = inngest.createFunction(
         fileName: job.filename,
         userId: job.user_id,
         summaryType: job.metadata?.summaryType || 'detailed',
-        language: job.language || 'auto'  // ✅ FIX: Extraer language del job
+        language: job.language || 'auto',  // ✅ FIX: Extraer language del job
+        actions: job.metadata?.actions || []  // 🔥 NEW: Extraer actions del job
       };
     });
 
-    const { audioUrl, fileName, userId, summaryType, language } = jobData;
+    const { audioUrl, fileName, userId, summaryType, language, actions } = jobData;
+
+    // 🔥 NEW: Helper function to check if an action was requested
+    const shouldExecute = (actionName) => {
+      // Si no hay actions definidas (jobs antiguos), ejecutar todo por compatibilidad
+      if (!actions || actions.length === 0) return true;
+      return actions.includes(actionName);
+    };
+
+    console.log('[transcribe] Actions requested:', actions);
 
     console.log('[transcribe] Iniciando transcripcion:', { jobId, fileName, userId });
 
@@ -159,17 +169,19 @@ const transcribeFile = inngest.createFunction(
       });
 
       // ============================================
-      // PASO 3: Identificar speakers
+      // PASO 3: Identificar speakers (CONDICIONAL)
       // ============================================
-      const speakersResult = await step.run('identify-speakers', async () => {
-        console.log('[transcribe] Identificando intervinientes...');
+      let speakers = [];
+      if (shouldExecute('Oradores')) {
+        const speakersResult = await step.run('identify-speakers', async () => {
+          console.log('[transcribe] Identificando intervinientes...');
 
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `Eres un asistente experto en analisis de transcripciones.
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `Eres un asistente experto en analisis de transcripciones.
 Identifica a todos los intervinientes/oradores en la transcripcion.
 
 Para cada interviniente, extrae:
@@ -184,45 +196,51 @@ Responde SOLO con un JSON array:
 
 Si no se menciona el cargo, usa "Interviniente" como role.
 Si no hay indicadores claros de speakers, devuelve array vacio.`
-            },
-            {
-              role: "user",
-              content: `Transcripcion:\n\n${transcriptionText}`
-            }
-          ],
-          temperature: 0.3,
-          response_format: { type: "json_object" }
+              },
+              {
+                role: "user",
+                content: `Transcripcion:\n\n${transcriptionText}`
+              }
+            ],
+            temperature: 0.3,
+            response_format: { type: "json_object" }
+          });
+
+          const result = JSON.parse(completion.choices[0].message.content);
+          const speakersData = result.speakers || [];
+
+          console.log('[transcribe] Intervinientes identificados:', speakersData.length);
+          return { speakers: speakersData };
         });
 
-        const result = JSON.parse(completion.choices[0].message.content);
-        const speakers = result.speakers || [];
-
-        console.log('[transcribe] Intervinientes identificados:', speakers.length);
-        return { speakers }; // 🔥 FIX: Retornar speakers
-      });
-
-      const speakers = speakersResult.speakers;
+        speakers = speakersResult.speakers;
+        console.log('[transcribe] Speakers guardados:', speakers.length);
+      } else {
+        console.log('[transcribe] Skipping speakers identification (not requested)');
+      }
 
       await step.run('update-progress-65', async () => {
         await updateTranscriptionProgress(jobId, 65);
       });
 
       // ============================================
-      // PASO 4: Generar resumen
+      // PASO 4: Generar resumen (CONDICIONAL)
       // ============================================
-      const summaryResult = await step.run('generate-summary', async () => {
-        console.log('[transcribe] Generando resumen...');
+      let summary = '';
+      if (shouldExecute('Resumir')) {
+        const summaryResult = await step.run('generate-summary', async () => {
+          console.log('[transcribe] Generando resumen...');
 
-        const summaryPrompt = summaryType === 'short'
-          ? 'Genera un resumen ejecutivo muy breve (maximo 3 parrafos) de esta transcripcion.'
-          : 'Genera un resumen detallado y estructurado de esta transcripcion, incluyendo todos los puntos clave discutidos.';
+          const summaryPrompt = summaryType === 'short'
+            ? 'Genera un resumen ejecutivo muy breve (maximo 3 parrafos) de esta transcripcion.'
+            : 'Genera un resumen detallado y estructurado de esta transcripcion, incluyendo todos los puntos clave discutidos.';
 
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `Eres un asistente experto en generar resumenes de transcripciones.
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `Eres un asistente experto en generar resumenes de transcripciones.
 ${summaryPrompt}
 
 El resumen debe:
@@ -230,40 +248,46 @@ El resumen debe:
 - Mantener los puntos clave
 - Usar lenguaje profesional
 - Respetar el contexto original`
-            },
-            {
-              role: "user",
-              content: `Transcripcion:\n\n${transcriptionText}`
-            }
-          ],
-          temperature: 0.5,
-          max_tokens: summaryType === 'short' ? 500 : 2000
+              },
+              {
+                role: "user",
+                content: `Transcripcion:\n\n${transcriptionText}`
+              }
+            ],
+            temperature: 0.5,
+            max_tokens: summaryType === 'short' ? 500 : 2000
+          });
+
+          const summaryContent = completion.choices[0].message.content;
+
+          console.log('[transcribe] Resumen generado');
+          return { summary: summaryContent };
         });
 
-        const summary = completion.choices[0].message.content;
-
-        console.log('[transcribe] Resumen generado');
-        return { summary }; // 🔥 FIX: Retornar summary
-      });
-
-      const summary = summaryResult.summary;
+        summary = summaryResult.summary;
+        console.log('[transcribe] Resumen guardado');
+      } else {
+        console.log('[transcribe] Skipping summary generation (not requested)');
+      }
 
       await step.run('update-progress-75', async () => {
         await updateTranscriptionProgress(jobId, 75);
       });
 
       // ============================================
-      // PASO 5: Generar tags
+      // PASO 5: Generar tags (CONDICIONAL)
       // ============================================
-      const tagsResult = await step.run('generate-tags', async () => {
-        console.log('[transcribe] Generando tags...');
+      let tags = [];
+      if (shouldExecute('Aplicar Tags')) {
+        const tagsResult = await step.run('generate-tags', async () => {
+          console.log('[transcribe] Generando tags...');
 
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `Eres un asistente experto en categorizacion.
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `Eres un asistente experto en categorizacion.
 Analiza la transcripcion y genera entre 5 y 10 tags relevantes.
 
 Los tags deben ser:
@@ -274,114 +298,140 @@ Los tags deben ser:
 
 Responde SOLO con JSON:
 {"tags": ["tag1", "tag2", "tag3"]}`
-            },
-            {
-              role: "user",
-              content: `Transcripcion:\n\n${transcriptionText}`
-            }
-          ],
-          temperature: 0.3,
-          response_format: { type: "json_object" }
+              },
+              {
+                role: "user",
+                content: `Transcripcion:\n\n${transcriptionText}`
+              }
+            ],
+            temperature: 0.3,
+            response_format: { type: "json_object" }
+          });
+
+          const result = JSON.parse(completion.choices[0].message.content);
+          const tagsData = result.tags || [];
+
+          console.log('[transcribe] Tags generados:', tagsData);
+          return { tags: tagsData };
         });
 
-        const result = JSON.parse(completion.choices[0].message.content);
-        const tags = result.tags || [];
-
-        console.log('[transcribe] Tags generados:', tags);
-        return { tags }; // 🔥 FIX: Retornar tags
-      });
-
-      const tags = tagsResult.tags;
+        tags = tagsResult.tags;
+        console.log('[transcribe] Tags guardados:', tags.length);
+      } else {
+        console.log('[transcribe] Skipping tags generation (not requested)');
+      }
 
       await step.run('update-progress-85', async () => {
         await updateTranscriptionProgress(jobId, 85);
       });
 
       // ============================================
-      // PASO 6: Generar subtitulos SRT y VTT
+      // PASO 6: Generar subtitulos SRT y VTT (CONDICIONAL)
       // ============================================
-      const subtitlesResult = await step.run('generate-subtitles', async () => {
-        console.log('[transcribe] Generando subtitulos...');
+      let subtitles = { srt: null, vtt: null };
+      const needsSRT = shouldExecute('SRT');
+      const needsVTT = shouldExecute('VTT');
 
-        const segments = transcriptionSegments || [];
+      if (needsSRT || needsVTT) {
+        const subtitlesResult = await step.run('generate-subtitles', async () => {
+          console.log('[transcribe] Generando subtitulos...', { needsSRT, needsVTT });
 
-        // Generar SRT
-        const srtContent = segments.map((segment, index) => {
-          const startTime = formatTimeSRT(segment.start);
-          const endTime = formatTimeSRT(segment.end);
-          return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
-        }).join('\n');
+          const segments = transcriptionSegments || [];
+          const result = {};
 
-        // Generar VTT
-        const vttContent = 'WEBVTT\n\n' + segments.map((segment, index) => {
-          const startTime = formatTimeVTT(segment.start);
-          const endTime = formatTimeVTT(segment.end);
-          return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
-        }).join('\n');
+          // Generar SRT solo si fue solicitado
+          if (needsSRT) {
+            const srtContent = segments.map((segment, index) => {
+              const startTime = formatTimeSRT(segment.start);
+              const endTime = formatTimeSRT(segment.end);
+              return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
+            }).join('\n');
 
-        // Subir archivos
-        const srtBlob = await put(`transcriptions/${jobId}.srt`, srtContent, {
-          access: 'public',
-          contentType: 'text/plain'
+            const srtBlob = await put(`transcriptions/${jobId}.srt`, srtContent, {
+              access: 'public',
+              contentType: 'text/plain'
+            });
+
+            result.srt = srtBlob.url;
+            console.log('[transcribe] SRT generado');
+          }
+
+          // Generar VTT solo si fue solicitado
+          if (needsVTT) {
+            const vttContent = 'WEBVTT\n\n' + segments.map((segment, index) => {
+              const startTime = formatTimeVTT(segment.start);
+              const endTime = formatTimeVTT(segment.end);
+              return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
+            }).join('\n');
+
+            const vttBlob = await put(`transcriptions/${jobId}.vtt`, vttContent, {
+              access: 'public',
+              contentType: 'text/vtt'
+            });
+
+            result.vtt = vttBlob.url;
+            console.log('[transcribe] VTT generado');
+          }
+
+          console.log('[transcribe] Subtitulos completados');
+          return { subtitles: result };
         });
 
-        const vttBlob = await put(`transcriptions/${jobId}.vtt`, vttContent, {
-          access: 'public',
-          contentType: 'text/vtt'
-        });
-
-        console.log('[transcribe] Subtitulos generados');
-
-        const subtitles = {
-          srt: srtBlob.url,
-          vtt: vttBlob.url
-        };
-
-        return { subtitles }; // 🔥 FIX: Retornar subtitles
-      });
-
-      const subtitles = subtitlesResult.subtitles;
+        subtitles = subtitlesResult.subtitles;
+        console.log('[transcribe] Subtitulos guardados:', { srt: !!subtitles.srt, vtt: !!subtitles.vtt });
+      } else {
+        console.log('[transcribe] Skipping subtitles generation (not requested)');
+      }
 
       await step.run('update-progress-90', async () => {
         await updateTranscriptionProgress(jobId, 90);
       });
 
       // ============================================
-      // PASO 7: Guardar archivos de texto
+      // PASO 7: Guardar archivos de texto (solo los solicitados)
       // ============================================
       const textFilesResult = await step.run('save-text-files', async () => {
-        console.log('[transcribe] Guardando archivos de texto...');
+        console.log('[transcribe] Guardando archivos de texto solicitados...');
 
-        // Guardar transcripcion completa
-        const txtBlob = await put(
-          `transcriptions/${jobId}.txt`,
-          transcriptionText,
-          { access: 'public', contentType: 'text/plain' }
-        );
+        const textFiles = {};
 
-        // Guardar resumen
-        const summaryBlob = await put(
-          `transcriptions/${jobId}-summary.txt`,
-          summary,
-          { access: 'public', contentType: 'text/plain' }
-        );
+        // Guardar transcripcion completa solo si fue solicitada
+        if (shouldExecute('Transcribir')) {
+          const txtBlob = await put(
+            `transcriptions/${jobId}.txt`,
+            transcriptionText,
+            { access: 'public', contentType: 'text/plain' }
+          );
+          textFiles.txt = txtBlob.url;
+          console.log('[transcribe] Transcripción TXT guardada');
+        } else {
+          console.log('[transcribe] Skipping TXT file (not requested)');
+        }
 
-        // Guardar speakers como JSON
-        const speakersBlob = await put(
-          `transcriptions/${jobId}-speakers.json`,
-          JSON.stringify(speakers, null, 2),
-          { access: 'public', contentType: 'application/json' }
-        );
+        // Guardar resumen solo si fue generado
+        if (summary) {
+          const summaryBlob = await put(
+            `transcriptions/${jobId}-summary.txt`,
+            summary,
+            { access: 'public', contentType: 'text/plain' }
+          );
+          textFiles.summary = summaryBlob.url;
+          console.log('[transcribe] Resumen guardado');
+        }
 
-        console.log('[transcribe] Archivos de texto guardados');
+        // Guardar speakers solo si fueron identificados
+        if (speakers && speakers.length > 0) {
+          const speakersBlob = await put(
+            `transcriptions/${jobId}-speakers.json`,
+            JSON.stringify(speakers, null, 2),
+            { access: 'public', contentType: 'application/json' }
+          );
+          textFiles.speakers = speakersBlob.url;
+          console.log('[transcribe] Speakers guardados');
+        }
 
-        const textFiles = {
-          txt: txtBlob.url,
-          summary: summaryBlob.url,
-          speakers: speakersBlob.url
-        };
-
-        return { textFiles }; // 🔥 FIX: Retornar textFiles
+        console.log('[transcribe] Archivos de texto completados');
+        return { textFiles };
       });
 
       const textFiles = textFilesResult.textFiles;
