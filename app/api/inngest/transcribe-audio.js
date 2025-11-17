@@ -159,17 +159,21 @@ const transcribeFile = inngest.createFunction(
       });
 
       // ============================================
-      // PASO 3: Identificar speakers
+      // PASO 3: PARALELIZAR análisis con GPT (speakers, resumen, tags)
+      // ✅ OPTIMIZACIÓN: Ejecutar las 3 llamadas en paralelo para reducir tiempo
       // ============================================
-      const speakersResult = await step.run('identify-speakers', async () => {
-        console.log('[transcribe] Identificando intervinientes...');
+      const analysisResult = await step.run('parallel-gpt-analysis', async () => {
+        console.log('[transcribe] Iniciando análisis paralelo (speakers, resumen, tags)...');
 
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `Eres un asistente experto en analisis de transcripciones.
+        // Ejecutar las 3 llamadas a GPT en paralelo
+        const [speakersCompletion, summaryCompletion, tagsCompletion] = await Promise.all([
+          // 1. Identificar speakers
+          openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `Eres un asistente experto en analisis de transcripciones.
 Identifica a todos los intervinientes/oradores en la transcripcion.
 
 Para cada interviniente, extrae:
@@ -184,86 +188,49 @@ Responde SOLO con un JSON array:
 
 Si no se menciona el cargo, usa "Interviniente" como role.
 Si no hay indicadores claros de speakers, devuelve array vacio.`
-            },
-            {
-              role: "user",
-              content: `Transcripcion:\n\n${transcriptionText}`
-            }
-          ],
-          temperature: 0.3,
-          response_format: { type: "json_object" }
-        });
+              },
+              {
+                role: "user",
+                content: `Transcripcion:\n\n${transcriptionText}`
+              }
+            ],
+            temperature: 0.3,
+            response_format: { type: "json_object" }
+          }),
 
-        const result = JSON.parse(completion.choices[0].message.content);
-        const speakers = result.speakers || [];
-
-        console.log('[transcribe] Intervinientes identificados:', speakers.length);
-        return { speakers }; // 🔥 FIX: Retornar speakers
-      });
-
-      const speakers = speakersResult.speakers;
-
-      await step.run('update-progress-65', async () => {
-        await updateTranscriptionProgress(jobId, 65);
-      });
-
-      // ============================================
-      // PASO 4: Generar resumen
-      // ============================================
-      const summaryResult = await step.run('generate-summary', async () => {
-        console.log('[transcribe] Generando resumen...');
-
-        const summaryPrompt = summaryType === 'short'
-          ? 'Genera un resumen ejecutivo muy breve (maximo 3 parrafos) de esta transcripcion.'
-          : 'Genera un resumen detallado y estructurado de esta transcripcion, incluyendo todos los puntos clave discutidos.';
-
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `Eres un asistente experto en generar resumenes de transcripciones.
-${summaryPrompt}
+          // 2. Generar resumen
+          openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `Eres un asistente experto en generar resumenes de transcripciones.
+${summaryType === 'short'
+  ? 'Genera un resumen ejecutivo muy breve (maximo 3 parrafos) de esta transcripcion.'
+  : 'Genera un resumen detallado y estructurado de esta transcripcion, incluyendo todos los puntos clave discutidos.'}
 
 El resumen debe:
 - Ser claro y bien estructurado
 - Mantener los puntos clave
 - Usar lenguaje profesional
 - Respetar el contexto original`
-            },
-            {
-              role: "user",
-              content: `Transcripcion:\n\n${transcriptionText}`
-            }
-          ],
-          temperature: 0.5,
-          max_tokens: summaryType === 'short' ? 500 : 2000
-        });
+              },
+              {
+                role: "user",
+                content: `Transcripcion:\n\n${transcriptionText}`
+              }
+            ],
+            temperature: 0.5,
+            max_tokens: summaryType === 'short' ? 500 : 2000
+          }),
 
-        const summary = completion.choices[0].message.content;
-
-        console.log('[transcribe] Resumen generado');
-        return { summary }; // 🔥 FIX: Retornar summary
-      });
-
-      const summary = summaryResult.summary;
-
-      await step.run('update-progress-75', async () => {
-        await updateTranscriptionProgress(jobId, 75);
-      });
-
-      // ============================================
-      // PASO 5: Generar tags
-      // ============================================
-      const tagsResult = await step.run('generate-tags', async () => {
-        console.log('[transcribe] Generando tags...');
-
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: `Eres un asistente experto en categorizacion.
+          // 3. Generar tags
+          openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `Eres un asistente experto en categorizacion.
 Analiza la transcripcion y genera entre 5 y 10 tags relevantes.
 
 Los tags deben ser:
@@ -274,34 +241,48 @@ Los tags deben ser:
 
 Responde SOLO con JSON:
 {"tags": ["tag1", "tag2", "tag3"]}`
-            },
-            {
-              role: "user",
-              content: `Transcripcion:\n\n${transcriptionText}`
-            }
-          ],
-          temperature: 0.3,
-          response_format: { type: "json_object" }
+              },
+              {
+                role: "user",
+                content: `Transcripcion:\n\n${transcriptionText}`
+              }
+            ],
+            temperature: 0.3,
+            response_format: { type: "json_object" }
+          })
+        ]);
+
+        // Procesar resultados
+        const speakersData = JSON.parse(speakersCompletion.choices[0].message.content);
+        const speakers = speakersData.speakers || [];
+
+        const summary = summaryCompletion.choices[0].message.content;
+
+        const tagsData = JSON.parse(tagsCompletion.choices[0].message.content);
+        const tags = tagsData.tags || [];
+
+        console.log('[transcribe] ✅ Análisis paralelo completado:', {
+          speakers: speakers.length,
+          summaryLength: summary?.length || 0,
+          tags: tags.length
         });
 
-        const result = JSON.parse(completion.choices[0].message.content);
-        const tags = result.tags || [];
-
-        console.log('[transcribe] Tags generados:', tags);
-        return { tags }; // 🔥 FIX: Retornar tags
+        return { speakers, summary, tags };
       });
 
-      const tags = tagsResult.tags;
-
-      await step.run('update-progress-85', async () => {
-        await updateTranscriptionProgress(jobId, 85);
-      });
+      // Extraer resultados del análisis paralelo
+      const speakers = analysisResult.speakers;
+      const summary = analysisResult.summary;
+      const tags = analysisResult.tags;
 
       // ============================================
-      // PASO 6: Generar subtitulos SRT y VTT
+      // PASO 4: Generar subtítulos y guardar archivos (consolidado)
+      // ✅ OPTIMIZACIÓN: Combinar generación de subtítulos y guardado de archivos
       // ============================================
-      const subtitlesResult = await step.run('generate-subtitles', async () => {
-        console.log('[transcribe] Generando subtitulos...');
+      const filesResult = await step.run('generate-and-save-files', async () => {
+        console.log('[transcribe] Generando subtítulos y guardando archivos...');
+
+        await updateTranscriptionProgress(jobId, 75);
 
         const segments = transcriptionSegments || [];
 
@@ -319,76 +300,51 @@ Responde SOLO con JSON:
           return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
         }).join('\n');
 
-        // Subir archivos
-        const srtBlob = await put(`transcriptions/${jobId}.srt`, srtContent, {
-          access: 'public',
-          contentType: 'text/plain'
-        });
+        await updateTranscriptionProgress(jobId, 85);
 
-        const vttBlob = await put(`transcriptions/${jobId}.vtt`, vttContent, {
-          access: 'public',
-          contentType: 'text/vtt'
-        });
+        // Subir TODOS los archivos en paralelo
+        const [srtBlob, vttBlob, txtBlob, summaryBlob, speakersBlob] = await Promise.all([
+          put(`transcriptions/${jobId}.srt`, srtContent, {
+            access: 'public',
+            contentType: 'text/plain'
+          }),
+          put(`transcriptions/${jobId}.vtt`, vttContent, {
+            access: 'public',
+            contentType: 'text/vtt'
+          }),
+          put(`transcriptions/${jobId}.txt`, transcriptionText, {
+            access: 'public',
+            contentType: 'text/plain'
+          }),
+          put(`transcriptions/${jobId}-summary.txt`, summary, {
+            access: 'public',
+            contentType: 'text/plain'
+          }),
+          put(`transcriptions/${jobId}-speakers.json`, JSON.stringify(speakers, null, 2), {
+            access: 'public',
+            contentType: 'application/json'
+          })
+        ]);
 
-        console.log('[transcribe] Subtitulos generados');
+        console.log('[transcribe] ✅ Todos los archivos generados y guardados');
 
-        const subtitles = {
-          srt: srtBlob.url,
-          vtt: vttBlob.url
-        };
-
-        return { subtitles }; // 🔥 FIX: Retornar subtitles
-      });
-
-      const subtitles = subtitlesResult.subtitles;
-
-      await step.run('update-progress-90', async () => {
-        await updateTranscriptionProgress(jobId, 90);
-      });
-
-      // ============================================
-      // PASO 7: Guardar archivos de texto
-      // ============================================
-      const textFilesResult = await step.run('save-text-files', async () => {
-        console.log('[transcribe] Guardando archivos de texto...');
-
-        // Guardar transcripcion completa
-        const txtBlob = await put(
-          `transcriptions/${jobId}.txt`,
-          transcriptionText,
-          { access: 'public', contentType: 'text/plain' }
-        );
-
-        // Guardar resumen
-        const summaryBlob = await put(
-          `transcriptions/${jobId}-summary.txt`,
-          summary,
-          { access: 'public', contentType: 'text/plain' }
-        );
-
-        // Guardar speakers como JSON
-        const speakersBlob = await put(
-          `transcriptions/${jobId}-speakers.json`,
-          JSON.stringify(speakers, null, 2),
-          { access: 'public', contentType: 'application/json' }
-        );
-
-        console.log('[transcribe] Archivos de texto guardados');
-
-        const textFiles = {
-          txt: txtBlob.url,
-          summary: summaryBlob.url,
-          speakers: speakersBlob.url
-        };
-
-        return { textFiles }; // 🔥 FIX: Retornar textFiles
-      });
-
-      const textFiles = textFilesResult.textFiles;
-
-      await step.run('update-progress-95', async () => {
         await updateTranscriptionProgress(jobId, 95);
+
+        return {
+          subtitles: {
+            srt: srtBlob.url,
+            vtt: vttBlob.url
+          },
+          textFiles: {
+            txt: txtBlob.url,
+            summary: summaryBlob.url,
+            speakers: speakersBlob.url
+          }
+        };
       });
+
+      const subtitles = filesResult.subtitles;
+      const textFiles = filesResult.textFiles;
 
       // ============================================
       // PASO 8: Guardar resultados en BD

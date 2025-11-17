@@ -201,14 +201,23 @@ export async function processAudioFile(jobId: string): Promise<void> {
       throw new Error(errorMsg);
     }
 
-    // STEP 3: Identify speakers
-    console.log('[AudioProcessor] Identifying speakers...');
-    const speakersCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `Eres un asistente experto en analisis de transcripciones.
+    // STEP 3: PARALLEL GPT Analysis (speakers, summary, tags)
+    // ✅ OPTIMIZATION: Execute all 3 GPT calls in parallel to reduce processing time
+    console.log('[AudioProcessor] Starting parallel GPT analysis (speakers, summary, tags)...');
+
+    const summaryType = job.metadata?.summaryType || 'detailed';
+    const summaryPrompt = summaryType === 'short'
+      ? 'Genera un resumen ejecutivo muy breve (maximo 3 parrafos) de esta transcripcion.'
+      : 'Genera un resumen detallado y estructurado de esta transcripcion, incluyendo todos los puntos clave discutidos.';
+
+    const [speakersCompletion, summaryCompletion, tagsCompletion] = await Promise.all([
+      // 1. Identify speakers
+      openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un asistente experto en analisis de transcripciones.
 Identifica a todos los intervinientes/oradores en la transcripcion.
 
 Para cada interviniente, extrae:
@@ -223,35 +232,23 @@ Responde SOLO con un JSON array:
 
 Si no se menciona el cargo, usa "Interviniente" como role.
 Si no hay indicadores claros de speakers, devuelve array vacio.`
-        },
-        {
-          role: "user",
-          content: `Transcripcion:\n\n${transcriptionText}`
-        }
-      ],
-      temperature: 0.3,
-      response_format: { type: "json_object" }
-    });
+          },
+          {
+            role: "user",
+            content: `Transcripcion:\n\n${transcriptionText}`
+          }
+        ],
+        temperature: 0.3,
+        response_format: { type: "json_object" }
+      }),
 
-    const speakersResult = JSON.parse(speakersCompletion.choices[0].message.content || '{}');
-    const speakers = speakersResult.speakers || [];
-
-    console.log('[AudioProcessor] Speakers identified:', speakers.length);
-    await updateTranscriptionProgress(jobId, 65);
-
-    // STEP 4: Generate summary
-    console.log('[AudioProcessor] Generating summary...');
-    const summaryType = job.metadata?.summaryType || 'detailed';
-    const summaryPrompt = summaryType === 'short'
-      ? 'Genera un resumen ejecutivo muy breve (maximo 3 parrafos) de esta transcripcion.'
-      : 'Genera un resumen detallado y estructurado de esta transcripcion, incluyendo todos los puntos clave discutidos.';
-
-    const summaryCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `Eres un asistente experto en generar resumenes de transcripciones.
+      // 2. Generate summary
+      openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un asistente experto en generar resumenes de transcripciones.
 ${summaryPrompt}
 
 El resumen debe:
@@ -259,29 +256,23 @@ El resumen debe:
 - Mantener los puntos clave
 - Usar lenguaje profesional
 - Respetar el contexto original`
-        },
-        {
-          role: "user",
-          content: `Transcripcion:\n\n${transcriptionText}`
-        }
-      ],
-      temperature: 0.5,
-      max_tokens: summaryType === 'short' ? 500 : 2000
-    });
+          },
+          {
+            role: "user",
+            content: `Transcripcion:\n\n${transcriptionText}`
+          }
+        ],
+        temperature: 0.5,
+        max_tokens: summaryType === 'short' ? 500 : 2000
+      }),
 
-    const summary = summaryCompletion.choices[0].message.content || '';
-
-    console.log('[AudioProcessor] Summary generated');
-    await updateTranscriptionProgress(jobId, 75);
-
-    // STEP 5: Generate tags
-    console.log('[AudioProcessor] Generating tags...');
-    const tagsCompletion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `Eres un asistente experto en categorizacion.
+      // 3. Generate tags
+      openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un asistente experto en categorizacion.
 Analiza la transcripcion y genera entre 5 y 10 tags relevantes.
 
 Los tags deben ser:
@@ -292,24 +283,38 @@ Los tags deben ser:
 
 Responde SOLO con JSON:
 {"tags": ["tag1", "tag2", "tag3"]}`
-        },
-        {
-          role: "user",
-          content: `Transcripcion:\n\n${transcriptionText}`
-        }
-      ],
-      temperature: 0.3,
-      response_format: { type: "json_object" }
-    });
+          },
+          {
+            role: "user",
+            content: `Transcripcion:\n\n${transcriptionText}`
+          }
+        ],
+        temperature: 0.3,
+        response_format: { type: "json_object" }
+      })
+    ]);
+
+    // Process results
+    const speakersResult = JSON.parse(speakersCompletion.choices[0].message.content || '{}');
+    const speakers = speakersResult.speakers || [];
+
+    const summary = summaryCompletion.choices[0].message.content || '';
 
     const tagsResult = JSON.parse(tagsCompletion.choices[0].message.content || '{}');
     const tags = tagsResult.tags || [];
 
-    console.log('[AudioProcessor] Tags generated:', tags);
+    console.log('[AudioProcessor] ✅ Parallel GPT analysis completed:', {
+      speakers: speakers.length,
+      summaryLength: summary.length,
+      tags: tags.length
+    });
+    await updateTranscriptionProgress(jobId, 75);
+
+    // STEP 4: Generate subtitles and save all files in parallel
+    // ✅ OPTIMIZATION: Combine subtitle generation and file uploads
+    console.log('[AudioProcessor] Generating subtitles and output files...');
     await updateTranscriptionProgress(jobId, 85);
 
-    // STEP 6: Generate subtitles (SRT and VTT)
-    console.log('[AudioProcessor] Generating subtitles...');
     const segments = transcriptionSegments || [];
 
     // Generate SRT
@@ -325,23 +330,6 @@ Responde SOLO con JSON:
       const endTime = formatTimeVTT(segment.end);
       return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
     }).join('\n');
-
-    // Upload subtitles to blob
-    const srtBlob = await put(`transcriptions/${jobId}.srt`, srtContent, {
-      access: 'public',
-      contentType: 'text/plain'
-    });
-
-    const vttBlob = await put(`transcriptions/${jobId}.vtt`, vttContent, {
-      access: 'public',
-      contentType: 'text/vtt'
-    });
-
-    console.log('[AudioProcessor] Subtitles generated');
-    await updateTranscriptionProgress(jobId, 90);
-
-    // STEP 7: Generate and save output files
-    console.log('[AudioProcessor] Generating output files (Excel, PDF, TXT)...');
 
     // Generate Excel file with all data
     const { generateAudioExcel } = await import('@/lib/excel-generator');
@@ -359,19 +347,11 @@ Responde SOLO con JSON:
       processingDate: new Date()
     });
 
-    const excelBlob = await put(
-      `transcriptions/${jobId}.xlsx`,
-      excelBuffer,
-      { access: 'public', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
-    );
-
-    console.log('[AudioProcessor] Excel generated');
-
     // Generate PDF with all data (with error handling)
-    let pdfBlob: any = null;
+    let pdfBuffer: Buffer | null = null;
     try {
       const { generateAudioPDF } = await import('@/lib/results-pdf-generator');
-      const pdfBuffer = await generateAudioPDF({
+      pdfBuffer = await generateAudioPDF({
         clientId,
         filename: fileName,
         duration: transcriptionDuration,
@@ -379,47 +359,61 @@ Responde SOLO con JSON:
         summary,
         speakers,
         tags,
-        language: jobLanguage || 'auto',  // ✅ FIX: Usar jobLanguage en vez de 'es' hardcoded
+        language: jobLanguage || 'auto',
         processingDate: new Date()
       });
-
-      pdfBlob = await put(
-        `transcriptions/${jobId}.pdf`,
-        pdfBuffer,
-        { access: 'public', contentType: 'application/pdf' }
-      );
-
-      console.log('[AudioProcessor] PDF generated');
     } catch (pdfError: any) {
       console.error('[AudioProcessor] PDF generation failed (non-fatal):', pdfError.message);
       // PDF generation is not critical, continue without it
     }
 
-    // Save full transcription (TXT)
-    const txtBlob = await put(
-      `transcriptions/${jobId}.txt`,
-      transcriptionText,
-      { access: 'public', contentType: 'text/plain' }
-    );
+    // Upload ALL files in parallel for maximum speed
+    const uploadPromises = [
+      put(`transcriptions/${jobId}.srt`, srtContent, {
+        access: 'public',
+        contentType: 'text/plain'
+      }),
+      put(`transcriptions/${jobId}.vtt`, vttContent, {
+        access: 'public',
+        contentType: 'text/vtt'
+      }),
+      put(`transcriptions/${jobId}.txt`, transcriptionText, {
+        access: 'public',
+        contentType: 'text/plain'
+      }),
+      put(`transcriptions/${jobId}-summary.txt`, summary, {
+        access: 'public',
+        contentType: 'text/plain'
+      }),
+      put(`transcriptions/${jobId}-speakers.json`, JSON.stringify(speakers, null, 2), {
+        access: 'public',
+        contentType: 'application/json'
+      }),
+      put(`transcriptions/${jobId}.xlsx`, excelBuffer, {
+        access: 'public',
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      })
+    ];
 
-    // Save summary (TXT)
-    const summaryBlob = await put(
-      `transcriptions/${jobId}-summary.txt`,
-      summary,
-      { access: 'public', contentType: 'text/plain' }
-    );
+    // Add PDF upload if it was generated successfully
+    if (pdfBuffer) {
+      uploadPromises.push(
+        put(`transcriptions/${jobId}.pdf`, pdfBuffer, {
+          access: 'public',
+          contentType: 'application/pdf'
+        })
+      );
+    }
 
-    // Save speakers as JSON
-    const speakersBlob = await put(
-      `transcriptions/${jobId}-speakers.json`,
-      JSON.stringify(speakers, null, 2),
-      { access: 'public', contentType: 'application/json' }
-    );
+    const uploadResults = await Promise.all(uploadPromises);
 
-    console.log('[AudioProcessor] All output files saved');
+    const [srtBlob, vttBlob, txtBlob, summaryBlob, speakersBlob, excelBlob, ...restBlobs] = uploadResults;
+    const pdfBlob = pdfBuffer ? restBlobs[0] : null;
+
+    console.log('[AudioProcessor] ✅ All files uploaded successfully');
     await updateTranscriptionProgress(jobId, 95);
 
-    // STEP 8: Save results to database
+    // STEP 5: Save results to database
     console.log('[AudioProcessor] Saving results to database...');
     await saveTranscriptionResults(jobId, {
       txtUrl: txtBlob.url,
@@ -432,7 +426,7 @@ Responde SOLO con JSON:
       metadata: {
         speakers: speakers,
         segments: transcriptionSegments?.length || 0,
-        language: jobLanguage || 'auto',  // ✅ FIX: Usar jobLanguage en vez de 'es' hardcoded
+        language: jobLanguage || 'auto',
         excelUrl: excelBlob.url,
         pdfUrl: pdfBlob?.url || null
       }
@@ -441,7 +435,7 @@ Responde SOLO con JSON:
     console.log('[AudioProcessor] Results saved to database');
     await updateTranscriptionProgress(jobId, 100);
 
-    // STEP 9: Delete original audio file to save storage costs
+    // STEP 6: Delete original audio file to save storage costs
     console.log('[AudioProcessor] Deleting original audio file to save storage...');
     try {
       await del(audioUrl);
@@ -452,7 +446,7 @@ Responde SOLO con JSON:
       console.error('[AudioProcessor] URL:', audioUrl);
     }
 
-    console.log('[AudioProcessor] Processing completed successfully:', jobId);
+    console.log('[AudioProcessor] ✅ Processing completed successfully:', jobId);
 
   } catch (error: any) {
     console.error('[AudioProcessor] Error processing audio:', error);
