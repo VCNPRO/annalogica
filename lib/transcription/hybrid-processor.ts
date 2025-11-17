@@ -54,7 +54,7 @@ async function transcribeWithWhisper(
     transcriptionParams.language = language;
   }
 
-  const transcriptionResponse = await openai!.audio.transcriptions.create(transcriptionParams);
+  const transcriptionResponse = await openai!.audio.transcriptions.create(transcriptionParams) as any;
 
   return {
     text: transcriptionResponse.text,
