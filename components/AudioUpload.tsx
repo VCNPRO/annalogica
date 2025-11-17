@@ -106,7 +106,7 @@ export default function AudioUpload() {
             )}
             {!file && (
               <p className="text-sm text-gray-500 mt-1">
-                MP3, WAV, M4A, OGG, FLAC o WebM - Máx. 25MB
+                MP3, WAV, M4A, OGG, FLAC o WebM - Máx. 1GB
               </p>
             )}
           </div>

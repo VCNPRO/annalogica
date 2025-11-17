@@ -23,6 +23,7 @@
     "@upstash/redis": "^1.35.5",
     "@vercel/blob": "^2.0.0",
     "@vercel/postgres": "^0.10.0",
+    "assemblyai": "^4.19.0",
     "bcryptjs": "^3.0.2",
     "cookie": "^1.0.2",
     "exceljs": "^4.4.0",

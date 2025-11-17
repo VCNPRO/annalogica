@@ -75,18 +75,24 @@ export const PROCESSING_CONSTANTS = {
 
 export const FILE_CONSTANTS = {
   /**
-   * Maximum file size (bytes) - OPTIMIZADO PARA BETA
-   * Audio: 100MB (~100 min), Video: 200MB (~200 min)
+   * Maximum file size (bytes) - PRODUCTION READY
+   * Audio: 1GB, Video: 5GB (AssemblyAI supports up to 5GB)
+   * Files >25MB will use AssemblyAI, <=25MB use OpenAI Whisper for cost optimization
    */
-  MAX_FILE_SIZE_AUDIO_BYTES: 100 * 1024 * 1024,
-  MAX_FILE_SIZE_VIDEO_BYTES: 200 * 1024 * 1024,
-  MAX_FILE_SIZE_DOCUMENT_BYTES: 50 * 1024 * 1024,
+  MAX_FILE_SIZE_AUDIO_BYTES: 1 * 1024 * 1024 * 1024,  // 1 GB
+  MAX_FILE_SIZE_VIDEO_BYTES: 5 * 1024 * 1024 * 1024,  // 5 GB
+  MAX_FILE_SIZE_DOCUMENT_BYTES: 50 * 1024 * 1024,      // 50 MB
+
+  /**
+   * Threshold for switching to AssemblyAI (files larger than this use AssemblyAI)
+   */
+  ASSEMBLYAI_THRESHOLD_BYTES: 25 * 1024 * 1024,        // 25 MB (OpenAI Whisper limit)
 
   /**
    * Maximum file size (MB) for display
    */
-  MAX_FILE_SIZE_AUDIO_MB: 100,
-  MAX_FILE_SIZE_VIDEO_MB: 200,
+  MAX_FILE_SIZE_AUDIO_MB: 1024,   // 1 GB
+  MAX_FILE_SIZE_VIDEO_MB: 5120,   // 5 GB
   MAX_FILE_SIZE_DOCUMENT_MB: 50,
 
   /**
