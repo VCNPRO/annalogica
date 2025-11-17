@@ -1,5 +1,6 @@
 // lib/processors/audio-processor.ts
 // Direct audio processing without Inngest
+// Hybrid transcription: Whisper (≤25MB) + AssemblyAI (>25MB, up to 5GB)
 import OpenAI from 'openai';
 import { put, del } from '@vercel/blob';
 import { sql } from '@vercel/postgres';
