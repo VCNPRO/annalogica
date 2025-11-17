@@ -10,6 +10,8 @@ import {
   getTranscriptionJob
 } from '@/lib/db/transcriptions';
 import { trackError } from '@/lib/error-tracker';
+import { transcribeWithAssemblyAI, isAssemblyAIAvailable } from '@/lib/transcription/assemblyai-client';
+import { FILE_CONSTANTS } from '@/constants/processing';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -71,7 +73,223 @@ export async function processAudioFile(jobId: string): Promise<void> {
     // Update progress: 10%
     await updateTranscriptionProgress(jobId, 10);
 
-    // STEP 1: Download audio
+    // STEP 0: Determine file size and decide which service to use
+    // Get file size by doing a HEAD request (to avoid downloading if using AssemblyAI)
+    let fileSizeBytes = 0;
+    let useAssemblyAI = false;
+
+    try {
+      const headResponse = await fetch(audioUrl, { method: 'HEAD' });
+      const contentLength = headResponse.headers.get('content-length');
+      if (contentLength) {
+        fileSizeBytes = parseInt(contentLength, 10);
+        const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
+        console.log('[AudioProcessor] File size:', fileSizeMB, 'MB');
+
+        // Decide which service to use based on file size
+        if (fileSizeBytes > FILE_CONSTANTS.ASSEMBLYAI_THRESHOLD_BYTES && isAssemblyAIAvailable()) {
+          useAssemblyAI = true;
+          console.log('[AudioProcessor] Using AssemblyAI (file >25MB and AssemblyAI available)');
+        } else if (fileSizeBytes > FILE_CONSTANTS.ASSEMBLYAI_THRESHOLD_BYTES && !isAssemblyAIAvailable()) {
+          console.warn('[AudioProcessor] File >25MB but AssemblyAI not available - will try Whisper (may fail)');
+        } else {
+          console.log('[AudioProcessor] Using OpenAI Whisper (file ≤25MB)');
+        }
+      }
+    } catch (error) {
+      console.error('[AudioProcessor] Could not determine file size, will use Whisper');
+    }
+
+    // STEP 1A: If using AssemblyAI, process with AssemblyAI (no need to download)
+    if (useAssemblyAI) {
+      console.log('[AudioProcessor] Processing with AssemblyAI...');
+      await updateTranscriptionProgress(jobId, 20);
+
+      try {
+        const assemblyResult = await transcribeWithAssemblyAI(audioUrl, jobLanguage || 'auto');
+
+        console.log('[AudioProcessor] ✅ AssemblyAI transcription completed');
+        await updateTranscriptionProgress(jobId, 60);
+
+        // Extract data
+        const transcriptionText = assemblyResult.text;
+        const transcriptionDuration = assemblyResult.duration;
+        const transcriptionSegments = assemblyResult.segments;
+        const speakers = assemblyResult.speakers;
+        const summary = assemblyResult.summary;
+
+        // Generate tags with GPT-4o-mini (AssemblyAI doesn't provide tags)
+        console.log('[AudioProcessor] Generating tags with GPT-4o-mini...');
+        const tagsCompletion = await openai!.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: `Eres un asistente experto en categorizacion.
+Analiza la transcripcion y genera entre 5 y 10 tags relevantes.
+
+Los tags deben ser:
+- Palabras clave o frases cortas (1-3 palabras)
+- Relevantes al contenido principal
+- En espanol
+- Sin simbolos especiales
+
+Responde SOLO con JSON:
+{"tags": ["tag1", "tag2", "tag3"]}`
+            },
+            {
+              role: "user",
+              content: `Transcripcion:\n\n${transcriptionText}`
+            }
+          ],
+          temperature: 0.3,
+          response_format: { type: "json_object" }
+        });
+
+        const tagsData = JSON.parse(tagsCompletion.choices[0].message.content || '{}');
+        const tags = tagsData.tags || [];
+
+        console.log('[AudioProcessor] ✅ Tags generated:', tags);
+        await updateTranscriptionProgress(jobId, 75);
+
+        // Continue with file generation and save (same as Whisper path)
+        // Generate subtitles and save files
+        const segments = transcriptionSegments || [];
+
+        // Generate SRT
+        const srtContent = segments.map((segment: any, index: number) => {
+          const startTime = formatTimeSRT(segment.start || 0);
+          const endTime = formatTimeSRT(segment.end || 0);
+          return `${index + 1}\n${startTime} --> ${endTime}\n${(segment.text || '').trim()}\n`;
+        }).join('\n');
+
+        // Generate VTT
+        const vttContent = 'WEBVTT\n\n' + segments.map((segment: any, index: number) => {
+          const startTime = formatTimeVTT(segment.start || 0);
+          const endTime = formatTimeVTT(segment.end || 0);
+          return `${index + 1}\n${startTime} --> ${endTime}\n${(segment.text || '').trim()}\n`;
+        }).join('\n');
+
+        await updateTranscriptionProgress(jobId, 85);
+
+        // Generate Excel
+        const { generateAudioExcel } = await import('@/lib/excel-generator');
+        const excelBuffer = await generateAudioExcel({
+          clientId,
+          filename: fileName,
+          duration: transcriptionDuration,
+          transcription: transcriptionText,
+          summary,
+          speakers,
+          tags,
+          hasSRT: true,
+          hasVTT: true,
+          language: jobLanguage || 'auto',
+          processingDate: new Date()
+        });
+
+        // Generate PDF
+        let pdfBuffer: Buffer | null = null;
+        try {
+          const { generateAudioPDF } = await import('@/lib/results-pdf-generator');
+          pdfBuffer = await generateAudioPDF({
+            clientId,
+            filename: fileName,
+            duration: transcriptionDuration,
+            transcription: transcriptionText,
+            summary,
+            speakers,
+            tags,
+            language: jobLanguage || 'auto',
+            processingDate: new Date()
+          });
+        } catch (pdfError: any) {
+          console.error('[AudioProcessor] PDF generation failed (non-fatal):', pdfError.message);
+        }
+
+        // Upload ALL files in parallel
+        const uploadPromises = [
+          put(`transcriptions/${jobId}.srt`, srtContent, {
+            access: 'public',
+            contentType: 'text/plain'
+          }),
+          put(`transcriptions/${jobId}.vtt`, vttContent, {
+            access: 'public',
+            contentType: 'text/vtt'
+          }),
+          put(`transcriptions/${jobId}.txt`, transcriptionText, {
+            access: 'public',
+            contentType: 'text/plain'
+          }),
+          put(`transcriptions/${jobId}-summary.txt`, summary, {
+            access: 'public',
+            contentType: 'text/plain'
+          }),
+          put(`transcriptions/${jobId}-speakers.json`, JSON.stringify(speakers, null, 2), {
+            access: 'public',
+            contentType: 'application/json'
+          }),
+          put(`transcriptions/${jobId}.xlsx`, excelBuffer, {
+            access: 'public',
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          })
+        ];
+
+        if (pdfBuffer) {
+          uploadPromises.push(
+            put(`transcriptions/${jobId}.pdf`, pdfBuffer, {
+              access: 'public',
+              contentType: 'application/pdf'
+            })
+          );
+        }
+
+        const uploadResults = await Promise.all(uploadPromises);
+        const [srtBlob, vttBlob, txtBlob, summaryBlob, speakersBlob, excelBlob, ...restBlobs] = uploadResults;
+        const pdfBlob = pdfBuffer ? restBlobs[0] : null;
+
+        console.log('[AudioProcessor] ✅ All files uploaded successfully (AssemblyAI path)');
+        await updateTranscriptionProgress(jobId, 95);
+
+        // Save results to database
+        await saveTranscriptionResults(jobId, {
+          txtUrl: txtBlob.url,
+          srtUrl: srtBlob.url,
+          vttUrl: vttBlob.url,
+          summaryUrl: summaryBlob.url,
+          speakersUrl: speakersBlob.url,
+          tags: tags,
+          duration: Math.round(transcriptionDuration),
+          metadata: {
+            speakers: speakers,
+            segments: transcriptionSegments?.length || 0,
+            language: jobLanguage || 'auto',
+            excelUrl: excelBlob.url,
+            pdfUrl: pdfBlob?.url || null,
+            provider: 'assemblyai'
+          }
+        });
+
+        await updateTranscriptionProgress(jobId, 100);
+
+        // Delete original audio file
+        try {
+          await del(audioUrl);
+          console.log('[AudioProcessor] ✅ Original audio file deleted (AssemblyAI path)');
+        } catch (deleteError: any) {
+          console.error('[AudioProcessor] ⚠️  Warning: Could not delete original audio file:', deleteError.message);
+        }
+
+        console.log('[AudioProcessor] ✅ Processing completed successfully with AssemblyAI:', jobId);
+        return;
+
+      } catch (assemblyError: any) {
+        console.error('[AudioProcessor] AssemblyAI processing failed:', assemblyError);
+        throw new Error(`AssemblyAI processing failed: ${assemblyError.message}`);
+      }
+    }
+
+    // STEP 1B: Download audio (only if using Whisper)
     console.log('[AudioProcessor] Downloading audio:', fileName);
     let audioFileForWhisper: any;
     try {
@@ -410,7 +628,7 @@ Responde SOLO con JSON:
     const [srtBlob, vttBlob, txtBlob, summaryBlob, speakersBlob, excelBlob, ...restBlobs] = uploadResults;
     const pdfBlob = pdfBuffer ? restBlobs[0] : null;
 
-    console.log('[AudioProcessor] ✅ All files uploaded successfully');
+    console.log('[AudioProcessor] ✅ All files uploaded successfully (Whisper path)');
     await updateTranscriptionProgress(jobId, 95);
 
     // STEP 5: Save results to database
@@ -428,7 +646,8 @@ Responde SOLO con JSON:
         segments: transcriptionSegments?.length || 0,
         language: jobLanguage || 'auto',
         excelUrl: excelBlob.url,
-        pdfUrl: pdfBlob?.url || null
+        pdfUrl: pdfBlob?.url || null,
+        provider: 'whisper'
       }
     });
 
@@ -439,14 +658,14 @@ Responde SOLO con JSON:
     console.log('[AudioProcessor] Deleting original audio file to save storage...');
     try {
       await del(audioUrl);
-      console.log('[AudioProcessor] ✅ Original audio file deleted:', audioUrl);
+      console.log('[AudioProcessor] ✅ Original audio file deleted (Whisper path)');
     } catch (deleteError: any) {
       // Don't fail the whole job if deletion fails, just log it
       console.error('[AudioProcessor] ⚠️  Warning: Could not delete original audio file:', deleteError.message);
       console.error('[AudioProcessor] URL:', audioUrl);
     }
 
-    console.log('[AudioProcessor] ✅ Processing completed successfully:', jobId);
+    console.log('[AudioProcessor] ✅ Processing completed successfully with Whisper:', jobId);
 
   } catch (error: any) {
     console.error('[AudioProcessor] Error processing audio:', error);
