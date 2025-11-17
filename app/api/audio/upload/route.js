@@ -45,11 +45,11 @@ export async function POST(request) {
       );
     }
 
-    // Validar tamaño (Whisper límite 25MB)
-    const maxSize = 25 * 1024 * 1024;
+    // Validar tamaño (Hybrid: Whisper ≤25MB, AssemblyAI >25MB up to 1GB)
+    const maxSize = 1 * 1024 * 1024 * 1024; // 1GB for audio
     if (file.size > maxSize) {
       return NextResponse.json(
-        { error: 'El archivo es demasiado grande. Máximo 25MB' },
+        { error: 'El archivo es demasiado grande. Máximo 1GB para audio' },
         { status: 400 }
       );
     }

@@ -314,8 +314,10 @@ export default function Dashboard() {
         // Videos se envían directamente al servidor sin conversión
         filesToProcess.push(file);
       } else if (detectedType === 'audio') {
-        if (file.size > 25 * 1024 * 1024) {
-          showNotification(`El archivo de audio ${file.name} excede el límite de 25MB y no puede ser procesado.`, 'error');
+        // Audio files up to 1GB (using hybrid Whisper + AssemblyAI)
+        const maxAudioSize = 1 * 1024 * 1024 * 1024; // 1GB
+        if (file.size > maxAudioSize) {
+          showNotification(`El archivo de audio ${file.name} excede el límite de 1GB y no puede ser procesado.`, 'error');
         } else {
           filesToProcess.push(file);
         }

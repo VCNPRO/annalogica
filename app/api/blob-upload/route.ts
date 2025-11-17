@@ -8,10 +8,10 @@ import { TranscriptionJobDB } from '@/lib/db';
 import { inngest } from '@/lib/inngest/client'; // 👈 CORREGIDO (singular)
 
 // Tamaños máximos (bytes)
-// 🔥 LÍMITES OPTIMIZADOS PARA BETA: Garantizan procesamiento <15 min
-const MAX_FILE_SIZE_AUDIO = 100 * 1024 * 1024;      // 100 MB (~100 min audio)
-const MAX_FILE_SIZE_VIDEO = 200 * 1024 * 1024;      // 200 MB (~200 min video)
-const MAX_FILE_SIZE_DOCUMENT = 50 * 1024 * 1024;    // 50 MB (sin cambios)
+// 🔥 LÍMITES PARA PRODUCCIÓN: Hybrid transcription (Whisper ≤25MB + AssemblyAI >25MB)
+const MAX_FILE_SIZE_AUDIO = 1 * 1024 * 1024 * 1024;  // 1 GB (Hybrid: Whisper + AssemblyAI)
+const MAX_FILE_SIZE_VIDEO = 5 * 1024 * 1024 * 1024;  // 5 GB (AssemblyAI supports up to 5GB)
+const MAX_FILE_SIZE_DOCUMENT = 50 * 1024 * 1024;     // 50 MB (sin cambios)
 
 // Tipos permitidos
 const ALLOWED_AUDIO_TYPES = [
