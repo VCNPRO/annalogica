@@ -36,6 +36,11 @@ interface UploadedFile {
   canRetry?: boolean; // Si el usuario puede reintentar
   error?: string; // Mensaje de error si falla el procesamiento
 
+  // Polling protection
+  pollingStartTime?: number; // When polling started (timestamp)
+  pollingErrorCount?: number; // Consecutive polling errors
+  pollingStoppedDueToErrors?: boolean; // Polling stopped due to too many errors
+
   // Results URLs
   txt_url?: string;
   srt_url?: string;
@@ -224,28 +229,84 @@ export default function Dashboard() {
   }, [uploadedFiles]);
 
   useEffect(() => {
+    const MAX_POLLING_TIME_MS = 30 * 60 * 1000; // 30 minutes max
+    const MAX_CONSECUTIVE_ERRORS = 10; // Stop after 10 consecutive errors
+
     const activeJobs = uploadedFiles.filter(
-      f => f.jobId && (f.status === 'pending' || f.status === 'processing' || (f.status === 'error' && f.canRetry === true))
+      f => f.jobId &&
+      (f.status === 'pending' || f.status === 'processing' || (f.status === 'error' && f.canRetry === true)) &&
+      !f.pollingStoppedDueToErrors
     );
+
     if (activeJobs.length === 0) return;
+
     const pollJobs = async () => {
+      const now = Date.now();
+
       for (const file of activeJobs) {
+        // Initialize polling start time if not set
+        if (!file.pollingStartTime) {
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === file.id ? { ...f, pollingStartTime: now } : f
+          ));
+          continue;
+        }
+
+        // Check if polling has exceeded max time (30 min)
+        const pollingDuration = now - file.pollingStartTime;
+        if (pollingDuration > MAX_POLLING_TIME_MS) {
+          console.error('[Polling] Max polling time exceeded for job:', file.jobId);
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === file.id ? {
+              ...f,
+              status: 'error',
+              error: 'Procesamiento excedió el tiempo máximo (30 min)',
+              pollingStoppedDueToErrors: true
+            } : f
+          ));
+          continue;
+        }
+
+        // Check if too many consecutive errors
+        if ((file.pollingErrorCount || 0) >= MAX_CONSECUTIVE_ERRORS) {
+          console.error('[Polling] Too many consecutive errors for job:', file.jobId);
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === file.id ? {
+              ...f,
+              status: 'error',
+              error: 'Demasiados errores de red. Por favor recarga la página.',
+              pollingStoppedDueToErrors: true
+            } : f
+          ));
+          continue;
+        }
+
         try {
           const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
           if (!res.ok) {
-            // Si el archivo ya está completado, no marcar como error
-            if (res.status === 404 && file.status !== 'completed') {
-              setUploadedFiles(prev => prev.map(f => f.id === file.id && f.status !== 'completed' ? { ...f, status: 'error' } : f));
-            }
+            // Increment error count
+            setUploadedFiles(prev => prev.map(f =>
+              f.id === file.id ? {
+                ...f,
+                pollingErrorCount: (f.pollingErrorCount || 0) + 1,
+                ...(res.status === 404 && f.status !== 'completed' ? { status: 'error' as FileStatus } : {})
+              } : f
+            ));
             continue;
           }
+
           const job = await res.json();
-          if (!job || !job.status) continue;
+          if (!job || !job.status) {
+            // Increment error count for invalid response
+            setUploadedFiles(prev => prev.map(f =>
+              f.id === file.id ? { ...f, pollingErrorCount: (f.pollingErrorCount || 0) + 1 } : f
+            ));
+            continue;
+          }
 
           setUploadedFiles(prev => prev.map(f => {
             if (f.id !== file.id) return f;
 
-            const now = Date.now();
             let newStatus: FileStatus = 'pending';
 
             if (job.status === 'completed') {
@@ -286,12 +347,16 @@ export default function Dashboard() {
               vtt_url: job.vtt_url || f.vtt_url,
               summary_url: job.summary_url || f.summary_url,
               speakers_url: job.speakers_url || f.speakers_url,
-              // 🔥 IMPORTANTE: Preservar las acciones originales
-              actions: f.actions || []
+              actions: f.actions || [],
+              pollingErrorCount: 0, // Reset error count on success
             };
           }));
         } catch (err) {
           console.error('[Polling] Error fetching job:', file.jobId, err);
+          // Increment error count on exception
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === file.id ? { ...f, pollingErrorCount: (f.pollingErrorCount || 0) + 1 } : f
+          ));
         }
       }
     };
