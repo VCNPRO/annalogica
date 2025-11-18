@@ -9,11 +9,15 @@ import {
 } from '@/lib/db/transcriptions';
 import { TranscriptionJobDB } from '@/lib/db';
 import { trackError } from '@/lib/error-tracker';
+import { transcribeWithAssemblyAI, isAssemblyAIAvailable } from '@/lib/transcription/assemblyai-client';
 
 // Inicializacion segura de OpenAI (solo si la key existe)
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
+
+// Threshold for switching to AssemblyAI (25MB = Whisper limit)
+const ASSEMBLYAI_THRESHOLD_BYTES = 25 * 1024 * 1024;
 
 // ============================================
 // FUNCIONES HELPER PARA SUBTITULOS
@@ -83,76 +87,127 @@ const transcribeFile = inngest.createFunction(
       });
 
       // ============================================
-      // PASO 2: Transcribir con Whisper (descarga + transcripción en un solo step)
+      // PASO 2: Hybrid Transcription (Whisper ≤25MB, AssemblyAI >25MB)
       // ============================================
-      // 🔥 FIX: Descargar Y transcribir en el MISMO step para evitar problemas de scope
-      const whisperResult = await step.run('whisper-transcribe', async () => {
-        console.log('[transcribe] Descargando audio:', fileName);
+      const transcriptionResult = await step.run('hybrid-transcribe', async () => {
+        // First, check file size with HEAD request
+        console.log('[transcribe] Verificando tamaño del archivo...');
 
-        const response = await fetch(audioUrl);
-        if (!response.ok) {
-          throw new Error(`Error descargando audio: ${response.status}`);
-        }
+        const headResponse = await fetch(audioUrl, { method: 'HEAD' });
+        const contentLength = headResponse.headers.get('content-length');
+        const fileSizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
+        const fileSizeMB = (fileSizeBytes / (1024 * 1024)).toFixed(2);
 
-        // Obtener el buffer del audio
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = Buffer.from(arrayBuffer);
+        console.log('[transcribe] Tamaño del archivo:', fileSizeMB, 'MB');
 
-        console.log('[transcribe] Audio descargado:', {
-          size: `${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB`
-        });
+        // Decide which service to use
+        const useAssemblyAI = fileSizeBytes > ASSEMBLYAI_THRESHOLD_BYTES && isAssemblyAIAvailable();
 
-        // Actualizar progreso a 20% después de descargar
-        await updateTranscriptionProgress(jobId, 20);
+        if (useAssemblyAI) {
+          // ============================================
+          // PATH A: AssemblyAI para archivos >25MB
+          // ============================================
+          console.log('[transcribe] Usando AssemblyAI (archivo >25MB)');
 
-        // Usar File de Node.js 18+ (compatible con OpenAI SDK)
-        const { File } = await import('node:buffer');
+          await updateTranscriptionProgress(jobId, 20);
 
-        const audioFile = new File(
-          [audioBuffer],
-          fileName,
-          {
-            type: response.headers.get('content-type') || 'audio/mpeg'
-          }
-        );
+          const assemblyResult = await transcribeWithAssemblyAI(audioUrl, language || 'auto');
 
-        console.log('[transcribe] Iniciando transcripcion con Whisper...');
+          console.log('[transcribe] Transcripción con AssemblyAI completada:', {
+            duration: `${assemblyResult.duration}s`,
+            segments: assemblyResult.segments?.length || 0
+          });
 
-        // ✅ FIX: Construir params condicionalmente según el idioma seleccionado
-        const transcriptionParams = {
-          file: audioFile,
-          model: "whisper-1",
-          response_format: "verbose_json",
-          timestamp_granularities: ["segment", "word"]
-        };
+          // Convert AssemblyAI segments to Whisper-compatible format
+          const segments = assemblyResult.segments.map((seg, i) => ({
+            id: i,
+            start: seg.start,
+            end: seg.end,
+            text: seg.text
+          }));
 
-        // Solo agregar language si NO es auto-detección
-        if (language && language !== 'auto') {
-          transcriptionParams.language = language;
-          console.log('[transcribe] Usando idioma especificado:', language);
+          return {
+            text: assemblyResult.text,
+            duration: assemblyResult.duration,
+            segments: segments,
+            speakers: assemblyResult.speakers,
+            summary: assemblyResult.summary,
+            provider: 'assemblyai'
+          };
         } else {
-          console.log('[transcribe] Usando detección automática de idioma');
+          // ============================================
+          // PATH B: Whisper para archivos ≤25MB
+          // ============================================
+          if (fileSizeBytes > ASSEMBLYAI_THRESHOLD_BYTES) {
+            console.warn('[transcribe] ⚠️ Archivo >25MB pero AssemblyAI no disponible - intentando con Whisper (puede fallar)');
+          } else {
+            console.log('[transcribe] Usando OpenAI Whisper (archivo ≤25MB)');
+          }
+
+          console.log('[transcribe] Descargando audio:', fileName);
+
+          const response = await fetch(audioUrl);
+          if (!response.ok) {
+            throw new Error(`Error descargando audio: ${response.status}`);
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const audioBuffer = Buffer.from(arrayBuffer);
+
+          console.log('[transcribe] Audio descargado:', {
+            size: `${(audioBuffer.length / 1024 / 1024).toFixed(2)} MB`
+          });
+
+          await updateTranscriptionProgress(jobId, 20);
+
+          const { File } = await import('node:buffer');
+          const audioFile = new File(
+            [audioBuffer],
+            fileName,
+            { type: response.headers.get('content-type') || 'audio/mpeg' }
+          );
+
+          console.log('[transcribe] Iniciando transcripcion con Whisper...');
+
+          const transcriptionParams = {
+            file: audioFile,
+            model: "whisper-1",
+            response_format: "verbose_json",
+            timestamp_granularities: ["segment", "word"]
+          };
+
+          if (language && language !== 'auto') {
+            transcriptionParams.language = language;
+            console.log('[transcribe] Usando idioma especificado:', language);
+          } else {
+            console.log('[transcribe] Usando detección automática de idioma');
+          }
+
+          const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams);
+
+          console.log('[transcribe] Transcripcion con Whisper completada:', {
+            duration: `${transcriptionResponse.duration}s`,
+            segments: transcriptionResponse.segments?.length || 0
+          });
+
+          return {
+            text: transcriptionResponse.text,
+            duration: transcriptionResponse.duration,
+            segments: transcriptionResponse.segments,
+            provider: 'whisper'
+          };
         }
-
-        const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams);
-
-        console.log('[transcribe] Transcripcion completada:', {
-          duration: `${transcriptionResponse.duration}s`,
-          segments: transcriptionResponse.segments?.length || 0
-        });
-
-        // Return data needed for next steps
-        return {
-          text: transcriptionResponse.text,
-          duration: transcriptionResponse.duration,
-          segments: transcriptionResponse.segments
-        };
       });
 
-      // Extract data from whisper result
-      const transcriptionText = whisperResult.text;
-      const transcriptionDuration = whisperResult.duration;
-      const transcriptionSegments = whisperResult.segments;
+      // Extract data from transcription result
+      const transcriptionText = transcriptionResult.text;
+      const transcriptionDuration = transcriptionResult.duration;
+      const transcriptionSegments = transcriptionResult.segments;
+      const transcriptionProvider = transcriptionResult.provider;
+      const assemblyAISpeakers = transcriptionResult.speakers;
+      const assemblyAISummary = transcriptionResult.summary;
+
+      console.log('[transcribe] Usando proveedor:', transcriptionProvider);
 
       await step.run('update-progress-50', async () => {
         await updateTranscriptionProgress(jobId, 50);
