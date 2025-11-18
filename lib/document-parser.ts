@@ -60,7 +60,8 @@ async function parsePDF(buffer: Buffer): Promise<ParseResult> {
     } else if (Array.isArray(result.text)) {
       // If it's an array of strings (pages), join them
       // Handle both string[] and object[] (pages with text property)
-      extractedText = result.text.map((item: any) => {
+      const textArray = result.text as unknown as any[];
+      extractedText = textArray.map((item: any) => {
         if (typeof item === 'string') return item;
         if (item && typeof item === 'object' && item.text) return String(item.text);
         if (item && typeof item === 'object' && item.str) return String(item.str);
