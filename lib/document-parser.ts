@@ -46,19 +46,52 @@ async function parsePDF(buffer: Buffer): Promise<ParseResult> {
       mergePages: true
     });
 
-    // 🔥 FIX: Ensure result.text is a string
+    // 🔥 FIX: Ensure result.text is a string - handle all unpdf return types
+    console.log('[DocumentParser] unpdf result type:', {
+      textType: typeof result.text,
+      isArray: Array.isArray(result.text),
+      constructor: result.text?.constructor?.name,
+      totalPages: result.totalPages
+    });
+
     let extractedText: string;
     if (typeof result.text === 'string') {
       extractedText = result.text;
     } else if (Array.isArray(result.text)) {
       // If it's an array of strings (pages), join them
-      extractedText = result.text.join('\n\n');
+      // Handle both string[] and object[] (pages with text property)
+      extractedText = result.text.map((item: any) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && item.text) return String(item.text);
+        if (item && typeof item === 'object' && item.str) return String(item.str);
+        return String(item || '');
+      }).join('\n\n');
     } else if (result.text && typeof result.text === 'object') {
-      // If it's an object, try to extract text from it
-      console.warn('[DocumentParser] result.text is an object, attempting to convert:', typeof result.text);
-      extractedText = JSON.stringify(result.text);
+      // If it's an object, try to extract text from common properties
+      console.warn('[DocumentParser] result.text is an object:', {
+        keys: Object.keys(result.text),
+        type: result.text.constructor?.name
+      });
+      // Try common text properties
+      if ('text' in result.text) {
+        extractedText = String((result.text as any).text || '');
+      } else if ('str' in result.text) {
+        extractedText = String((result.text as any).str || '');
+      } else if ('content' in result.text) {
+        extractedText = String((result.text as any).content || '');
+      } else {
+        // Last resort: stringify and warn
+        extractedText = JSON.stringify(result.text);
+        console.error('[DocumentParser] ⚠️ Could not extract text from object, using JSON stringify');
+      }
     } else {
       extractedText = String(result.text || '');
+    }
+
+    // Final validation: ensure we have a string
+    if (typeof extractedText !== 'string') {
+      console.error('[DocumentParser] ❌ extractedText is not a string after processing:', typeof extractedText);
+      extractedText = String(extractedText || '');
     }
 
     if (!extractedText || extractedText.trim().length === 0) {

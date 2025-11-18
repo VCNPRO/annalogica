@@ -1406,7 +1406,7 @@ export default function Dashboard() {
             </select>
         </div>
 
-          <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden mb-6`} style={{ flex: '1 1 60%', minHeight: '400px' }}>
+          <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden mb-6`} style={{ flex: '1 1 auto', minHeight: '300px', maxHeight: 'calc(100vh - 280px)' }}>
             <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
               <div>
                 <div className="flex items-center gap-2 mb-2">
@@ -1499,7 +1499,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 200px)' }}>
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 350px)', minHeight: '200px' }}>
               {uploadedFiles.length === 0 ? (
                 <div className="px-4 py-8 text-center">
                   <p className={`text-xs ${textSecondary}`}>{t('dashboard.noFilesYet')}</p>
