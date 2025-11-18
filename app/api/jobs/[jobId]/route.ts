@@ -50,11 +50,17 @@ export async function GET(_req: Request, context: any) {
       ? job.processing_progress
       : (typeof metadata.progress === 'number' ? metadata.progress : undefined);
 
+    // 🔥 FIX: Include tags from database column in metadata for frontend compatibility
+    const metadataWithTags = {
+      ...metadata,
+      tags: job.tags || metadata.tags || []
+    };
+
     return NextResponse.json({
       id: jobId,
       status: job.status,       // 'pending' | 'processing' | 'transcribed' | 'summarized' | 'completed' | 'failed'
       progress,
-      metadata,                 // para compatibilidad con tu UI
+      metadata: metadataWithTags, // Include tags in metadata for UI compatibility
       error: metadata.error ?? null,
       updatedAt: job.updated_at ? new Date(job.updated_at).toISOString() : undefined,
       // Include URLs for downloads (only present when completed)
