@@ -26,6 +26,29 @@ export interface AssemblyAIResult {
 }
 
 /**
+ * Filter out common watermarks and unwanted text from transcription
+ */
+function filterWatermarks(text: string): string {
+  // Common watermarks to remove
+  const watermarks = [
+    /Subtítulos\s+a\s+parte\s+de\s+la\s+comunidad\s+de\s+Amara\.org\.?/gi,
+    /Subtítulos\s+por\s+la\s+comunidad\s+de\s+Amara\.org\.?/gi,
+    /Amara\.org\s+subtitles\.?/gi,
+    /Subtitles\s+by\s+the\s+Amara\.org\s+community\.?/gi,
+  ];
+
+  let filtered = text;
+  for (const watermark of watermarks) {
+    filtered = filtered.replace(watermark, '');
+  }
+
+  // Clean up multiple spaces and newlines
+  filtered = filtered.replace(/\n{3,}/g, '\n\n').replace(/\s{2,}/g, ' ').trim();
+
+  return filtered;
+}
+
+/**
  * Extract speakers from AssemblyAI utterances
  */
 function extractSpeakers(utterances: any[]): Speaker[] {
@@ -108,13 +131,25 @@ export async function transcribeWithAssemblyAI(
   // Extract speakers from utterances
   const speakers = extractSpeakers(transcript.utterances || []);
 
+  // Filter watermarks from text and summary
+  const filteredText = filterWatermarks(transcript.text || '');
+  const filteredSummary = filterWatermarks(transcript.summary || '');
+
+  // Also filter segments/utterances text
+  const filteredSegments = (transcript.utterances || []).map((utterance: any) => ({
+    ...utterance,
+    text: filterWatermarks(utterance.text || '')
+  })).filter((seg: any) => seg.text && seg.text.trim().length > 0);
+
+  console.log('[AssemblyAI] Watermarks filtered from transcription');
+
   // Return formatted result
   return {
-    text: transcript.text || '',
+    text: filteredText,
     duration: transcript.audio_duration || 0,
     speakers: speakers,
-    summary: transcript.summary || '',
-    segments: transcript.utterances || []
+    summary: filteredSummary,
+    segments: filteredSegments
   };
 }
 
