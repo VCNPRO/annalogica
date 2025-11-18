@@ -46,15 +46,30 @@ async function parsePDF(buffer: Buffer): Promise<ParseResult> {
       mergePages: true
     });
 
-    if (!result.text || result.text.trim().length === 0) {
+    // 🔥 FIX: Ensure result.text is a string
+    let extractedText: string;
+    if (typeof result.text === 'string') {
+      extractedText = result.text;
+    } else if (Array.isArray(result.text)) {
+      // If it's an array of strings (pages), join them
+      extractedText = result.text.join('\n\n');
+    } else if (result.text && typeof result.text === 'object') {
+      // If it's an object, try to extract text from it
+      console.warn('[DocumentParser] result.text is an object, attempting to convert:', typeof result.text);
+      extractedText = JSON.stringify(result.text);
+    } else {
+      extractedText = String(result.text || '');
+    }
+
+    if (!extractedText || extractedText.trim().length === 0) {
       throw new Error('El PDF está vacío o no contiene texto extraíble');
     }
 
     const processingTime = Date.now() - startTime;
-    console.log(`[DocumentParser] ✅ unpdf succeeded: ${result.text.length} chars, ${result.totalPages} pages in ${processingTime}ms`);
+    console.log(`[DocumentParser] ✅ unpdf succeeded: ${extractedText.length} chars, ${result.totalPages} pages in ${processingTime}ms`);
 
     return {
-      text: result.text,
+      text: extractedText,
       metadata: {
         method: 'unpdf',
         pages: result.totalPages,
