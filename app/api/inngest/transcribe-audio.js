@@ -279,7 +279,8 @@ El resumen debe:
 - Ser claro y bien estructurado
 - Mantener los puntos clave
 - Usar lenguaje profesional
-- Respetar el contexto original`
+- Respetar el contexto original
+- IMPORTANTE: Genera el resumen en el MISMO IDIOMA que la transcripcion original`
               },
               {
                 role: "user",
@@ -302,7 +303,7 @@ Analiza la transcripcion y genera entre 5 y 10 tags relevantes.
 Los tags deben ser:
 - Palabras clave o frases cortas (1-3 palabras)
 - Relevantes al contenido principal
-- En espanol
+- En el MISMO IDIOMA que la transcripcion original
 - Sin simbolos especiales
 
 Responde SOLO con JSON:
@@ -386,10 +387,16 @@ Responde SOLO con JSON:
             access: 'public',
             contentType: 'text/plain'
           }),
-          put(`transcriptions/${jobId}-speakers.json`, JSON.stringify(speakers, null, 2), {
-            access: 'public',
-            contentType: 'application/json'
-          })
+          // Format speakers as readable text instead of JSON
+          put(`transcriptions/${jobId}-speakers.txt`,
+            speakers.length > 0
+              ? speakers.map((s, i) => `${i + 1}. ${s.name} - ${s.role}`).join('\n')
+              : 'No se identificaron oradores en esta transcripción.',
+            {
+              access: 'public',
+              contentType: 'text/plain'
+            }
+          )
         ]);
 
         console.log('[transcribe] ✅ Todos los archivos generados y guardados');
