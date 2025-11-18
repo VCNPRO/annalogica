@@ -280,7 +280,11 @@ El resumen debe:
 - Mantener los puntos clave
 - Usar lenguaje profesional
 - Respetar el contexto original
-- IMPORTANTE: Genera el resumen en el MISMO IDIOMA que la transcripcion original`
+
+🔴 MUY IMPORTANTE: Detecta el idioma de la transcripción y genera el resumen EN ESE MISMO IDIOMA.
+Si la transcripción está en catalán, el resumen debe estar en catalán.
+Si la transcripción está en inglés, el resumen debe estar en inglés.
+NO traduzcas al español a menos que la transcripción original esté en español.`
               },
               {
                 role: "user",
@@ -303,8 +307,12 @@ Analiza la transcripcion y genera entre 5 y 10 tags relevantes.
 Los tags deben ser:
 - Palabras clave o frases cortas (1-3 palabras)
 - Relevantes al contenido principal
-- En el MISMO IDIOMA que la transcripcion original
 - Sin simbolos especiales
+
+🔴 MUY IMPORTANTE: Los tags deben estar en el MISMO IDIOMA que la transcripción.
+Si la transcripción está en catalán, los tags deben estar en catalán.
+Si la transcripción está en inglés, los tags deben estar en inglés.
+NO traduzcas al español a menos que la transcripción original esté en español.
 
 Responde SOLO con JSON:
 {"tags": ["tag1", "tag2", "tag3"]}`
@@ -367,6 +375,34 @@ Responde SOLO con JSON:
           return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
         }).join('\n');
 
+        // 🔥 FIX: Formatear transcripción con párrafos separados por pausas/segmentos
+        // Agrupa segmentos en párrafos basándose en pausas largas (>2s) o cada ~5 segmentos
+        let formattedTranscription = '';
+        let currentParagraph = [];
+        let lastEndTime = 0;
+
+        for (let i = 0; i < segments.length; i++) {
+          const segment = segments[i];
+          const pauseLength = segment.start - lastEndTime;
+
+          // Nueva línea si hay pausa larga (>2s) o cada 5 segmentos
+          if ((pauseLength > 2 && currentParagraph.length > 0) || currentParagraph.length >= 5) {
+            formattedTranscription += currentParagraph.join(' ').trim() + '\n\n';
+            currentParagraph = [];
+          }
+
+          currentParagraph.push(segment.text.trim());
+          lastEndTime = segment.end;
+        }
+
+        // Agregar último párrafo
+        if (currentParagraph.length > 0) {
+          formattedTranscription += currentParagraph.join(' ').trim();
+        }
+
+        // Si no hay segmentos, usar el texto original
+        const finalTranscriptionText = formattedTranscription || transcriptionText;
+
         await updateTranscriptionProgress(jobId, 85);
 
         // Subir TODOS los archivos en paralelo
@@ -379,7 +415,7 @@ Responde SOLO con JSON:
             access: 'public',
             contentType: 'text/vtt'
           }),
-          put(`transcriptions/${jobId}.txt`, transcriptionText, {
+          put(`transcriptions/${jobId}.txt`, finalTranscriptionText, {
             access: 'public',
             contentType: 'text/plain'
           }),
