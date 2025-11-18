@@ -46,10 +46,11 @@ function formatTimeVTT(seconds) {
 const transcribeFile = inngest.createFunction(
   {
     id: 'transcribe-audio-whisper',
-    name: 'Transcribe Audio with OpenAI Whisper',
+    name: 'Transcribe Audio with Hybrid (Whisper + AssemblyAI)',
     concurrency: { limit: 5 },
-    retries: 3,
-    timeout: '15m'
+    retries: 2,
+    // Increased timeout for large files processed by AssemblyAI (up to 1 hour)
+    timeout: '60m'
   },
   { event: 'audio/transcribe.requested' },
   async ({ event, step }) => {
@@ -111,9 +112,19 @@ const transcribeFile = inngest.createFunction(
 
           await updateTranscriptionProgress(jobId, 20);
 
-          const assemblyResult = await transcribeWithAssemblyAI(audioUrl, language || 'auto');
+          let assemblyResult;
+          try {
+            console.log('[transcribe] Iniciando transcripción con AssemblyAI...');
+            assemblyResult = await transcribeWithAssemblyAI(audioUrl, language || 'auto');
+          } catch (assemblyError) {
+            console.error('[transcribe] ❌ Error en AssemblyAI:', {
+              message: assemblyError.message,
+              stack: assemblyError.stack?.substring(0, 500)
+            });
+            throw new Error(`AssemblyAI transcription error: ${assemblyError.message}`);
+          }
 
-          console.log('[transcribe] Transcripción con AssemblyAI completada:', {
+          console.log('[transcribe] ✅ Transcripción con AssemblyAI completada:', {
             duration: `${assemblyResult.duration}s`,
             segments: assemblyResult.segments?.length || 0
           });

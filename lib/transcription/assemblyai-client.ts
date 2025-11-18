@@ -113,11 +113,25 @@ export async function transcribeWithAssemblyAI(
     console.log('[AssemblyAI] Using automatic language detection');
   }
 
-  // Submit transcription job
-  const transcript = await client.transcripts.transcribe(params);
+  // Submit transcription job with extended polling timeout
+  // For large files (up to 5GB), transcription can take 15-30+ minutes
+  console.log('[AssemblyAI] Submitting transcription job...');
+
+  let transcript;
+  try {
+    transcript = await client.transcripts.transcribe(params);
+  } catch (transcribeError: any) {
+    console.error('[AssemblyAI] Transcription API error:', {
+      message: transcribeError.message,
+      code: transcribeError.code,
+      status: transcribeError.status
+    });
+    throw new Error(`AssemblyAI API error: ${transcribeError.message || 'Unknown error'}`);
+  }
 
   // Check for errors
   if (transcript.status === 'error') {
+    console.error('[AssemblyAI] Transcription failed:', transcript.error);
     throw new Error(`AssemblyAI transcription failed: ${transcript.error}`);
   }
 
