@@ -89,27 +89,38 @@ export async function transcribeWithAssemblyAI(
 
   console.log('[AssemblyAI] Starting transcription:', { audioUrl: audioUrl.substring(0, 100), language });
 
+  // Languages that support summarization and auto_highlights
+  // These features are primarily available for English
+  const supportedLanguagesForAdvancedFeatures = ['en', 'en_us', 'en_uk', 'en_au'];
+  const supportsAdvancedFeatures = language && supportedLanguagesForAdvancedFeatures.includes(language.toLowerCase());
+
   // Prepare transcription params
   const params: any = {
     audio_url: audioUrl,
 
-    // Enable speaker detection (diarization)
+    // Enable speaker detection (diarization) - works for all languages
     speaker_labels: true,
-
-    // Enable automatic summarization
-    summarization: true,
-    summary_model: 'informative',
-    summary_type: 'bullets',
-
-    // Enable automatic highlights/key points
-    auto_highlights: true,
   };
+
+  // Only enable summarization and auto_highlights for supported languages
+  // These features are NOT available when using automatic language detection
+  if (supportsAdvancedFeatures) {
+    params.summarization = true;
+    params.summary_model = 'informative';
+    params.summary_type = 'bullets';
+    params.auto_highlights = true;
+    console.log('[AssemblyAI] Advanced features enabled (summarization, auto_highlights)');
+  } else {
+    console.log('[AssemblyAI] Advanced features disabled (not supported for this language or auto-detection)');
+  }
 
   // Set language (auto-detect or specific)
   if (language && language !== 'auto') {
     params.language_code = language;
     console.log('[AssemblyAI] Using specified language:', language);
   } else {
+    // Use language_detection for automatic detection
+    params.language_detection = true;
     console.log('[AssemblyAI] Using automatic language detection');
   }
 
