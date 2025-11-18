@@ -69,20 +69,21 @@ async function parsePDF(buffer: Buffer): Promise<ParseResult> {
       }).join('\n\n');
     } else if (result.text && typeof result.text === 'object') {
       // If it's an object, try to extract text from common properties
+      const textObj = result.text as any;
       console.warn('[DocumentParser] result.text is an object:', {
-        keys: Object.keys(result.text),
-        type: result.text.constructor?.name
+        keys: Object.keys(textObj),
+        type: textObj.constructor?.name
       });
       // Try common text properties
-      if ('text' in result.text) {
-        extractedText = String((result.text as any).text || '');
-      } else if ('str' in result.text) {
-        extractedText = String((result.text as any).str || '');
-      } else if ('content' in result.text) {
-        extractedText = String((result.text as any).content || '');
+      if ('text' in textObj) {
+        extractedText = String(textObj.text || '');
+      } else if ('str' in textObj) {
+        extractedText = String(textObj.str || '');
+      } else if ('content' in textObj) {
+        extractedText = String(textObj.content || '');
       } else {
         // Last resort: stringify and warn
-        extractedText = JSON.stringify(result.text);
+        extractedText = JSON.stringify(textObj);
         console.error('[DocumentParser] ⚠️ Could not extract text from object, using JSON stringify');
       }
     } else {
