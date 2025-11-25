@@ -69,7 +69,8 @@ export async function processDocumentFile(
         metadata: parseMetadata
       });
     } catch (error: any) {
-      const errorMsg = `Document text extraction failed: ${error.message}`;
+      const errorDetails = error.error || error.message || JSON.stringify(error, null, 2);
+      const errorMsg = `Document text extraction failed: ${errorDetails}`;
       await trackError(
         'document_extraction_error',
         'critical',
