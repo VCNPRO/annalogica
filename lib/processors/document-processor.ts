@@ -69,6 +69,7 @@ export async function processDocumentFile(
         metadata: parseMetadata
       });
     } catch (error: any) {
+      console.error('[DocumentProcessor] RAW EXTRACTION ERROR:', error);
       const errorDetails = error.error || error.message || JSON.stringify(error, null, 2);
       const errorMsg = `Document text extraction failed: ${errorDetails}`;
       await trackError(
