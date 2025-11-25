@@ -183,7 +183,8 @@ export async function processDocumentFile(
         });
 
         const aiResult = JSON.parse(completion.choices[0].message.content || '{}');
-        summary = aiResult.summary || '';
+        const rawSummary = aiResult.summary;
+        summary = typeof rawSummary === 'object' ? JSON.stringify(rawSummary, null, 2) : rawSummary || '';
         tags = aiResult.tags || [];
 
         console.log('[DocumentProcessor] ✅ Summary and tags generated:', {
