@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { RefreshCw, Trash2, Sun, Moon, BookOpen, LogOut } from 'lucide-react';
 import jsPDF from 'jspdf';
-import ExcelJS from 'exceljs';
-import { useTranslations } from '@/hooks/useTranslations';
 
-// OpenAI Whisper V3 + GPT-4o + Inngest - Arquitectura asíncrona con polling
+// AssemblyAI + Inngest - Arquitectura asíncrona con polling
 
 type FileStatus = 'uploading' | 'pending' | 'processing' | 'completed' | 'error';
 
@@ -20,7 +18,6 @@ interface UploadedFile {
   status: FileStatus;
   date: string;
   fileType: 'audio' | 'video' | 'text'; // New: Store file type
-  mimeType?: string; // Store MIME type for API calls
   actions: string[]; // New: Store selected actions for the file
   jobId?: string; // Add jobId to link to details page
   blobUrl?: string; // Store blob URL for processing
@@ -28,20 +25,6 @@ interface UploadedFile {
   fileSize?: number; // Store original file size in bytes
   processingStartTime?: number; // Store when processing started (timestamp)
   estimatedTimeRemaining?: number; // Estimated seconds remaining
-
-  // 🔥 WATCHDOG ANTI-CLAVADO
-  lastProgressValue?: number; // Último progreso detectado
-  lastProgressTime?: number; // Cuándo cambió el progreso (timestamp)
-  stuckWarningShown?: boolean; // Si ya se mostró alerta de clavado
-  canRetry?: boolean; // Si el usuario puede reintentar
-  error?: string; // Mensaje de error si falla el procesamiento
-
-  // Results URLs
-  txt_url?: string;
-  srt_url?: string;
-  vtt_url?: string;
-  summary_url?: string;
-  speakers_url?: string;
 }
 
 interface Job {
@@ -52,12 +35,7 @@ interface Job {
   speakers_url?: string;
   metadata?: {
     tags?: string[];
-    ttsUrl?: string; // 🎤 TTS audio URL
-    requestedActions?: string[]; // 🔥 Acciones que el usuario pidió explícitamente
   };
-  status?: string;
-  progress?: number;
-  error?: string;
 }
 
 interface User {
@@ -68,13 +46,10 @@ interface User {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { t, loading: translationsLoading } = useTranslations();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [forcePolling, setForcePolling] = useState(0);
-  const [showVideoPreview, setShowVideoPreview] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]); // Keep this state
 
   // Load files from localStorage on initial render
   useEffect(() => {
@@ -82,15 +57,10 @@ export default function Dashboard() {
       const savedFiles = localStorage.getItem('uploadedFiles');
       if (savedFiles) {
         const parsedFiles: UploadedFile[] = JSON.parse(savedFiles);
+        // Reset progress for files that were uploading or processing
         const restoredFiles = parsedFiles.map(file => {
-          // Solo marcar como error los archivos que estaban en proceso al cerrar
-          // Los archivos completados se mantienen como completados
           if (file.status === 'uploading' || file.status === 'processing') {
             return { ...file, status: 'error' as FileStatus, uploadProgress: 0, processingProgress: 0 };
-          }
-          // Los archivos completados se mantienen sin cambios
-          if (file.status === 'completed') {
-            return file;
           }
           return file;
         });
@@ -113,42 +83,213 @@ export default function Dashboard() {
   const [selectedUploadedFileIds, setSelectedUploadedFileIds] = useState<Set<string>>(new Set());
   const [selectedCompletedFileIds, setSelectedCompletedFileIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [language, setLanguage] = useState('auto');
+  const [language, setLanguage] = useState('es');
+  const [targetLanguage, setTargetLanguage] = useState('en');
   const [summaryType, setSummaryType] = useState<'short' | 'detailed'>('detailed');
   const [downloadFormat, setDownloadFormat] = useState<'txt' | 'pdf' | 'both'>('pdf');
   const [downloadDirHandle, setDownloadDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [createSubfolders, setCreateSubfolders] = useState(true);
-  const [timerTick, setTimerTick] = useState(0);
+  const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
   const [notification, setNotification] = useState<{message: string; type: 'success' | 'error' | 'info'} | null>(null);
-  const [userStats, setUserStats] = useState<{
-    total: number;
-    completed: number;
-    processing: number;
-    errors: number;
-    totalHours: string;
-  } | null>(null);
+
+  // Show notification function
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 4000); // Auto-hide after 4 seconds
+  };
+
+  useEffect(() => {
+    // SECURITY: Verificar autenticación mediante cookie httpOnly
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me', {
+          credentials: 'include' // Importante: incluir cookies
+        });
+
+        if (!res.ok) {
+          router.push('/login');
+          return;
+        }
+
+        const data = await res.json();
+        setUser(data.user);
+        // Guardar datos del usuario en localStorage (no sensible)
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setLoading(false);
+      } catch (error) {
+        console.error('Error verificando autenticación:', error);
+        router.push('/login');
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
+  // Update timer every second for files being processed
+  useEffect(() => {
+    const hasProcessingFiles = uploadedFiles.some(f => f.status === 'processing' && f.processingStartTime);
+    if (!hasProcessingFiles) return;
+
+    const interval = setInterval(() => {
+      setTimerTick(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [uploadedFiles]);
+
+  // Polling para actualizar estado de jobs activos
+  useEffect(() => {
+    // Filtrar archivos que necesitan polling (tienen jobId y están pending o processing)
+    const activeJobs = uploadedFiles.filter(
+      f => f.jobId && (f.status === 'pending' || f.status === 'processing')
+    );
+
+    if (activeJobs.length === 0) return;
+
+    const pollJobs = async () => {
+      for (const file of activeJobs) {
+        try {
+          // SECURITY: Cookie httpOnly se envía automáticamente
+          const res = await fetch(`/api/jobs/${file.jobId}`, {
+            credentials: 'include'
+          });
+
+          if (!res.ok) continue;
+
+          const data = await res.json();
+          const job = data.job;
+
+          // Auto-restart logic: Check if job is stuck (no progress for too long)
+          if (file.processingStartTime) {
+            const timeSinceStart = (Date.now() - file.processingStartTime) / 1000; // seconds
+            const audioDuration = job.audio_duration_seconds || 60;
+            const maxExpectedTime = audioDuration * 0.5; // 0.5x multiplier (very generous timeout)
+            const timeoutThreshold = Math.max(maxExpectedTime, 1200); // At least 20 minutes
+
+            // If job is stuck for too long (beyond reasonable processing time)
+            if (timeSinceStart > timeoutThreshold && (job.status === 'processing' || job.status === 'pending')) {
+              console.warn(`[Auto-restart] Job ${file.jobId} appears stuck (${Math.floor(timeSinceStart)}s elapsed, expected ~${Math.floor(maxExpectedTime)}s)`);
+
+              // TODO: Implement retry/restart API endpoint
+              // For now, just log it
+              setError(`Archivo "${file.name}" parece estar bloqueado. Por favor, intenta procesarlo de nuevo.`);
+            }
+          }
+
+          // Map job status to FileStatus
+          let newStatus: FileStatus = file.status;
+          let processingProgress = file.processingProgress || 0;
+          let processingStartTime = file.processingStartTime;
+          let estimatedTimeRemaining = file.estimatedTimeRemaining;
+
+          // Check if this is a document (PDF, DOCX, TXT)
+          const isDocument = file.fileType === 'text' || job.metadata?.isDocument;
+
+          if (job.status === 'processing' || job.status === 'transcribed') {
+            newStatus = 'processing';
+
+            // Set processing start time if not already set
+            if (!processingStartTime) {
+              processingStartTime = Date.now();
+            }
+
+            const createdAt = new Date(job.created_at).getTime();
+            const now = Date.now();
+            const elapsed = (now - createdAt) / 1000; // seconds
+
+            if (isDocument) {
+              // Document processing: Simpler progress model
+              // Documents typically process faster than audio
+              const estimatedDocTime = 30; // ~30 seconds for document processing
+
+              if (job.status === 'transcribed') {
+                // Document text extracted, generating summary/tags
+                processingProgress = 95;
+                estimatedTimeRemaining = 5;
+              } else {
+                // Extract + parse phase
+                const baseProgress = Math.floor((elapsed / estimatedDocTime) * 100);
+                processingProgress = Math.min(90, baseProgress);
+                const remainingProgress = 100 - processingProgress;
+                estimatedTimeRemaining = Math.ceil((remainingProgress / 100) * estimatedDocTime);
+              }
+            } else {
+              // Audio/Video processing: Use audio duration
+              const audioDuration = job.audio_duration_seconds || 60;
+              const estimatedTotalTime = audioDuration * 0.25;
+
+              if (job.status === 'transcribed') {
+                processingProgress = 98;
+                estimatedTimeRemaining = 5;
+              } else {
+                const baseProgress = Math.floor((elapsed / estimatedTotalTime) * 100);
+                processingProgress = Math.min(98, baseProgress);
+                const remainingProgress = 100 - processingProgress;
+                estimatedTimeRemaining = Math.ceil((remainingProgress / 100) * estimatedTotalTime);
+              }
+            }
+          } else if (job.status === 'completed' || job.status === 'summarized') {
+            newStatus = 'completed';
+            processingProgress = 100;
+            estimatedTimeRemaining = 0;
+          } else if (job.status === 'failed' || job.status === 'error') {
+            newStatus = 'error';
+          }
+
+          // Update file status and progress if changed
+          if (newStatus !== file.status || processingProgress !== file.processingProgress || estimatedTimeRemaining !== file.estimatedTimeRemaining) {
+            setUploadedFiles(prev => prev.map(f =>
+              f.id === file.id ? {
+                ...f,
+                status: newStatus,
+                processingProgress,
+                audioDuration: job.audio_duration_seconds,
+                processingStartTime,
+                estimatedTimeRemaining
+              } : f
+            ));
+          }
+        } catch (err) {
+          console.error('[Polling] Error fetching job:', file.jobId, err);
+        }
+      }
+    };
+
+    // Poll immediately and then every 5 seconds
+    pollJobs();
+    const interval = setInterval(pollJobs, 5000);
+
+    return () => clearInterval(interval);
+  }, [uploadedFiles]);
 
   const getFileType = (mimeType: string, filename: string): 'audio' | 'video' | 'text' => {
+    // Check MIME type first
     if (mimeType.startsWith('audio/')) return 'audio';
     if (mimeType.startsWith('video/')) return 'video';
     if (mimeType.startsWith('text/') || mimeType === 'application/pdf' || mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return 'text';
+
+    // Fallback: check file extension (some browsers don't report MIME type correctly for PDFs)
     const ext = filename.toLowerCase().split('.').pop();
     if (ext === 'pdf' || ext === 'txt' || ext === 'docx') return 'text';
     if (['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'].includes(ext || '')) return 'audio';
     if (['mp4', 'avi', 'mov', 'mkv', 'webm'].includes(ext || '')) return 'video';
-    return 'text';
+
+    return 'text'; // Default to text if unknown
   };
 
+  // Helper function to format file size
   const formatFileSize = (bytes?: number): string => {
     if (!bytes) return '0 KB';
     const kb = bytes / 1024;
     const mb = kb / 1024;
     const gb = mb / 1024;
+
     if (gb >= 1) return `${gb.toFixed(2)} GB`;
     if (mb >= 1) return `${mb.toFixed(2)} MB`;
     return `${kb.toFixed(2)} KB`;
   };
 
+  // Helper function to format elapsed time
   const formatElapsedTime = (startTime?: number): string => {
     if (!startTime) return '0:00';
     const elapsed = Math.floor((Date.now() - startTime) / 1000); // seconds
@@ -157,6 +298,7 @@ export default function Dashboard() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  // Helper function to format time remaining
   const formatTimeRemaining = (seconds?: number): string => {
     if (!seconds || seconds <= 0) return '0:00';
     const minutes = Math.floor(seconds / 60);
@@ -164,230 +306,105 @@ export default function Dashboard() {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
-  };
-
-  const loadUserStats = useCallback(async () => {
-    if (!user) return;
-    try {
-      const res = await fetch('/api/user/stats', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setUserStats(data);
-      }
-    } catch (error) {
-      console.error('Error loading user stats:', error);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (!res.ok) {
-          // 🔥 SECURITY FIX: Si no está autenticado, limpiar localStorage
-          localStorage.clear();
-          router.push('/login');
-          return;
-        }
-        const data = await res.json();
-        setUser(data.user);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setLoading(false);
-      } catch (error) {
-        console.error('Error verificando autenticación:', error);
-        // 🔥 SECURITY FIX: Si hay error, limpiar localStorage
-        localStorage.clear();
-        router.push('/login');
-      }
-    };
-    checkAuth();
-  }, [router]);
-
-  useEffect(() => {
-    if (user) {
-      loadUserStats();
-      const interval = setInterval(loadUserStats, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [user, loadUserStats]);
-
-  useEffect(() => {
-    const hasProcessingFiles = uploadedFiles.some(f => f.status === 'processing' && f.processingStartTime);
-    if (!hasProcessingFiles) return;
-    const interval = setInterval(() => {
-      setTimerTick(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [uploadedFiles]);
-
-  useEffect(() => {
-    const activeJobs = uploadedFiles.filter(
-      f => f.jobId && (f.status === 'pending' || f.status === 'processing' || (f.status === 'error' && f.canRetry === true))
-    );
-    if (activeJobs.length === 0) return;
-    const pollJobs = async () => {
-      for (const file of activeJobs) {
-        try {
-          const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
-          if (!res.ok) {
-            // Si el archivo ya está completado, no marcar como error
-            if (res.status === 404 && file.status !== 'completed') {
-              setUploadedFiles(prev => prev.map(f => f.id === file.id && f.status !== 'completed' ? { ...f, status: 'error' } : f));
-            }
-            continue;
-          }
-          const job = await res.json();
-          if (!job || !job.status) continue;
-
-          setUploadedFiles(prev => prev.map(f => {
-            if (f.id !== file.id) return f;
-
-            const now = Date.now();
-            let newStatus: FileStatus = 'pending';
-
-            if (job.status === 'completed') {
-              newStatus = 'completed';
-            } else if (job.status === 'failed' || job.status === 'error') {
-              newStatus = 'error';
-            } else if (job.status === 'processing') {
-              newStatus = 'processing';
-            } else {
-              newStatus = 'pending';
-            }
-
-            // Inicializar processingStartTime cuando comienza el processing
-            let processingStartTime = f.processingStartTime;
-            if (newStatus === 'processing' && !processingStartTime) {
-              processingStartTime = now;
-            }
-
-            // Calcular tiempo estimado restante basado en progreso
-            let estimatedTimeRemaining = f.estimatedTimeRemaining;
-            if (newStatus === 'processing' && job.progress && processingStartTime) {
-              const elapsed = (now - processingStartTime) / 1000; // segundos
-              const progressRate = job.progress / elapsed; // progreso por segundo
-              if (progressRate > 0 && job.progress < 100) {
-                estimatedTimeRemaining = (100 - job.progress) / progressRate;
-              }
-            }
-
-            return {
-              ...f,
-              status: newStatus,
-              processingProgress: job.progress || f.processingProgress || 0,
-              processingStartTime,
-              estimatedTimeRemaining,
-              error: job.error || f.error,
-              txt_url: job.txt_url || f.txt_url,
-              srt_url: job.srt_url || f.srt_url,
-              vtt_url: job.vtt_url || f.vtt_url,
-              summary_url: job.summary_url || f.summary_url,
-              speakers_url: job.speakers_url || f.speakers_url,
-              // 🔥 IMPORTANTE: Preservar las acciones originales
-              actions: f.actions || []
-            };
-          }));
-        } catch (err) {
-          console.error('[Polling] Error fetching job:', file.jobId, err);
-        }
-      }
-    };
-    pollJobs();
-    const interval = setInterval(pollJobs, 5000);
-    return () => clearInterval(interval);
-  }, [uploadedFiles, forcePolling]);
-
-
-
   const processFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+
     setError(null);
 
-    let filesToProcess: File[] = [];
+    try {
+      // SECURITY: No necesitamos token, la cookie httpOnly se envía automáticamente
 
-    for (const file of Array.from(files)) {
-      const detectedType = getFileType(file.type, file.name);
-      // 🔥 FIX: Aplicar la validación de 25MB tanto para audio como para video
-      if (detectedType === 'video' || detectedType === 'audio') {
-        if (file.size > 25 * 1024 * 1024) {
-          showNotification(`El archivo ${file.name} excede el límite de 25MB y no puede ser procesado.`, 'error');
-        } else {
-          filesToProcess.push(file);
+      // Add a size validation (25MB limit) for audio and video files.
+      // This is a client-side check to provide immediate feedback to the user,
+      // preventing the upload of files that might exceed API limits or cause issues.
+      const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+
+      const filesToProcess = Array.from(files).map((file, i) => {
+        const fileId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`;
+        const detectedType = getFileType(file.type, file.name);
+        console.log(`[Upload] File: ${file.name}, MIME: ${file.type}, Detected type: ${detectedType}`);
+
+        if ((detectedType === 'audio' || detectedType === 'video') && file.size > MAX_FILE_SIZE) {
+          showNotification(`El archivo ${file.name} (${formatFileSize(file.size)}) excede el límite de ${formatFileSize(MAX_FILE_SIZE)} y no puede ser procesado.`, 'error');
+          return null; // Exclude this file
         }
-      } else {
-        filesToProcess.push(file);
+
+        const newFile: UploadedFile = {
+          id: fileId,
+          name: file.name,
+          uploadProgress: 0,
+          status: 'uploading',
+          date: new Date().toISOString(),
+          fileType: detectedType,
+          actions: [],
+          fileSize: file.size // Capture file size in bytes
+        };
+        return { file, fileId, newFile };
+      }).filter(Boolean) as { file: File; fileId: string; newFile: UploadedFile }[]; // Filter out nulls and cast
+      
+      if (filesToProcess.length === 0) {
+        return; // No files to process after filtering
       }
+
+      // Add all files to state at once
+      setUploadedFiles(prev => [...prev, ...filesToProcess.map(f => f.newFile)]);
+
+      // Upload all files in parallel
+      const { upload } = await import('@vercel/blob/client');
+
+      const uploadPromises = filesToUpload.map(async ({ file, fileId }) => {
+        try {
+          const timestamp = Date.now();
+          const randomSuffix = Math.random().toString(36).substring(2, 8);
+          const uniqueFilename = `${timestamp}-${randomSuffix}-${file.name}`;
+
+          const blob = await upload(uniqueFilename, file, {
+            access: 'public',
+            handleUploadUrl: '/api/blob-upload',
+            clientPayload: JSON.stringify({
+              size: file.size,
+              type: file.type,
+            }),
+            onUploadProgress: ({ percentage }) => {
+              setUploadedFiles(prev => prev.map(f =>
+                f.id === fileId ? { ...f, uploadProgress: percentage } : f
+              ));
+            },
+          });
+
+          // Update with blobUrl
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === fileId ? { ...f, uploadProgress: 100, status: 'pending', blobUrl: blob.url } : f
+          ));
+        } catch (err: any) {
+          console.error(`Error uploading ${file.name}:`, err);
+          setUploadedFiles(prev => prev.map(f =>
+            f.id === fileId ? { ...f, status: 'error' } : f
+          ));
+        }
+      });
+
+      await Promise.all(uploadPromises);
+      
+    } catch (err: any) {
+      setError(err.message);
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === (files && files[0] ? files[0].name : '') ? { ...f, status: 'error' } : f // This needs to be fixed for multiple files
+      ));
     }
-
-    const filesToUpload = filesToProcess.map((file, i) => {
-      const fileId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`;
-      const detectedType = getFileType(file.type, file.name);
-      const newFile: UploadedFile = {
-        id: fileId,
-        name: file.name,
-        uploadProgress: 0,
-        status: 'uploading',
-        date: new Date().toISOString(),
-        fileType: detectedType,
-        mimeType: file.type,
-        actions: [],
-        fileSize: file.size
-      };
-      return { file, fileId, newFile };
-    });
-
-    setUploadedFiles(prev => [...prev, ...filesToUpload.map(f => f.newFile)]);
-
-    const { upload } = await import('@vercel/blob/client');
-    const uploadPromises = filesToUpload.map(async ({ file, fileId }) => {
-      try {
-        // Capturar nombre antes del check para evitar problemas de tipo
-        const fileName = (file as any)?.name || 'desconocido';
-
-        // Verificar que file sea realmente un objeto File
-        if (!(file instanceof File)) {
-          console.error('[Upload] ERROR: file no es una instancia de File:', typeof file, file);
-          throw new Error(`El archivo ${fileName} no es un objeto File válido`);
-        }
-
-        console.log('[Upload] Subiendo archivo:', file.name, 'tipo:', file.type, 'tamaño:', file.size);
-
-        const timestamp = Date.now();
-        const randomSuffix = Math.random().toString(36).substring(2, 8);
-        const uniqueFilename = `${timestamp}-${randomSuffix}-${file.name}`;
-        const blob = await upload(uniqueFilename, file, {
-          access: 'public',
-          handleUploadUrl: '/api/blob-upload',
-          clientPayload: JSON.stringify({ size: file.size, type: file.type }),
-          onUploadProgress: ({ percentage }) => {
-            setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, uploadProgress: percentage } : f));
-          },
-        });
-        setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, uploadProgress: 100, status: 'pending', blobUrl: blob.url } : f));
-      } catch (err: any) {
-        console.error(`Error uploading ${file.name}:`, err);
-        showNotification(`Error subiendo ${file.name}: ${err.message}`, 'error');
-        setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'error' } : f));
-      }
-    });
-    await Promise.all(uploadPromises);
   }, [router]);
 
-      const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      processFiles(e.target.files);
-      setShowVideoPreview(false); // Resetear la opción al cargar un nuevo archivo
-      e.target.value = ''; // Clear input to allow re-uploading same file
-    };
-  
-    const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      processFiles(e.dataTransfer.files);
-      setShowVideoPreview(false); // Resetear la opción al soltar un nuevo archivo
-    }, [processFiles]);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processFiles(e.target.files);
+    e.target.value = ''; // Clear input to allow re-uploading same file
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    processFiles(e.dataTransfer.files);
+  }, [processFiles]);
+
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -418,7 +435,7 @@ export default function Dashboard() {
   };
 
   const handleSelectAllUploaded = () => {
-    const currentUploadedFiles = uploadedFiles; // Mostrar todos los archivos
+    const currentUploadedFiles = uploadedFiles.filter(f => f.status !== 'completed');
     if (selectedUploadedFileIds.size === currentUploadedFiles.length) {
       setSelectedUploadedFileIds(new Set()); // Deselect all uploaded
     } else {
@@ -436,15 +453,14 @@ export default function Dashboard() {
   };
 
   const handleApplyAction = (actionName: string) => {
-    // Toggle acción: agregar o quitar
     setUploadedFiles(prevFiles =>
       prevFiles.map(file =>
         selectedUploadedFileIds.has(file.id)
           ? {
               ...file,
               actions: file.actions.includes(actionName)
-                ? file.actions.filter(a => a !== actionName) // Quitar si ya está
-                : [...file.actions, actionName], // Agregar si no está
+                ? file.actions.filter(a => a !== actionName) // Deselect if already selected
+                : [...file.actions, actionName],
             }
           : file
       )
@@ -510,16 +526,6 @@ export default function Dashboard() {
             throw new Error(`Las acciones ${invalidActions.join(', ')} no están disponibles para documentos de texto. Solo puedes usar Resumen y Etiquetas.`);
           }
 
-          // 🔥 CAMBIO: Poner el archivo en estado "processing" ANTES de llamar al API
-          setUploadedFiles(prev => prev.map(f =>
-            f.id === file.id ? {
-              ...f,
-              status: 'processing' as const,
-              processingProgress: 5,
-              processingStartTime: Date.now()
-            } : f
-          ));
-
           // Send document URL to server for processing (same as audio/video)
           // Server will download, parse with multi-layer fallback, and process
           const processRes = await fetch('/api/process-document', {
@@ -540,11 +546,9 @@ export default function Dashboard() {
           console.log('[Process] Document API Response status:', processRes.status);
 
           if (!processRes.ok) {
-            const errorData = await processRes.json().catch(() => ({}));
-            console.error('[Process] Document API Error (full):', JSON.stringify(errorData, null, 2));
-            console.error('[Process] Error message:', errorData.error);
-            console.error('[Process] Error details:', errorData);
-            throw new Error(errorData.error || errorData.message || 'Error al procesar documento');
+            const errorData = await processRes.json();
+            console.error('[Process] Document API Error:', errorData);
+            throw new Error(errorData.error || 'Error al procesar documento');
           }
 
           const responseData = await processRes.json();
@@ -558,53 +562,25 @@ export default function Dashboard() {
           setUploadedFiles(prev => prev.map(f => {
             if (f.id === file.id) {
               console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
-              return {
-                ...f,
-                jobId,
-                status: 'processing' as const,
-                // 🔥 FIX: Inicializar watchdog al crear el job
-                lastProgressValue: 0,
-                lastProgressTime: Date.now(),
-                stuckWarningShown: false
-              };
+              return { ...f, jobId, status: 'processing' as const };
             }
             return f;
           }));
 
-          // 🔥 FIX: Forzar polling para documentos también
-          setTimeout(() => {
-            setForcePolling(prev => prev + 1);
-          }, 100);
-
-
         } else {
-          // Procesar como audio/video con Inngest (ASÍNCRONO - timeout 15 minutos)
-          console.log('[Process] 🎵 Processing as AUDIO/VIDEO with Inngest');
-
-          // 🔥 CAMBIO: Poner el archivo en estado "processing" ANTES de llamar al API
-          // para que el usuario vea la barra de progreso inmediatamente
-          setUploadedFiles(prev => prev.map(f =>
-            f.id === file.id ? {
-              ...f,
-              status: 'processing' as const,
-              processingProgress: 5,
-              processingStartTime: Date.now()
-            } : f
-          ));
+          // Procesar como audio/video (la transcripción se hace siempre internamente)
+          console.log('[Process] 🎵 Processing as AUDIO/VIDEO');
 
           // SECURITY: Cookie httpOnly se envía automáticamente
-          // Usar endpoint asíncrono con Inngest (15min timeout vs 5min síncrono)
-          const processRes = await fetch(`/api/jobs/${file.id}`, {
+          const processRes = await fetch('/api/process', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
             credentials: 'include',
             body: JSON.stringify({
-              url: file.blobUrl,
+              audioUrl: file.blobUrl,
               filename: file.name,
-              mime: file.mimeType || 'audio/mpeg',
-              size: file.fileSize || 0,
               language: language,
               actions: file.actions,
               summaryType: summaryType
@@ -616,44 +592,25 @@ export default function Dashboard() {
           if (!processRes.ok) {
             const errorData = await processRes.json();
             console.error('[Process] API Error:', errorData);
-            throw new Error(errorData.message || 'Error al procesar');
+            throw new Error(errorData.error || 'Error al procesar');
           }
 
           const responseData = await processRes.json();
           console.log('[Process] API Response data:', responseData);
 
-          // API response: { success, message, data: { jobId, mime, queuedAt } }
+          // API wraps response in { success, data: { jobId, status, message } }
           const jobId = responseData.data?.jobId || responseData.jobId;
-          console.log('[Process] ✅ Job enqueued with Inngest:', jobId, file.name);
+          console.log('[Process] ✅ Job created:', jobId, file.name);
           processedCount++;
 
-          // Update file with jobId and set to pending (Inngest will process it)
-          setUploadedFiles(prev => {
-            const updated = prev.map(f => {
-              if (f.id === file.id) {
-                console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
-                const updatedFile = {
-                  ...f,
-                  jobId,
-                  status: 'pending' as const,
-                  // 🔥 FIX: Inicializar watchdog al crear el job
-                  lastProgressValue: 0,
-                  lastProgressTime: Date.now(),
-                  stuckWarningShown: false
-                };
-                console.log('[Process] Updated file object:', updatedFile);
-                return updatedFile;
-              }
-              return f;
-            });
-            console.log('[Process] New state after update:', updated.map(f => ({ id: f.id, jobId: f.jobId, status: f.status })));
-            return updated;
-          });
-
-          // 🔥 FIX: Forzar polling inmediatamente después de crear el job
-          setTimeout(() => {
-            setForcePolling(prev => prev + 1);
-          }, 100);
+          // Update file with jobId
+          setUploadedFiles(prev => prev.map(f => {
+            if (f.id === file.id) {
+              console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
+              return { ...f, jobId, status: 'pending' as const };
+            }
+            return f;
+          }));
         }
 
       } catch (err: any) {
@@ -673,7 +630,7 @@ export default function Dashboard() {
       showNotification('No se procesó ningún archivo. Verifica las acciones seleccionadas.', 'error');
     }
 
-    // Limpiar solo la selección después de procesar (mantener acciones para mostrar iconos correctos)
+    // Deselect all after processing
     setSelectedUploadedFileIds(new Set());
   };
 
@@ -726,11 +683,8 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error en logout:', error);
     } finally {
-      // 🔥 SECURITY FIX: Limpiar TODOS los datos locales, incluyendo archivos
+      // Limpiar datos locales no sensibles
       localStorage.removeItem('user');
-      localStorage.removeItem('uploadedFiles');
-      // Limpiar también cualquier otro dato relacionado con la sesión
-      localStorage.clear();
       router.push('/login');
     }
   };
@@ -786,70 +740,6 @@ export default function Dashboard() {
     }
   };
 
-  const generateExcel = async (title: string, text: string, filename: string): Promise<Blob> => {
-    try {
-      const workbook = new ExcelJS.Workbook();
-      // Usar nombre corto para la hoja (máximo 31 caracteres en Excel)
-      const sheetName = title.substring(0, 31);
-      const worksheet = workbook.addWorksheet(sheetName);
-
-      // Título grande en la primera fila
-      worksheet.mergeCells('A1:A1');
-      const titleCell = worksheet.getCell('A1');
-      titleCell.value = title.toUpperCase();
-      titleCell.font = { bold: true, size: 16, color: { argb: 'FFE67E22' } };
-      titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-      titleCell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFF5F5F5' }
-      };
-      worksheet.getRow(1).height = 30;
-
-      // Metadata
-      worksheet.addRow(['']);
-      worksheet.addRow([`Archivo: ${filename}`]);
-      worksheet.addRow([`Fecha: ${new Date().toLocaleDateString('es-ES')}`]);
-      worksheet.addRow(['']);
-
-      // Header de contenido
-      const headerRow = worksheet.addRow(['Contenido']);
-      headerRow.font = { bold: true, size: 12 };
-      headerRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE67E22' }
-      };
-      headerRow.getCell(1).font = { ...headerRow.font, color: { argb: 'FFFFFFFF' } };
-
-      // Dividir el texto en líneas y agregarlas
-      const lines = text.split('\n');
-      lines.forEach(line => {
-        worksheet.addRow([line]);
-      });
-
-      // Configurar columna
-      worksheet.getColumn(1).width = 100;
-
-      // Ajustar altura y alineación de filas de contenido
-      worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber > 5) { // Solo las filas de contenido
-          row.height = 15;
-          row.alignment = { wrapText: true, vertical: 'top' };
-        }
-      });
-
-      // Generar buffer y convertir a Blob
-      const buffer = await workbook.xlsx.writeBuffer();
-      return new Blob([buffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
-    } catch (error) {
-      console.error(`Error generando Excel para "${title}":`, error);
-      throw error;
-    }
-  };
-
   const downloadFilesOrganized = async (file: UploadedFile, job: Job, dirHandle: FileSystemDirectoryHandle, format: 'txt' | 'pdf' | 'both') => {
     try {
       // Create folder for this file
@@ -865,69 +755,83 @@ export default function Dashboard() {
         await writable.close();
       };
 
-      // 🔥 Obtener acciones solicitadas por el usuario
-      const requestedActions = file.actions || [];
-      console.log('[Download] Acciones solicitadas:', requestedActions);
-
-      // Download Transcription (solo PDF) - Solo si se pidió "Transcribir"
-      if (job.txt_url && requestedActions.includes('Transcribir')) {
+      // Download Transcription
+      if (job.txt_url) {
         const textRes = await fetch(job.txt_url);
         const textContent = await textRes.text();
-        const pdfBlob = await generatePdf('Transcripción', textContent, file.name);
-        const pdfHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
-        await saveBlob(pdfHandle, pdfBlob);
+        if (format === 'pdf' || format === 'both') {
+          const pdfBlob = await generatePdf('Transcripción', textContent, file.name);
+          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.pdf`, { create: true });
+          await saveBlob(pdfHandle, pdfBlob);
+        }
+        if (format === 'txt' || format === 'both') {
+          const txtBlob = new Blob([textContent], { type: 'text/plain' });
+          const txtHandle = await folderHandle.getFileHandle(`${baseName}-transcripcion.txt`, { create: true });
+          await saveBlob(txtHandle, txtBlob);
+        }
       }
 
-      // Download Summary (solo PDF) - Solo si se pidió "Resumir"
-      if (job.summary_url && requestedActions.includes('Resumir')) {
+      // Download Summary
+      if (job.summary_url) {
         const summaryRes = await fetch(job.summary_url);
         const summaryText = await summaryRes.text();
-        const pdfBlob = await generatePdf('Resumen', summaryText, file.name);
-        const pdfHandle = await folderHandle.getFileHandle(`${baseName}-resumen.pdf`, { create: true });
-        await saveBlob(pdfHandle, pdfBlob);
+        if (format === 'pdf' || format === 'both') {
+          const pdfBlob = await generatePdf('Resumen', summaryText, file.name);
+          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-resumen.pdf`, { create: true });
+          await saveBlob(pdfHandle, pdfBlob);
+        }
+        if (format === 'txt' || format === 'both') {
+          const txtBlob = new Blob([summaryText], { type: 'text/plain' });
+          const txtHandle = await folderHandle.getFileHandle(`${baseName}-resumen.txt`, { create: true });
+          await saveBlob(txtHandle, txtBlob);
+        }
       }
 
-      // Download Speakers Report (solo PDF) - Solo si se pidió "Oradores"
-      if (job.speakers_url && requestedActions.includes('Oradores')) {
+      // Download Speakers Report
+      if (job.speakers_url) {
         const speakersRes = await fetch(job.speakers_url);
         const speakersText = await speakersRes.text();
-        const pdfBlob = await generatePdf('Análisis de Oradores', speakersText, file.name);
-        const pdfHandle = await folderHandle.getFileHandle(`${baseName}-oradores.pdf`, { create: true });
-        await saveBlob(pdfHandle, pdfBlob);
+        if (format === 'pdf' || format === 'both') {
+          const pdfBlob = await generatePdf('Análisis de Oradores', speakersText, file.name);
+          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-oradores.pdf`, { create: true });
+          await saveBlob(pdfHandle, pdfBlob);
+        }
+        if (format === 'txt' || format === 'both') {
+          const txtBlob = new Blob([speakersText], { type: 'text/plain' });
+          const txtHandle = await folderHandle.getFileHandle(`${baseName}-oradores.txt`, { create: true });
+          await saveBlob(txtHandle, txtBlob);
+        }
       }
-
-      // Download Tags (solo PDF) - Solo si se pidió "Aplicar Tags"
-      if (job.metadata?.tags && job.metadata.tags.length > 0 && requestedActions.includes('Aplicar Tags')) {
+      
+      // Download Tags
+      if (job.metadata?.tags && job.metadata.tags.length > 0) {
         const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
-        const pdfBlob = await generatePdf('Tags', tagsText, file.name);
-        const pdfHandle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
-        await saveBlob(pdfHandle, pdfBlob);
+        if (format === 'pdf' || format === 'both') {
+          const pdfBlob = await generatePdf('Tags', tagsText, file.name);
+          const pdfHandle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
+          await saveBlob(pdfHandle, pdfBlob);
+        }
+        if (format === 'txt' || format === 'both') {
+          const txtBlob = new Blob([tagsText], { type: 'text/plain' });
+          const txtHandle = await folderHandle.getFileHandle(`${baseName}-tags.txt`, { create: true });
+          await saveBlob(txtHandle, txtBlob);
+        }
       }
 
-      // Download SRT (como .txt) - Solo si se pidió "SRT"
-      if (job.srt_url && requestedActions.includes('SRT')) {
+      // Download SRT (always as .srt)
+      if (job.srt_url) {
         const srtRes = await fetch(job.srt_url);
-        const srtContent = await srtRes.text();
-        const srtBlob = new Blob([srtContent], { type: 'text/plain' });
-        const fileHandle = await folderHandle.getFileHandle(`${baseName}.srt.txt`, { create: true });
+        const srtBlob = await srtRes.blob();
+        const fileHandle = await folderHandle.getFileHandle(`${baseName}.srt`, { create: true });
         await saveBlob(fileHandle, srtBlob);
       }
 
-      // Download VTT (como .txt) - Solo si se pidió "VTT"
-      if (job.vtt_url && requestedActions.includes('VTT')) {
+      // Download VTT (always as .vtt)
+      if (job.vtt_url) {
         const vttRes = await fetch(job.vtt_url);
-        const vttContent = await vttRes.text();
-        const vttBlob = new Blob([vttContent], { type: 'text/plain' });
-        const fileHandle = await folderHandle.getFileHandle(`${baseName}.vtt.txt`, { create: true });
+        const vttBlob = await vttRes.blob();
+        const fileHandle = await folderHandle.getFileHandle(`${baseName}.vtt`, { create: true });
         await saveBlob(fileHandle, vttBlob);
-      }
-
-      // 🎤 Download TTS Audio (always as .mp3)
-      if (job.metadata?.ttsUrl) {
-        const ttsRes = await fetch(job.metadata.ttsUrl);
-        const ttsBlob = await ttsRes.blob();
-        const fileHandle = await folderHandle.getFileHandle(`${baseName}-audio-narrado.mp3`, { create: true });
-        await saveBlob(fileHandle, ttsBlob);
       }
 
       showNotification(`✅ Archivos para "${file.name}" guardados en la carpeta: ${baseName}`, 'success');
@@ -953,68 +857,73 @@ export default function Dashboard() {
 
     const baseName = file.name.replace(/\.[^/.]+$/, '');
 
-    // 🔥 Obtener acciones solicitadas por el usuario
-    const requestedActions = file.actions || [];
-    console.log('[Download] Acciones solicitadas:', requestedActions);
-
-    // Download Transcription (solo PDF) - Solo si se pidió "Transcribir"
-    if (job.txt_url && requestedActions.includes('Transcribir')) {
+    // Download Transcription
+    if (job.txt_url) {
       const res = await fetch(job.txt_url);
       const text = await res.text();
-      const pdfBlob = await generatePdf('Transcripción', text, file.name);
-      triggerDownload(pdfBlob, `${baseName}-transcripcion.pdf`);
+      if (format === 'pdf' || format === 'both') {
+        const pdfBlob = await generatePdf('Transcripción', text, file.name);
+        triggerDownload(pdfBlob, `${baseName}-transcripcion.pdf`);
+      }
+      if (format === 'txt' || format === 'both') {
+        const txtBlob = new Blob([text], { type: 'text/plain' });
+        triggerDownload(txtBlob, `${baseName}-transcripcion.txt`);
+      }
     }
 
-    // Download Summary (solo PDF) - Solo si se pidió "Resumir"
-    if (job.summary_url && requestedActions.includes('Resumir')) {
+    // Download Summary
+    if (job.summary_url) {
       const res = await fetch(job.summary_url);
       const text = await res.text();
-      const pdfBlob = await generatePdf('Resumen', text, file.name);
-      triggerDownload(pdfBlob, `${baseName}-resumen.pdf`);
+      if (format === 'pdf' || format === 'both') {
+        const pdfBlob = await generatePdf('Resumen', text, file.name);
+        triggerDownload(pdfBlob, `${baseName}-resumen.pdf`);
+      }
+      if (format === 'txt' || format === 'both') {
+        const txtBlob = new Blob([text], { type: 'text/plain' });
+        triggerDownload(txtBlob, `${baseName}-resumen.txt`);
+      }
     }
 
-    // Download Speakers Report (solo PDF) - Solo si se pidió "Oradores"
-    if (job.speakers_url && requestedActions.includes('Oradores')) {
+    // Download Speakers Report
+    if (job.speakers_url) {
       const res = await fetch(job.speakers_url);
       const text = await res.text();
-      const pdfBlob = await generatePdf('Análisis de Oradores', text, file.name);
-      triggerDownload(pdfBlob, `${baseName}-oradores.pdf`);
+      if (format === 'pdf' || format === 'both') {
+        const pdfBlob = await generatePdf('Análisis de Oradores', text, file.name);
+        triggerDownload(pdfBlob, `${baseName}-oradores.pdf`);
+      }
+      if (format === 'txt' || format === 'both') {
+        const txtBlob = new Blob([text], { type: 'text/plain' });
+        triggerDownload(txtBlob, `${baseName}-oradores.txt`);
+      }
     }
 
-    // Download Tags (solo PDF) - Solo si se pidió "Aplicar Tags"
-    if (job.metadata?.tags && job.metadata.tags.length > 0 && requestedActions.includes('Aplicar Tags')) {
+    // Download Tags
+    if (job.metadata?.tags && job.metadata.tags.length > 0) {
       const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
-      const pdfBlob = await generatePdf('Tags', tagsText, file.name);
-      triggerDownload(pdfBlob, `${baseName}-tags.pdf`);
+      if (format === 'pdf' || format === 'both') {
+        const pdfBlob = await generatePdf('Tags', tagsText, file.name);
+        triggerDownload(pdfBlob, `${baseName}-tags.pdf`);
+      }
+      if (format === 'txt' || format === 'both') {
+        const txtBlob = new Blob([tagsText], { type: 'text/plain' });
+        triggerDownload(txtBlob, `${baseName}-tags.txt`);
+      }
     }
 
-    // Download SRT (como .txt) - Solo si se pidió "SRT"
-    if (job.srt_url && requestedActions.includes('SRT')) {
-      const res = await fetch(job.srt_url);
-      const text = await res.text();
-      const srtBlob = new Blob([text], { type: 'text/plain' });
-      triggerDownload(srtBlob, `${baseName}.srt.txt`);
-    }
-
-    // Download VTT (como .txt) - Solo si se pidió "VTT"
-    if (job.vtt_url && requestedActions.includes('VTT')) {
-      const res = await fetch(job.vtt_url);
-      const text = await res.text();
-      const vttBlob = new Blob([text], { type: 'text/plain' });
-      triggerDownload(vttBlob, `${baseName}.vtt.txt`);
-    }
-
-    // 🎤 Download TTS Audio
-    if (job.metadata?.ttsUrl) window.open(job.metadata.ttsUrl, '_blank');
+    // Always download other formats as-is
+    if (job.srt_url) window.open(job.srt_url, '_blank');
+    if (job.vtt_url) window.open(job.vtt_url, '_blank');
   };
 
   const getStatusText = (status: FileStatus) => {
     switch (status) {
-      case 'uploading': return t('dashboard.status.uploading');
-      case 'pending': return t('dashboard.status.pending');
-      case 'processing': return t('dashboard.status.processing');
-      case 'completed': return t('dashboard.status.completed');
-      case 'error': return t('dashboard.status.error');
+      case 'uploading': return 'Subiendo';
+      case 'pending': return 'Pendiente';
+      case 'processing': return 'Procesando';
+      case 'completed': return 'Completado';
+      case 'error': return 'Error';
     }
   };
 
@@ -1107,10 +1016,10 @@ export default function Dashboard() {
           <div className="flex flex-col mb-6">
             <div className="flex items-baseline gap-x-3">
               <h1 className="font-orbitron text-[36px] text-orange-500 font-bold">annalogica</h1>
-              <span className={textSecondary}>{t('dashboard.workingFor')}</span>
+              <span className={textSecondary}>trabajando para</span>
             </div>
             {(user?.name || user?.email) && (
-              <p className={`text-white text-xl font-medium -mt-1 ml-1`}>{user.name || user.email}</p>
+              <p className={`${textPrimary} text-xl font-semibold -mt-1 ml-1`}>{user.name || user.email}</p>
             )}
           </div>
 
@@ -1121,18 +1030,18 @@ export default function Dashboard() {
               onDragOver={handleDragOver}
             >
               <p className={`text-xs ${textSecondary} mb-3`}>
-                {t('dashboard.uploadFiles')}
+                Archivos admitidos: Audio, Video, TXT, DOCX, PDF.
               </p>
               <div className={`${textSecondary} mb-3`}>
                 <svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
-              <p className={`text-xs ${textSecondary} mb-1`}>{t('dashboard.dragDrop')}</p>
-              <p className={`text-xs ${textSecondary} mb-2`}>{t('dashboard.or')}</p>
+              <p className={`text-xs ${textSecondary} mb-1`}>Arrastra y suelta hasta 50 archivos aquí</p>
+              <p className={`text-xs ${textSecondary} mb-2`}>o</p>
               <label>
                 <span className="text-orange-500 text-xs font-medium hover:text-orange-600 cursor-pointer">
-                  {t('dashboard.selectFiles')}
+                  Selecciona archivos de tu equipo
                 </span>
                 <input
                   type="file"
@@ -1154,9 +1063,9 @@ export default function Dashboard() {
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-orange-500 text-sm">🤖</span>
-              <h2 className={`text-sm font-medium ${textPrimary}`}>{t('dashboard.aiActions')}</h2>
+              <h2 className={`text-sm font-medium ${textPrimary}`}>Acciones IA</h2>
             </div>
-            <p className={`text-xs ${textSecondary} mb-3`}>{t('dashboard.selectFilesAndActions')}</p>
+            <p className={`text-xs ${textSecondary} mb-3`}>Selecciona archivos y aplica acciones.</p>
 
             <div className="space-y-2">
               {/* Fila 1: Transcribir + Oradores */}
@@ -1165,17 +1074,17 @@ export default function Dashboard() {
                   onClick={() => !hasDocuments && handleApplyAction('Transcribir')}
                   className={`p-2 ${canTranscribe && !hasDocuments ? 'bg-orange-500 hover:bg-orange-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
                   disabled={!canTranscribe || hasDocuments}
-                  title={hasDocuments ? t('dashboard.notAvailableForDocs') : t('dashboard.transcribe')}
+                  title={hasDocuments ? 'No disponible para documentos' : 'Transcribir audio/video a texto'}
                 >
-                  📝 {t('dashboard.transcribe')}
+                  📝 Transcribir
                 </button>
                 <button
                   onClick={() => !hasDocuments && handleApplyAction('Oradores')}
                   className={`p-2 ${hasDocuments ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'} text-white rounded-lg text-xs font-medium transition-colors`}
                   disabled={hasDocuments}
-                  title={hasDocuments ? t('dashboard.notAvailableForDocs') : t('dashboard.speakers')}
+                  title={hasDocuments ? 'No disponible para documentos' : 'Identificar y analizar hablantes'}
                 >
-                  🎙️ {t('dashboard.speakers')}
+                  🎙️ Oradores
                 </button>
               </div>
 
@@ -1184,9 +1093,9 @@ export default function Dashboard() {
                 <button
                   onClick={() => handleApplyAction('Resumir')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                  title={t('dashboard.summary')}
+                  title="Generar resumen del contenido"
                 >
-                  📋 {t('dashboard.summary')}
+                  📋 Resumen
                 </button>
                 <div className="flex items-center justify-around gap-1 text-xs">
                   <label className="flex items-center gap-1">
@@ -1197,7 +1106,7 @@ export default function Dashboard() {
                       checked={summaryType === 'short'}
                       onChange={() => setSummaryType('short')}
                     />
-                    <span className={textSecondary}>{t('dashboard.short')}</span>
+                    <span className={textSecondary}>Corto</span>
                   </label>
                   <label className="flex items-center gap-1">
                     <input
@@ -1207,7 +1116,7 @@ export default function Dashboard() {
                       checked={summaryType === 'detailed'}
                       onChange={() => setSummaryType('detailed')}
                     />
-                    <span className={textSecondary}>{t('dashboard.detailed')}</span>
+                    <span className={textSecondary}>Detallado</span>
                   </label>
                 </div>
               </div>
@@ -1218,9 +1127,9 @@ export default function Dashboard() {
                   onClick={() => !hasDocuments && handleApplyAction('Subtítulos')}
                   className={`p-2 ${hasDocuments ? 'bg-gray-400 cursor-not-allowed' : 'bg-orange-500 hover:bg-orange-600'} text-white rounded-lg text-xs font-medium transition-colors`}
                   disabled={hasDocuments}
-                  title={hasDocuments ? t('dashboard.notAvailableForDocs') : t('dashboard.subtitles')}
+                  title={hasDocuments ? 'No disponible para documentos' : 'Generar archivos de subtítulos'}
                 >
-                  📄 {t('dashboard.subtitles')}
+                  📄 Subtítulos
                 </button>
                 <div className="flex items-center justify-around gap-1 text-xs">
                   <label className={`flex items-center gap-1 ${hasDocuments ? 'opacity-50 cursor-not-allowed' : ''}`}>
@@ -1253,78 +1162,58 @@ export default function Dashboard() {
               {/* Fila 4: Etiquetas + Archivos Procesados */}
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleApplyAction('Aplicar Tags')}
+                  onClick={() => handleApplyAction('Etiquetas')}
                   className="p-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-medium transition-colors"
-                  title={t('dashboard.tags')}
+                  title="Generar etiquetas temáticas"
                 >
-                  🏷️ {t('dashboard.tags')}
+                  🏷️ Etiquetas
                 </button>
                 <Link
                   href="/processed-files"
                   className="flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-medium transition-colors"
-                  title={t('dashboard.processedFiles')}
+                  title="Ver todos los archivos procesados"
                 >
-                  ✅ {t('dashboard.processedFiles')}
+                  ✅ Archivos Procesados
                 </Link>
               </div>
 
-              {/* Fila 5: Generar Audio (TTS) - Solo para documentos */}
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => hasDocuments && handleApplyAction('GenerarAudio')}
-                  className={`p-2 ${hasDocuments ? 'bg-purple-500 hover:bg-purple-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg text-xs font-medium transition-colors`}
-                  disabled={!hasDocuments}
-                  title={hasDocuments ? t('dashboard.generateAudio') : t('dashboard.onlyForDocs')}
-                >
-                  🎤 {t('dashboard.generateAudio')}
-                </button>
-                <div className="flex items-center justify-center text-xs">
-                  <span className={`${textSecondary} text-[10px]`}>
-                    {hasDocuments ? `🔊 ${t('dashboard.naturalVoice')}` : t('dashboard.onlyForDocs')}
-                  </span>
-                </div>
-              </div>
-
-              {/* Botón Procesar Archivos */}
+              {/* Fila 5: Procesar Archivos - ancho completo */}
               <button
                 onClick={handleProcessSelectedFiles}
-                className="w-full p-3 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-bold transition-colors mt-3 shadow-lg"
+                className="w-full p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors mt-2"
               >
-                🚀 {t('dashboard.processSelectedFiles')}
+                🚀 Procesar Archivos
               </button>
             </div>
-            <p className={`text-xs ${textSecondary} text-center mt-2`}>
-              💡 {t('dashboard.tipSelectFiles')}
-            </p>
           </div>
 
           <div className="mt-auto pt-6 border-t border-zinc-800">
             <p className={`text-xs ${textSecondary} text-center mb-1`}>
-              © 2025 Annalogica by videoconversion digital lab, S.L.
+              © 2025 Annalogica. Todos los derechos reservados.
             </p>
             <div className="flex justify-center gap-3 text-xs mb-2">
-              <a href="/privacy" className={`${textSecondary} hover:text-orange-500`}>{t('nav.privacy')}</a>
-              <a href="/terms" className={`${textSecondary} hover:text-orange-500`}>{t('nav.terms')}</a>
-              <a href="/settings#contacto" className={`${textSecondary} hover:text-orange-500`}>{t('nav.contact')}</a>
+              <a href="/privacy" className={`${textSecondary} hover:text-orange-500`}>Privacidad</a>
+              <a href="/terms" className={`${textSecondary} hover:text-orange-500`}>Términos</a>
+              <a href="mailto:legal@annalogica.eu" className={`${textSecondary} hover:text-orange-500`}>Contacto</a>
             </div>
-            <div className={`text-xs ${textSecondary} text-center space-y-1`}>
-              <p>{t('dashboard.emails')}</p>
-            </div>
+            <p className={`text-xs ${textSecondary} text-center`}>
+              support@annalogica.eu
+            </p>
           </div>
         </div>
 
         <div className="flex-1 p-6 overflow-y-auto flex flex-col" style={{ height: '100%' }}>
           <div className="mb-6 flex justify-start">
-            <label htmlFor="language-select" className="sr-only">{t('dashboard.contentLanguage')}</label>
+            <label htmlFor="language-select" className="sr-only">Idioma del Contenido</label>
             <select
                 id="language-select"
                 className={`p-2 ${bgSecondary} rounded-lg shadow-sm ${border} border ${textPrimary} text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500`}
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 style={{ minWidth: '180px' }}
-                title={t('dashboard.contentLanguage')}
+                title="Selecciona el idioma del audio/video"
             >
-                <option value="auto">{t('dashboard.autoDetect')}</option>
+                <option value="auto">Detección automática</option>
                 <option value="es">Español</option>
                 <option value="ca">Català</option>
                 <option value="eu">Euskera</option>
@@ -1343,14 +1232,14 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
-                    checked={selectedUploadedFileIds.size === uploadedFiles.length && uploadedFiles.length > 0}
+                    checked={selectedUploadedFileIds.size === uploadedFiles.filter(f => f.status !== 'completed').length && uploadedFiles.filter(f => f.status !== 'completed').length > 0}
                     onChange={handleSelectAllUploaded}
                     className="form-checkbox h-4 w-4 text-orange-500 rounded"
                   />
                   <span className="text-orange-500 text-sm">📁</span>
-                  <h2 className={`text-sm font-medium ${textPrimary}`}>{t('dashboard.uploadedFiles')}</h2>
+                  <h2 className={`text-sm font-medium ${textPrimary}`}>Archivos Cargados</h2>
                 </div>
-                <p className={`text-xs ${textSecondary}`}>{t('dashboard.allFiles')}</p>
+                <p className={`text-xs ${textSecondary}`}>Archivos en proceso de subida y procesamiento</p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -1380,10 +1269,10 @@ export default function Dashboard() {
                     }
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
-                  title={t('dashboard.restart')}
+                  title="Reiniciar procesamiento de archivos seleccionados"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  {t('dashboard.restart')}
+                  Reiniciar
                 </button>
                 <button
                   onClick={async () => {
@@ -1422,21 +1311,21 @@ export default function Dashboard() {
                     showNotification(`${total} archivo(s) eliminado(s) correctamente`, 'success');
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
-                  title={t('common.delete')}
+                  title="Eliminar archivos seleccionados"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  {t('common.delete')}
+                  Eliminar
                 </button>
               </div>
             </div>
 
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 200px)' }}>
-              {uploadedFiles.length === 0 ? (
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(60vh - 200px)' }}>
+              {uploadedFiles.filter(f => f.status !== 'completed').length === 0 ? (
                 <div className="px-4 py-8 text-center">
-                  <p className={`text-xs ${textSecondary}`}>{t('dashboard.noFilesYet')}</p>
+                  <p className={`text-xs ${textSecondary}`}>No hay archivos cargados aún.</p>
                 </div>
               ) : (
-                uploadedFiles.map((file) => (
+                uploadedFiles.filter(f => f.status !== 'completed').map((file) => (
                   <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
                     <div className="flex items-center gap-4 mb-2">
                       <input
@@ -1469,310 +1358,70 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-
-
-                    <div className="ml-6 space-y-2">
+                    <div className="ml-6 space-y-1">
                       {file.status === 'uploading' && (
-                        <div className={`${darkMode ? 'bg-blue-950/30' : 'bg-blue-50'} p-3 rounded-lg border ${darkMode ? 'border-blue-800' : 'border-blue-200'}`}>
-                          <div className="flex justify-between items-center mb-2">
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className={`text-xs ${textSecondary}`}>Subida</span>
                             <div className="flex items-center gap-2">
-                              <span className="relative flex h-3 w-3">
+                              <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
                               </span>
-                              <span className={`text-sm font-medium ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>{t('dashboard.uploadingFile')}</span>
+                              <span className="text-xs text-blue-500">{file.uploadProgress.toFixed(0)}%</span>
                             </div>
-                            <span className={`text-sm font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>{file.uploadProgress.toFixed(0)}%</span>
                           </div>
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className={`text-xs ${textSecondary}`} title="Tamaño del archivo">
-                              📦 {formatFileSize(file.fileSize)}
-                            </span>
-                          </div>
-                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-2.5 overflow-hidden`}>
-                            <div className="bg-gradient-to-r from-blue-500 to-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                                 style={{ width: `${file.uploadProgress}%` }} />
+                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
+                            <div className="bg-blue-500 h-1 rounded-full transition-all" style={{ width: `${file.uploadProgress}%` }} />
                           </div>
                         </div>
                       )}
                       {file.status === 'processing' && (
-                        <div className={`${darkMode ? 'bg-purple-950/30' : 'bg-purple-50'} p-3 rounded-lg border ${darkMode ? 'border-purple-800' : 'border-purple-200'}`}>
-                          <div className="flex justify-between items-center mb-2">
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`text-xs ${textSecondary}`}>
+                                {(file.processingProgress || 0) >= 98 ? '🟡 Finalizando...' : 'Procesando'}
+                              </span>
+                              {(file.processingProgress || 0) >= 98 && (
+                                <span className={`text-xs ${textSecondary} italic`}>(Generando resumen)</span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2">
                               {(file.processingProgress || 0) >= 90 ? (
-                                <span className="relative flex h-3 w-3" title="Finalizando - Generando resumen y oradores">
+                                <span className="relative flex h-2 w-2" title="Finalizando - Generando resumen y oradores">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
                                 </span>
                               ) : (
-                                <span className="relative flex h-3 w-3" title="Procesando - Transcribiendo audio">
+                                <span className="relative flex h-2 w-2" title="Procesando - Transcribiendo audio">
                                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                                 </span>
                               )}
-                              <span className={`text-sm font-medium ${darkMode ? 'text-purple-300' : 'text-purple-700'}`}>
-                                {(file.processingProgress || 0) >= 98 ? `🟡 ${t('dashboard.finalizing')}` : (file.processingProgress || 0) >= 90 ? `⚡ ${t('dashboard.generatingSummary')}` : `🎙️ ${t('dashboard.transcribing')}`}
-                              </span>
+                              <span className="text-xs text-purple-500">{file.processingProgress || 0}%</span>
                             </div>
-                            <span className={`text-sm font-bold ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>{file.processingProgress || 0}%</span>
                           </div>
 
-                          {/* Timer, file size, and estimated time info */}
-                          <div className="grid grid-cols-3 gap-2 mb-2">
-                            <div className={`flex items-center gap-1.5 ${darkMode ? 'bg-zinc-800/50' : 'bg-white'} px-2 py-1.5 rounded`}>
-                              <span className="text-sm" title="Tiempo transcurrido">⏱️</span>
-                              <span className={`text-xs font-medium ${textSecondary}`}>
-                                {formatElapsedTime(file.processingStartTime)}
+                          {/* Timer, file size, and estimated time info */} 
+                          <div className="flex justify-between items-center mb-1">
+                            <div className="flex items-center gap-3">
+                              <span className={`text-xs ${textSecondary}`} title="Tiempo transcurrido">
+                                ⏱️ {formatElapsedTime(file.processingStartTime)}
                               </span>
-                            </div>
-                            <div className={`flex items-center gap-1.5 ${darkMode ? 'bg-zinc-800/50' : 'bg-white'} px-2 py-1.5 rounded`}>
-                              <span className="text-sm" title="Tamaño del archivo">📦</span>
-                              <span className={`text-xs font-medium ${textSecondary}`}>
-                                {formatFileSize(file.fileSize)}
+                              <span className={`text-xs ${textSecondary}`} title="Tamaño del archivo">
+                                📦 {formatFileSize(file.fileSize)}
                               </span>
                             </div>
                             {file.estimatedTimeRemaining !== undefined && file.estimatedTimeRemaining > 0 && (
-                              <div className={`flex items-center gap-1.5 ${darkMode ? 'bg-zinc-800/50' : 'bg-white'} px-2 py-1.5 rounded`}>
-                                <span className="text-sm" title="Tiempo restante">⏳</span>
-                                <span className={`text-xs font-medium ${textSecondary}`}>
-                                  ~{formatTimeRemaining(file.estimatedTimeRemaining)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-2.5 overflow-hidden`}>
-                            <div className={`h-2.5 rounded-full transition-all duration-300 ease-out ${
-                              (file.processingProgress || 0) >= 90
-                                ? 'bg-gradient-to-r from-yellow-500 to-orange-500'
-                                : 'bg-gradient-to-r from-purple-500 to-indigo-600'
-                            }`}
-                                 style={{ width: `${file.processingProgress || 0}%` }} />
-                          </div>
-                        </div>
-                      )}
-                      {file.status === 'error' && (
-                        <div className={`${darkMode ? 'bg-red-950/30' : 'bg-red-50'} p-3 rounded-lg border ${darkMode ? 'border-red-800' : 'border-red-200'}`}>
-                          <div className="flex justify-between items-center mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="relative flex h-3 w-3">
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                              <span className={`text-xs ${textSecondary}`} title="Tiempo estimado restante">
+                                ⏳ ~{formatTimeRemaining(file.estimatedTimeRemaining)}
                               </span>
-                              <span className={`text-sm font-medium ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
-                                {file.canRetry ? '⚠️ Job clavado - Sin progreso' : '❌ Error en procesamiento'}
-                              </span>
-                            </div>
+                            )}
                           </div>
 
-                          {file.canRetry && (
-                            <div className="mt-3 flex items-center gap-2">
-                              <button
-                                onClick={async () => {
-                                  // TODO: Implementar endpoint de retry
-                                  console.log('[Retry] Reintentando job:', file.jobId);
-
-                                  // Por ahora, resetear estado del archivo para que el usuario pueda reprocesar
-                                  setUploadedFiles(prev => prev.map(f =>
-                                    f.id === file.id ? {
-                                      ...f,
-                                      status: 'pending' as const,
-                                      processingProgress: 0,
-                                      // 🔥 FIX: Inicializar watchdog correctamente al reintentar
-                                      lastProgressValue: 0,
-                                      lastProgressTime: Date.now(),
-                                      stuckWarningShown: false,
-                                      canRetry: false
-                                    } : f
-                                  ));
-
-                                  showNotification(`Reintentando "${file.name}"...`, 'info');
-                                }}
-                                className={`flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2`}
-                              >
-                                <RefreshCw className="h-4 w-4" />
-                                Reintentar Procesamiento
-                              </button>
-                            </div>
-                          )}
-
-                          <p className={`text-xs ${darkMode ? 'text-red-400' : 'text-red-600'} mt-2`}>
-                            {file.canRetry
-                              ? `El procesamiento se detuvo. Puedes reintentar o contactar soporte si el problema persiste.`
-                              : 'Hubo un error. Por favor, intenta de nuevo o contacta soporte.'}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Mostrar botones de descarga individuales para archivos completados */}
-                      {file.status === 'completed' && file.actions && file.actions.length > 0 && (
-                        <div className="ml-6 mt-2">
-                          <p className={`text-xs font-medium ${textSecondary} mb-2`}>Archivos disponibles para descargar:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {/* Solo mostrar botón de Transcripción si se pidió explícitamente Transcribir */}
-                            {file.txt_url && file.actions.includes('Transcribir') && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(file.txt_url!);
-                                    const text = await res.text();
-                                    const pdfBlob = await generatePdf('Transcripción', text, file.name);
-                                    const url = URL.createObjectURL(pdfBlob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}-transcripcion.pdf`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                    showNotification('Transcripción descargada correctamente', 'success');
-                                  } catch (error) {
-                                    showNotification('Error al descargar transcripción', 'error');
-                                  }
-                                }}
-                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-                                title="Descargar transcripción en PDF"
-                              >
-                                📝 Transcripción (PDF)
-                              </button>
-                            )}
-                            {/* Solo mostrar botón de SRT si se pidió SRT */}
-                            {file.srt_url && file.actions.includes('SRT') && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(file.srt_url!);
-                                    const text = await res.text();
-                                    const blob = new Blob([text], { type: 'text/plain' });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}.srt.txt`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                    showNotification('Subtítulos SRT descargados correctamente', 'success');
-                                  } catch (error) {
-                                    showNotification('Error al descargar SRT', 'error');
-                                  }
-                                }}
-                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-500 hover:bg-purple-600 text-white'}`}
-                                title="Descargar subtítulos SRT como TXT"
-                              >
-                                📄 SRT (TXT)
-                              </button>
-                            )}
-                            {/* Solo mostrar botón de VTT si se pidió VTT */}
-                            {file.vtt_url && file.actions.includes('VTT') && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(file.vtt_url!);
-                                    const text = await res.text();
-                                    const blob = new Blob([text], { type: 'text/plain' });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}.vtt.txt`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                    showNotification('Subtítulos VTT descargados correctamente', 'success');
-                                  } catch (error) {
-                                    showNotification('Error al descargar VTT', 'error');
-                                  }
-                                }}
-                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-500 hover:bg-purple-600 text-white'}`}
-                                title="Descargar subtítulos VTT como TXT"
-                              >
-                                📄 VTT (TXT)
-                              </button>
-                            )}
-                            {/* Solo mostrar botón de Resumen si se pidió Resumir */}
-                            {file.summary_url && file.actions.includes('Resumir') && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(file.summary_url!);
-                                    const text = await res.text();
-                                    const pdfBlob = await generatePdf('Resumen', text, file.name);
-                                    const url = URL.createObjectURL(pdfBlob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}-resumen.pdf`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                    showNotification('Resumen descargado correctamente', 'success');
-                                  } catch (error) {
-                                    showNotification('Error al descargar resumen', 'error');
-                                  }
-                                }}
-                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
-                                title="Descargar resumen en PDF"
-                              >
-                                📋 Resumen (PDF)
-                              </button>
-                            )}
-                            {/* Solo mostrar botón de Oradores si se pidió explícitamente */}
-                            {file.speakers_url && file.actions.includes('Oradores') && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    const res = await fetch(file.speakers_url!);
-                                    const text = await res.text();
-                                    const pdfBlob = await generatePdf('Análisis de Oradores', text, file.name);
-                                    const url = URL.createObjectURL(pdfBlob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}-oradores.pdf`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                    showNotification('Análisis de oradores descargado correctamente', 'success');
-                                  } catch (error) {
-                                    showNotification('Error al descargar análisis de oradores', 'error');
-                                  }
-                                }}
-                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-orange-600 hover:bg-orange-700 text-white' : 'bg-orange-500 hover:bg-orange-600 text-white'}`}
-                                title="Descargar análisis de oradores en PDF"
-                              >
-                                🎙️ Oradores (PDF)
-                              </button>
-                            )}
-                            {/* Solo mostrar botón de Tags si se pidió Aplicar Tags */}
-                            {file.actions.includes('Aplicar Tags') && (
-                              <button
-                                onClick={async () => {
-                                  try {
-                                    // Obtener job para acceder a metadata.tags
-                                    const jobRes = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
-                                    const jobData = await jobRes.json();
-                                    const tags = jobData.metadata?.tags || [];
-                                    const tagsText = `Tags para: ${file.name}\n\n- ${tags.join('\n- ')}`;
-                                    const pdfBlob = await generatePdf('Tags', tagsText, file.name);
-                                    const url = URL.createObjectURL(pdfBlob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `${file.name.replace(/\.[^/.]+$/, '')}-tags.pdf`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                    showNotification('Tags descargados correctamente', 'success');
-                                  } catch (error) {
-                                    showNotification('Error al descargar tags', 'error');
-                                  }
-                                }}
-                                className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${darkMode ? 'bg-yellow-600 hover:bg-yellow-700 text-white' : 'bg-yellow-500 hover:bg-yellow-600 text-white'}`}
-                                title="Descargar tags en PDF"
-                              >
-                                🏷️ Tags (PDF)
-                              </button>
-                            )}
+                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
+                            <div className="bg-purple-500 h-1 rounded-full transition-all" style={{ width: `${file.processingProgress || 0}%` }} />
                           </div>
                         </div>
                       )}
@@ -1783,7 +1432,180 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden`} style={{ flex: '1 1 40%', minHeight: '300px' }}>
+            <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedCompletedFileIds.size === uploadedFiles.filter(f => f.status === 'completed').length && uploadedFiles.filter(f => f.status === 'completed').length > 0}
+                    onChange={handleSelectAllCompleted}
+                    className="form-checkbox h-4 w-4 text-orange-500 rounded"
+                  />
+                  <span className="text-green-500 text-sm">✅</span>
+                  <h2 className={`text-sm font-medium ${textPrimary}`}>Todos los Archivos Completados</h2>
+                </div>
 
+
+                <div className="flex items-center gap-2 mt-2">
+                  <span className={`text-xs ${textSecondary}`}>Formato:</span>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      className="accent-orange-500 scale-75"
+                      name="downloadFormat"
+                      checked={downloadFormat === 'pdf'}
+                      onChange={() => setDownloadFormat('pdf')}
+                    />
+                    <span className={`text-xs ${textSecondary}`}>PDF</span>
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      className="accent-orange-500 scale-75"
+                      name="downloadFormat"
+                      checked={downloadFormat === 'txt'}
+                      onChange={() => setDownloadFormat('txt')}
+                    />
+                    <span className={`text-xs ${textSecondary}`}>TXT</span>
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      className="accent-orange-500 scale-75"
+                      name="downloadFormat"
+                      checked={downloadFormat === 'both'}
+                      onChange={() => setDownloadFormat('both')}
+                    />
+                    <span className={`text-xs ${textSecondary}`}>Ambos</span>
+                  </label>
+                </div>
+
+
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const completedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id));
+                    if (completedFiles.length === 0) {
+                      showNotification('Selecciona al menos un archivo completado para descargar.', 'info');
+                      return;
+                    }
+
+                    if (!downloadDirHandle && 'showDirectoryPicker' in window) {
+                      showNotification('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".', 'info');
+                      return;
+                    }
+
+                    for (const file of completedFiles) {
+                      if (file.jobId) {
+                        try {
+                          const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
+                          if (res.ok) {
+                            const data = await res.json();
+                            const job = data.job;
+                            if (downloadDirHandle) {
+                              await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
+                            } else {
+                              await downloadFilesIndividually(file, job, downloadFormat);
+                            }
+                          }
+                        } catch (err) {
+                          console.error('Error downloading files:', err);
+                          showNotification(`Error al descargar ${file.name}.`, 'error');
+                        }
+                      }
+                    }
+                  }}
+                  disabled={uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id)).length === 0}
+                  className="px-3 py-1.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded text-xs font-medium transition-colors"
+                >
+                  📥 Descargar Seleccionados
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!('showDirectoryPicker' in window)) {
+                      showNotification('Tu navegador no soporta la selección de carpetas. Las descargas se realizarán individualmente.', 'info');
+                      return;
+                    }
+                    try {
+                      const handle = await (window as any).showDirectoryPicker();
+                      setDownloadDirHandle(handle);
+                      showNotification(`Carpeta de descarga seleccionada: "${handle.name}". Las próximas descargas se guardarán aquí.`, 'success');
+                    } catch (err) {
+                      console.error('Error al seleccionar la carpeta:', err);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors"
+                  title="Elegir carpeta de descarga"
+                >
+                  📁 Carpeta Descarga
+                </button>
+                <button
+                  onClick={handleDeleteSelectedCompletedFiles}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors"
+                  title="Eliminar archivos procesados seleccionados"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Eliminar
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(40vh - 200px)' }}>
+              {uploadedFiles.filter(f => f.status === 'completed').length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <p className={`text-xs ${textSecondary}`}>No hay archivos completados aún.</p>
+                </div>
+              ) : (
+                uploadedFiles.filter(f => f.status === 'completed').map((file) => (
+                  <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedCompletedFileIds.has(file.id)}
+                        onChange={() => handleFileSelect(file.id, 'completed')}
+                        className="form-checkbox h-4 w-4 text-orange-500 rounded"
+                      />
+                      <span className={`text-xs ${textPrimary} flex-1 truncate`}>{file.name}</span>
+                      <span className={`text-xs font-medium ${getStatusColor(file.status)}`}>
+                        ✓ Completado
+                      </span>
+                      <button
+                        onClick={async () => {
+                          if (!file.jobId) return;
+
+                          if (!downloadDirHandle && 'showDirectoryPicker' in window) {
+                            showNotification('Por favor, elige una carpeta de destino primero usando el botón "📁 Carpeta Descarga".', 'info');
+                            return;
+                          }
+
+                          try {
+                            const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
+                            if (res.ok) {
+                              const data = await res.json();
+                              const job = data.job;
+                              if (downloadDirHandle) {
+                                await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
+                              } else {
+                                await downloadFilesIndividually(file, job, downloadFormat);
+                              }
+                            }
+                          } catch (err) {
+                            console.error('Error downloading file:', err);
+                            showNotification(`Error al descargar ${file.name}.`, 'error');
+                          }
+                        }}
+                        className="px-2 py-1 bg-green-500 hover:bg-green-600 text-white rounded text-xs font-medium transition-colors"
+                      >
+                        📥 Descargar
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
 
         </div>
       </div>
