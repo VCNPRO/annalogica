@@ -55,7 +55,14 @@ export function ChatWidget() {
       });
 
       if (!response.ok) {
-        throw new Error('Error en la respuesta del servidor');
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (jsonError) {
+          console.error('Error parsing error response:', jsonError);
+          throw new Error('Error desconocido del servidor');
+        }
+        throw new Error(errorData.error || 'Error desconocido del servidor');
       }
 
       const data = await response.json();
@@ -67,11 +74,11 @@ export function ChatWidget() {
       };
       setMessages(prev => [...prev, assistantMessage]);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error enviando mensaje:', error);
       const errorMessage: Message = {
         role: 'assistant',
-        content: 'Lo siento, ha ocurrido un error. Por favor, intenta de nuevo.'
+        content: error.message || 'Lo siento, ha ocurrido un error. Por favor, intenta de nuevo.'
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
