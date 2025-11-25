@@ -314,11 +314,20 @@ export default function Dashboard() {
     try {
       // SECURITY: No necesitamos token, la cookie httpOnly se envía automáticamente
 
-      // Create all file entries first
-      const filesToUpload = Array.from(files).map((file, i) => {
+      // Add a size validation (25MB limit) for audio and video files.
+      // This is a client-side check to provide immediate feedback to the user,
+      // preventing the upload of files that might exceed API limits or cause issues.
+      const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+
+      const filesToProcess = Array.from(files).map((file, i) => {
         const fileId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`;
         const detectedType = getFileType(file.type, file.name);
         console.log(`[Upload] File: ${file.name}, MIME: ${file.type}, Detected type: ${detectedType}`);
+
+        if ((detectedType === 'audio' || detectedType === 'video') && file.size > MAX_FILE_SIZE) {
+          showNotification(`El archivo ${file.name} (${formatFileSize(file.size)}) excede el límite de ${formatFileSize(MAX_FILE_SIZE)} y no puede ser procesado.`, 'error');
+          return null; // Exclude this file
+        }
 
         const newFile: UploadedFile = {
           id: fileId,
@@ -331,10 +340,14 @@ export default function Dashboard() {
           fileSize: file.size // Capture file size in bytes
         };
         return { file, fileId, newFile };
-      });
+      }).filter(Boolean) as { file: File; fileId: string; newFile: UploadedFile }[]; // Filter out nulls and cast
+      
+      if (filesToProcess.length === 0) {
+        return; // No files to process after filtering
+      }
 
       // Add all files to state at once
-      setUploadedFiles(prev => [...prev, ...filesToUpload.map(f => f.newFile)]);
+      setUploadedFiles(prev => [...prev, ...filesToProcess.map(f => f.newFile)]);
 
       // Upload all files in parallel
       const { upload } = await import('@vercel/blob/client');
