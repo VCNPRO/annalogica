@@ -310,12 +310,10 @@ export default function Dashboard() {
 
     for (const file of Array.from(files)) {
       const detectedType = getFileType(file.type, file.name);
-      if (detectedType === 'video') {
-        // Videos se envían directamente al servidor sin conversión
-        filesToProcess.push(file);
-      } else if (detectedType === 'audio') {
+      // 🔥 FIX: Aplicar la validación de 25MB tanto para audio como para video
+      if (detectedType === 'video' || detectedType === 'audio') {
         if (file.size > 25 * 1024 * 1024) {
-          showNotification(`El archivo de audio ${file.name} excede el límite de 25MB y no puede ser procesado.`, 'error');
+          showNotification(`El archivo ${file.name} excede el límite de 25MB y no puede ser procesado.`, 'error');
         } else {
           filesToProcess.push(file);
         }
