@@ -321,7 +321,12 @@ export default function Dashboard() {
         const blob = await upload(uniqueFilename, file, {
           access: 'public',
           handleUploadUrl: '/api/blob-upload',
-          clientPayload: JSON.stringify({ size: file.size, type: file.type }),
+          clientPayload: JSON.stringify({
+            filename: file.name,
+            size: file.size,
+            type: file.type,
+            language: language
+          }),
           onUploadProgress: ({ percentage }) => {
             setUploadedFiles(prev => prev.map(f => f.id === fileId ? { ...f, uploadProgress: percentage } : f));
           },
