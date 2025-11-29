@@ -9,37 +9,7 @@ import ExcelJS from 'exceljs';
 import { useTranslations } from '@/hooks/useTranslations';
 import FileListTable from '@/components/FileListTable';
 import CompletedFilesTable from '@/components/CompletedFilesTable';
-
-type FileStatus = 'uploading' | 'pending' | 'processing' | 'completed' | 'error';
-
-interface UploadedFile {
-  id: string;
-  name: string;
-  uploadProgress: number;
-  processingProgress?: number;
-  status: FileStatus;
-  date: string;
-  fileType: 'audio' | 'video' | 'text';
-  mimeType?: string;
-  actions: string[];
-  jobId?: string;
-  blobUrl?: string;
-  audioDuration?: number;
-  fileSize?: number;
-  processingStartTime?: number;
-  estimatedTimeRemaining?: number;
-  lastProgressValue?: number;
-  lastProgressTime?: number;
-  stuckWarningShown?: boolean;
-  canRetry?: boolean;
-  error?: string;
-  errorMessage?: string;
-  txt_url?: string;
-  srt_url?: string;
-  vtt_url?: string;
-  summary_url?: string;
-  speakers_url?: string;
-}
+import type { UploadedFile, FileStatus, FileType } from '@/types/file';
 
 interface Job {
   txt_url?: string;
@@ -271,7 +241,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [uploadedFiles, forcePolling]);
 
-  const getFileType = (mimeType: string, fileName?: string): 'audio' | 'video' | 'text' => {
+  const getFileType = (mimeType: string, fileName?: string): FileType => {
     if (mimeType.startsWith('audio/')) return 'audio';
     if (mimeType.startsWith('video/')) return 'video';
     return 'text';
