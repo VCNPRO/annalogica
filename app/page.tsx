@@ -370,11 +370,19 @@ export default function Dashboard() {
 
   const handleApplyAction = (actionName: string) => {
     setUploadedFiles(prevFiles =>
-      prevFiles.map(file =>
-        selectedUploadedFileIds.has(file.id)
-          ? { ...file, actions: file.actions.includes(actionName) ? file.actions.filter(a => a !== actionName) : [...file.actions, actionName] }
-          : file
-      )
+      prevFiles.map(file => {
+        if (!selectedUploadedFileIds.has(file.id)) return file;
+
+        const currentActions = file.actions || [];
+        const hasAction = currentActions.includes(actionName);
+
+        return {
+          ...file,
+          actions: hasAction
+            ? currentActions.filter(a => a !== actionName)
+            : [...currentActions, actionName]
+        };
+      })
     );
   };
 
@@ -385,7 +393,7 @@ export default function Dashboard() {
       return;
     }
     const filesToProcess = uploadedFiles.filter(file => selectedUploadedFileIds.has(file.id));
-    const filesWithoutActions = filesToProcess.filter(f => f.actions.length === 0);
+    const filesWithoutActions = filesToProcess.filter(f => !f.actions || f.actions.length === 0);
     if (filesWithoutActions.length > 0) {
       showNotification('Selecciona al menos una acción (Oradores, Resumen, Subtítulos, Etiquetas).', 'error');
       return;
@@ -405,7 +413,7 @@ export default function Dashboard() {
         const isDocument = file.fileType === 'text';
         if (isDocument) {
           console.log('[Process] 📄 Processing as DOCUMENT (server-side with multi-layer fallback)');
-          const invalidActions = file.actions.filter(a => a === 'Transcribir' || a === 'Oradores' || a === 'Subtítulos' || a === 'SRT' || a === 'VTT');
+          const invalidActions = (file.actions || []).filter(a => a === 'Transcribir' || a === 'Oradores' || a === 'Subtítulos' || a === 'SRT' || a === 'VTT');
           if (invalidActions.length > 0) {
             throw new Error(`Las acciones ${invalidActions.join(', ')} no están disponibles para documentos de texto.`);
           }
