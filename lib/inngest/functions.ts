@@ -60,7 +60,7 @@ export const transcribeFile = inngest.createFunction(
     id: 'task-transcribe-file-deepgram-v2',
     name: 'Task: Transcribe File (Deepgram)',
     retries: 2,
-    concurrency: { limit: 5 }
+    concurrency: { limit: 20 }
   },
   { event: 'task/transcribe' },
   async ({ event, step }) => {
@@ -257,7 +257,7 @@ export const processDocument = inngest.createFunction(
     id: 'task-process-document-openai',
     name: 'Task: Process Document (OpenAI)',
     retries: 2,
-    concurrency: { limit: 5 }
+    concurrency: { limit: 20 }
   },
   { event: 'task/process-document' },
   async ({ event, step }) => {

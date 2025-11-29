@@ -314,19 +314,36 @@ export default function Dashboard() {
     try {
       // SECURITY: No necesitamos token, la cookie httpOnly se envía automáticamente
 
-      // Add a size validation (25MB limit) for audio and video files.
-      // This is a client-side check to provide immediate feedback to the user,
-      // preventing the upload of files that might exceed API limits or cause issues.
-      const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
+      // PERFORMANCE: Validación de tamaño de archivos
+      // Límite de Deepgram para audio/video: 2 GB
+      // Límite de procesamiento para documentos: 100 MB
+      const MAX_AUDIO_VIDEO_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB (límite Deepgram)
+      const MAX_DOCUMENT_SIZE = 100 * 1024 * 1024; // 100 MB (límite razonable para PDFs/DOCX)
 
       const filesToProcess = Array.from(files).map((file, i) => {
         const fileId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}-${i}`;
         const detectedType = getFileType(file.type, file.name);
         console.log(`[Upload] File: ${file.name}, MIME: ${file.type}, Detected type: ${detectedType}`);
 
-        if ((detectedType === 'audio' || detectedType === 'video') && file.size > MAX_FILE_SIZE) {
-          showNotification(`El archivo ${file.name} (${formatFileSize(file.size)}) excede el límite de ${formatFileSize(MAX_FILE_SIZE)} y no puede ser procesado.`, 'error');
-          return null; // Exclude this file
+        // Validar tamaño según tipo de archivo
+        if (detectedType === 'audio' || detectedType === 'video') {
+          if (file.size > MAX_AUDIO_VIDEO_SIZE) {
+            showNotification(
+              `El archivo de ${detectedType} "${file.name}" (${formatFileSize(file.size)}) excede el límite de 2 GB.\n\n` +
+              `Por favor, comprima o divida el archivo antes de cargarlo.`,
+              'error'
+            );
+            return null;
+          }
+        } else if (detectedType === 'text') {
+          if (file.size > MAX_DOCUMENT_SIZE) {
+            showNotification(
+              `El documento "${file.name}" (${formatFileSize(file.size)}) excede el límite de 100 MB.\n\n` +
+              `Por favor, reduzca el tamaño del archivo antes de cargarlo.`,
+              'error'
+            );
+            return null;
+          }
         }
 
         const newFile: UploadedFile = {
