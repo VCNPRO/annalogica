@@ -7,6 +7,8 @@ import { RefreshCw, Trash2, Sun, Moon, BookOpen, LogOut } from 'lucide-react';
 import jsPDF from 'jspdf';
 import ExcelJS from 'exceljs';
 import { useTranslations } from '@/hooks/useTranslations';
+import FileListTable from '@/components/FileListTable';
+import CompletedFilesTable from '@/components/CompletedFilesTable';
 
 type FileStatus = 'uploading' | 'pending' | 'processing' | 'completed' | 'error';
 
@@ -31,6 +33,7 @@ interface UploadedFile {
   stuckWarningShown?: boolean;
   canRetry?: boolean;
   error?: string;
+  errorMessage?: string;
   txt_url?: string;
   srt_url?: string;
   vtt_url?: string;
@@ -485,6 +488,16 @@ export default function Dashboard() {
     setSelectedUploadedFileIds(new Set());
   };
 
+  const handleRemoveFile = (fileId: string) => {
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+    setSelectedUploadedFileIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(fileId);
+      return newSet;
+    });
+    showNotification('Archivo eliminado.', 'info');
+  };
+
   const handleDeleteSelectedCompletedFiles = async () => {
     const selectedCompletedFiles = uploadedFiles.filter(f => f.status === 'completed' && selectedCompletedFileIds.has(f.id));
     if (selectedCompletedFiles.length === 0) {
@@ -925,47 +938,15 @@ export default function Dashboard() {
             </select>
         </div>
 
-          <div className={`${bgSecondary} rounded-lg ${border} border overflow-hidden mb-6`} style={{ flex: '1 1 60%', minHeight: '400px' }}>
-            <div className={`px-4 py-3 ${border} border-b flex items-center justify-between`}>
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedUploadedFileIds.size === uploadedFiles.length && uploadedFiles.length > 0}
-                    onChange={handleSelectAllUploaded}
-                    className="form-checkbox h-4 w-4 text-orange-500 rounded"
-                  />
-                  <span className="text-orange-500 text-sm">📁</span>
-                  <h2 className={`text-sm font-medium ${textPrimary}`}>{t('dashboard.uploadedFiles')}</h2>
-                </div>
-                <p className={`text-xs ${textSecondary}`}>{t('dashboard.allFiles')}</p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => { /* Restart logic */ }} className={`flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs font-medium transition-colors`} title={t('dashboard.restart')}> 
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  {t('dashboard.restart')}
-                </button>
-                <button onClick={async () => { /* Delete logic */ }} className={`flex items-center gap-1.5 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium transition-colors`} title={t('common.delete')}> 
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {t('common.delete')}
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 200px)' }}>
-              {uploadedFiles.length === 0 ? (
-                <div className="px-4 py-8 text-center">
-                  <p className={`text-xs ${textSecondary}`}>{t('dashboard.noFilesYet')}</p>
-                </div>
-              ) : (
-                uploadedFiles.map((file) => (
-                  <div key={file.id} className={`px-4 py-3 ${border} border-b ${hover}`}>
-                    {/* File row content */}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <FileListTable
+            files={uploadedFiles}
+            selectedFileIds={selectedUploadedFileIds}
+            darkMode={darkMode}
+            onSelectFile={(fileId) => handleFileSelect(fileId, 'uploaded')}
+            onSelectAll={handleSelectAllUploaded}
+            onDeselectAll={() => setSelectedUploadedFileIds(new Set())}
+            onRemoveFile={handleRemoveFile}
+          />
         </div>
       </div>
     </div>
