@@ -157,7 +157,7 @@ export default function Dashboard() {
           if (!res.ok) continue;
 
           const data = await res.json();
-          const job = data.job;
+          const job = data;
 
           // Auto-restart logic: Check if job is stuck (no progress for too long)
           if (file.processingStartTime) {
