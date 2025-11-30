@@ -517,8 +517,6 @@ export default function Dashboard() {
       return;
     }
 
-    setError(null);
-
     console.log('[Process] ✅ All validations passed! Starting processing...');
     console.log('[Process] Files to process:', filesToProcess.map(f => ({ name: f.name, actions: f.actions, fileType: f.fileType, blobUrl: f.blobUrl })));
 
@@ -637,7 +635,7 @@ export default function Dashboard() {
 
       } catch (err: any) {
         console.error('[Process] ❌ Error:', err);
-        setError(`Error procesando ${file.name}: ${err.message}`);
+        showNotification(err.message, 'error');
         setUploadedFiles(prev => prev.map(f =>
           f.id === file.id ? { ...f, status: 'error' } : f
         ));
