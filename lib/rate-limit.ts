@@ -40,7 +40,7 @@ export const uploadRateLimit = redis
 export const processRateLimit = redis
   ? new Ratelimit({
       redis,
-      limiter: Ratelimit.slidingWindow(5, '1 h'), // 5 transcriptions per hour
+      limiter: Ratelimit.slidingWindow(1000000, '1 h'), // 1,000,000 transcriptions per hour
       analytics: true,
       prefix: '@annalogica/process',
     })
