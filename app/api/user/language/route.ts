@@ -70,11 +70,23 @@ export async function GET(request: NextRequest) {
       language
     });
 
-  } catch (error) {
-    console.error('Error getting language:', error);
+  } catch (error: any) {
+    console.error('[ERROR] /api/user/language GET:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      stack: error.stack?.split('\n')[0]
+    });
+
     return NextResponse.json(
-      { error: 'Error al obtener idioma' },
+      {
+        error: 'Error al obtener idioma',
+        debug: process.env.NODE_ENV === 'production' ? undefined : {
+          message: error.message,
+          code: error.code
+        }
+      },
       { status: 500 }
-      );
+    );
   }
 }

@@ -4,14 +4,16 @@ import { TranscriptionJobDB } from '@/lib/db';
 import ExcelJS from 'exceljs';
 
 /**
- * GET /api/export?format=csv|excel
+ * GET /api/export?format=csv|excel&jobId=xxx
  *
- * Exporta todos los archivos procesados del usuario en formato CSV o Excel
+ * Exporta archivos procesados del usuario en formato CSV o Excel
+ * - Si se especifica jobId, exporta solo ese archivo
+ * - Si no se especifica jobId, exporta todos los archivos del usuario
  *
  * Estructura de columnas:
  * A: Tipo (audio, video, documento)
  * B: Título del archivo
- * C: Transcripción
+ * C: Transcripción (solo si fue solicitada)
  * D: Resumen
  * E: Tags
  * F-K: Oradores 1-6 con título
@@ -28,12 +30,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get format from query params
+    // Get format and jobId from query params
     const { searchParams } = new URL(request.url);
     const format = searchParams.get('format') || 'excel';
+    const jobId = searchParams.get('jobId'); // Optional: export single file
 
-    // Get all processed jobs for this user
-    const jobs = await TranscriptionJobDB.findByUserId(auth.userId);
+    // Get processed jobs for this user
+    let jobs;
+    if (jobId) {
+      // Export single file
+      const job = await TranscriptionJobDB.findById(jobId);
+      if (!job || job.user_id !== auth.userId) {
+        return NextResponse.json(
+          { error: 'Archivo no encontrado o no autorizado' },
+          { status: 404 }
+        );
+      }
+      jobs = [job];
+    } else {
+      // Export all files
+      jobs = await TranscriptionJobDB.findByUserId(auth.userId);
+    }
 
     if (!jobs || jobs.length === 0) {
       return NextResponse.json(
@@ -50,8 +67,13 @@ export async function GET(request: NextRequest) {
         let tags: string[] = [];
         let speakers: Array<{ name: string; title?: string }> = [];
 
-        // Fetch transcription
-        if (job.txt_url) {
+        // 🔥 Obtener acciones solicitadas por el usuario
+        const requestedActions = (job.metadata as any)?.actions || [];
+        const wasTranscriptionRequested = requestedActions.includes('Transcribir');
+
+        // Fetch transcription SOLO si fue solicitada explícitamente
+        // Para documentos, NO incluir transcripción a menos que se pidió explícitamente
+        if (job.txt_url && wasTranscriptionRequested) {
           try {
             const res = await fetch(job.txt_url);
             transcription = await res.text();

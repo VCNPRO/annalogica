@@ -17,12 +17,13 @@ export interface UploadedFile {
   id: string;
   name: string;
   fileType: FileType;
-  fileSize: number;
+  fileSize?: number;
   date: string;
   status: FileStatus;
 
   // Upload state
   uploadProgress?: number;
+  mimeType?: string;
 
   // Pending state
   blobUrl?: string;
@@ -34,9 +35,21 @@ export interface UploadedFile {
   processingStartTime?: number;
   estimatedTimeRemaining?: number;
   audioDuration?: number;
+  lastProgressValue?: number;
+  lastProgressTime?: number;
+  stuckWarningShown?: boolean;
+  canRetry?: boolean;
 
   // Error state
+  error?: string;
   errorMessage?: string;
+
+  // Completed state - URLs to processed files
+  txt_url?: string;
+  srt_url?: string;
+  vtt_url?: string;
+  summary_url?: string;
+  speakers_url?: string;
 }
 
 /**

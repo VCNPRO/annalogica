@@ -1,0 +1,185 @@
+# ============================================
+# STRESS TEST CONFIGURATION - Artillery
+# ============================================
+#
+# Este archivo define pruebas de carga para Annalogica
+#
+# Uso:
+#   npm install -g artillery
+#   artillery run testing/stress-test.yml
+#
+# Prueba rápida (1 minuto):
+#   artillery quick --count 10 --num 20 https://annalogica.eu
+#
+# ============================================
+
+config:
+  target: "https://annalogica.eu"
+  # Para pruebas locales, cambia a: "http://localhost:3000"
+
+  phases:
+    # FASE 1: Warm-up (30 segundos)
+    - duration: 30
+      arrivalRate: 5  # 5 usuarios/segundo
+      name: "Warm-up - Carga baja"
+
+    # FASE 2: Ramp-up (60 segundos)
+    - duration: 60
+      arrivalRate: 5
+      rampTo: 25      # Incrementar gradualmente a 25 usuarios/seg
+      name: "Ramp-up - Incremento gradual"
+
+    # FASE 3: Sustained load (120 segundos)
+    - duration: 120
+      arrivalRate: 25  # 25 usuarios/segundo constantes
+      name: "Sustained load - Carga sostenida"
+
+    # FASE 4: Spike (30 segundos)
+    - duration: 30
+      arrivalRate: 50  # Pico de 50 usuarios/seg
+      name: "Spike - Pico de carga"
+
+    # FASE 5: Cool-down (30 segundos)
+    - duration: 30
+      arrivalRate: 50
+      rampTo: 5       # Reducir gradualmente
+      name: "Cool-down - Reducción gradual"
+
+  # Variables de entorno
+  variables:
+    testEmail: "loadtest@annalogica.eu"
+    testPassword: "LoadTest123!"
+
+  # Configuración HTTP
+  http:
+    timeout: 30
+    pool: 50  # Conexiones concurrentes
+
+  # Umbrales de éxito (SLA)
+  ensure:
+    maxErrorRate: 1          # Máximo 1% de errores
+    p95: 2000                # 95% de requests < 2 segundos
+    p99: 5000                # 99% de requests < 5 segundos
+
+scenarios:
+  # ============================================
+  # ESCENARIO 1: Navegación básica
+  # ============================================
+  - name: "Navegación y autenticación"
+    weight: 40  # 40% del tráfico
+    flow:
+      - get:
+          url: "/"
+          capture:
+            - json: "$.version"
+              as: "appVersion"
+
+      - get:
+          url: "/pricing"
+          expect:
+            - statusCode: 200
+
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ testEmail }}"
+            password: "{{ testPassword }}"
+          capture:
+            - header: "set-cookie"
+              as: "authCookie"
+          expect:
+            - statusCode: [200, 401]  # OK o credenciales inválidas
+
+      - think: 3  # Pausa de 3 segundos (simular usuario real)
+
+  # ============================================
+  # ESCENARIO 2: Upload de archivos
+  # ============================================
+  - name: "Upload y procesamiento"
+    weight: 30  # 30% del tráfico
+    flow:
+      # Login
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ testEmail }}"
+            password: "{{ testPassword }}"
+          capture:
+            - header: "set-cookie"
+              as: "authCookie"
+
+      # Simular upload (sin archivo real para stress test)
+      - get:
+          url: "/api/user/stats"
+          headers:
+            Cookie: "{{ authCookie }}"
+          expect:
+            - statusCode: [200, 401]
+
+      - think: 2
+
+  # ============================================
+  # ESCENARIO 3: Consulta de resultados
+  # ============================================
+  - name: "Consulta de jobs procesados"
+    weight: 20  # 20% del tráfico
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ testEmail }}"
+            password: "{{ testPassword }}"
+          capture:
+            - header: "set-cookie"
+              as: "authCookie"
+
+      - get:
+          url: "/api/processed-files"
+          headers:
+            Cookie: "{{ authCookie }}"
+          expect:
+            - statusCode: [200, 401]
+
+      - think: 1
+
+  # ============================================
+  # ESCENARIO 4: Admin dashboard
+  # ============================================
+  - name: "Admin panel"
+    weight: 10  # 10% del tráfico
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "admin@annalogica.eu"
+            password: "{{ testPassword }}"
+          capture:
+            - header: "set-cookie"
+              as: "adminCookie"
+
+      - get:
+          url: "/api/admin/stats"
+          headers:
+            Cookie: "{{ adminCookie }}"
+          expect:
+            - statusCode: [200, 401, 403]
+
+      - get:
+          url: "/api/admin/users"
+          headers:
+            Cookie: "{{ adminCookie }}"
+          expect:
+            - statusCode: [200, 401, 403]
+
+# ============================================
+# ESCENARIOS ADICIONALES (Heavy Load)
+# ============================================
+# Descomenta para pruebas más agresivas
+
+# - name: "Heavy API load"
+#   weight: 5
+#   flow:
+#     - loop:
+#       - get:
+#           url: "/api/health"
+#       count: 100  # 100 requests consecutivas

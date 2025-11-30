@@ -65,7 +65,7 @@ const transcribeFile = inngest.createFunction(
         throw new Error(`Job ${jobId} no encontrado en la base de datos`);
       }
 
-      console.log('[transcribe] Job encontrado:', { jobId, filename: job.filename });
+      console.log('[transcribe] Job encontrado:', { jobId, filename: job.filename, language: job.language });
 
       return {
         audioUrl: job.audio_url,
@@ -140,7 +140,7 @@ const transcribeFile = inngest.createFunction(
           transcriptionParams.language = language;
           console.log('[transcribe] Usando idioma especificado:', language);
         } else {
-          console.log('[transcribe] Usando deteccion automatica de idioma');
+          console.log('[transcribe] Usando detección automática de idioma');
         }
 
         const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams);

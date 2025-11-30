@@ -1,0 +1,210 @@
+name: 🏥 Health Check & Error Detection
+
+# Monitoreo continuo cada 15 minutos
+# Detecta errores y envía alertas inmediatas
+
+on:
+  schedule:
+    # Cada 15 minutos
+    - cron: '*/15 * * * *'
+  workflow_dispatch:  # Manual
+
+env:
+  ALERT_EMAIL: 'santi@annalogica.eu'
+  PRODUCTION_URL: 'https://annalogica.eu'
+
+jobs:
+  health-check:
+    name: 🏥 Production Health Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: 🏥 Check /api/health endpoint
+        id: health_check
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" ${{ env.PRODUCTION_URL }}/api/health)
+          echo "health_status=$RESPONSE" >> $GITHUB_OUTPUT
+
+          if [ "$RESPONSE" != "200" ]; then
+            echo "::error::Health check falló con código $RESPONSE"
+            echo "healthy=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Health check OK (200)"
+            echo "healthy=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🌐 Check homepage
+        id: homepage_check
+        run: |
+          START_TIME=$(date +%s%3N)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}:%{time_total}" ${{ env.PRODUCTION_URL }}/)
+          END_TIME=$(date +%s%3N)
+
+          HTTP_CODE=$(echo $RESPONSE | cut -d: -f1)
+          RESPONSE_TIME=$(echo $RESPONSE | cut -d: -f2)
+
+          echo "homepage_status=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "homepage_time=$RESPONSE_TIME" >> $GITHUB_OUTPUT
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Homepage falló con código $HTTP_CODE"
+            echo "homepage_ok=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Homepage OK (200) - ${RESPONSE_TIME}s"
+            echo "homepage_ok=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🔍 Check recent errors (via API)
+        id: error_check
+        run: |
+          # Intentar obtener errores recientes del endpoint de admin
+          # Si tienes un endpoint público de health que devuelva error count, úsalo aquí
+          echo "error_count=0" >> $GITHUB_OUTPUT
+
+      - name: 📊 Performance check
+        id: performance
+        run: |
+          # Verificar tiempo de respuesta de varios endpoints
+          declare -a ENDPOINTS=("/api/health" "/api/version" "/pricing")
+          SLOW_ENDPOINTS=()
+
+          for endpoint in "${ENDPOINTS[@]}"; do
+            RESPONSE_TIME=$(curl -s -o /dev/null -w "%{time_total}" ${{ env.PRODUCTION_URL }}$endpoint)
+            echo "Endpoint $endpoint: ${RESPONSE_TIME}s"
+
+            # Si demora más de 3 segundos, es lento
+            if (( $(echo "$RESPONSE_TIME > 3.0" | bc -l) )); then
+              SLOW_ENDPOINTS+=("$endpoint (${RESPONSE_TIME}s)")
+            fi
+          done
+
+          if [ ${#SLOW_ENDPOINTS[@]} -gt 0 ]; then
+            echo "::warning::Endpoints lentos detectados: ${SLOW_ENDPOINTS[*]}"
+            echo "slow_endpoints=${SLOW_ENDPOINTS[*]}" >> $GITHUB_OUTPUT
+            echo "performance_ok=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Performance OK - todos los endpoints <3s"
+            echo "performance_ok=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🚨 Create incident if health check failed
+        if: steps.health_check.outputs.healthy == 'false' || steps.homepage_check.outputs.homepage_ok == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '🚨 ALERTA: Annalogica Health Check Failed';
+            const body = `
+            ## 🚨 INCIDENTE DE PRODUCCIÓN
+
+            **Fecha:** ${new Date().toISOString()}
+            **Severidad:** ALTA
+
+            ### Estado de los Checks:
+            - Health API: ${{ steps.health_check.outputs.health_status }}
+            - Homepage: ${{ steps.homepage_check.outputs.homepage_status }}
+            - Performance: ${{ steps.performance.outputs.performance_ok }}
+
+            ### Acción Requerida:
+            1. Verificar logs de Vercel
+            2. Revisar status de servicios externos (OpenAI, Vercel Postgres)
+            3. Verificar deployment reciente
+
+            ### Enlaces:
+            - [Vercel Dashboard](https://vercel.com/solammedia-9886s-projects/annalogica)
+            - [GitHub Actions](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['incident', 'high-priority', 'production']
+            });
+
+      - name: 📧 Send alert email
+        if: steps.health_check.outputs.healthy == 'false' || steps.homepage_check.outputs.homepage_ok == 'false'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.resend.com
+          server_port: 465
+          secure: true
+          username: resend
+          password: ${{ secrets.RESEND_API_KEY }}
+          subject: "🚨 ALERTA CRÍTICA: Annalogica Health Check Failed"
+          to: ${{ env.ALERT_EMAIL }}
+          from: Annalogica Monitoring <alerts@annalogica.eu>
+          body: |
+            🚨 ALERTA CRÍTICA - ACCIÓN INMEDIATA REQUERIDA
+
+            Hola Santi,
+
+            El sistema de monitoreo ha detectado un problema crítico en producción.
+
+            📊 ESTADO DEL SISTEMA:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Health API: ${{ steps.health_check.outputs.health_status }}
+            Homepage: ${{ steps.homepage_check.outputs.homepage_status }} (${{ steps.homepage_check.outputs.homepage_time }}s)
+            Performance: ${{ steps.performance.outputs.performance_ok }}
+
+            ⏰ DETECCIÓN:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+            🔗 ACCIONES INMEDIATAS:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            1. Vercel Dashboard: https://vercel.com/solammedia-9886s-projects/annalogica
+            2. Logs detallados: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            3. Verificar servicios: OpenAI, Vercel Postgres, Stripe
+
+            Este es un mensaje automático del sistema de monitoreo.
+
+            ---
+            Annalogica Health Monitoring System
+            https://annalogica.eu
+
+      - name: ⚠️ Send performance warning
+        if: steps.performance.outputs.performance_ok == 'false' && steps.health_check.outputs.healthy == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.resend.com
+          server_port: 465
+          secure: true
+          username: resend
+          password: ${{ secrets.RESEND_API_KEY }}
+          subject: "⚠️ Annalogica: Performance Degradation Detected"
+          to: ${{ env.ALERT_EMAIL }}
+          from: Annalogica Monitoring <alerts@annalogica.eu>
+          body: |
+            ⚠️ ADVERTENCIA DE PERFORMANCE
+
+            Hola Santi,
+
+            Se ha detectado degradación en el rendimiento de algunos endpoints.
+
+            📊 ENDPOINTS LENTOS:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            ${{ steps.performance.outputs.slow_endpoints }}
+
+            ⏰ DETECCIÓN:
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+            El sistema sigue operativo pero con tiempos de respuesta elevados (>3s).
+
+            Considera revisar:
+            - Uso de CPU/Memoria en Vercel
+            - Conexiones a base de datos
+            - Caché y CDN
+
+            ---
+            Annalogica Performance Monitoring
