@@ -185,7 +185,7 @@ export default function Dashboard() {
           // Check if this is a document (PDF, DOCX, TXT)
           const isDocument = file.fileType === 'text' || job.metadata?.isDocument;
 
-          if (job.status === 'processing' || job.status === 'transcribed') {
+          if (job.status === 'processing' || job.status === 'transcribed' || job.status === 'transcribing') {
             newStatus = 'processing';
 
             // Set processing start time if not already set

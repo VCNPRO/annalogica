@@ -175,7 +175,7 @@ export default function ProcessedFilesPage() {
     // Status filter
     if (filterStatus !== 'all') {
       if (filterStatus === 'completed' && job.status !== 'completed') return false;
-      if (filterStatus === 'processing' && !['pending', 'processing', 'transcribed', 'summarized'].includes(job.status)) return false;
+      if (filterStatus === 'processing' && !['pending', 'processing', 'transcribed', 'summarized', 'transcribing'].includes(job.status)) return false;
       if (filterStatus === 'failed' && job.status !== 'failed') return false;
     }
 
