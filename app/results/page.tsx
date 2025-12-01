@@ -66,7 +66,7 @@ export default function Results() {
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm ${textPrimary} truncate`}>{file.name}</p>
                       {/* METADATA DISPLAY */}
-                      {(file.metadata?.speakers?.length > 0 || file.metadata?.tags?.length > 0) && (
+                      {(file.metadata?.speakers?.length > 0 || file.tags?.length > 0) && (
                         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                           {file.metadata?.speakers?.length > 0 && (
                             <span className="flex items-center gap-1 text-zinc-400">
@@ -74,10 +74,10 @@ export default function Results() {
                               {file.metadata.speakers.join(', ')}
                             </span>
                           )}
-                          {file.metadata?.speakers?.length > 0 && file.metadata?.tags?.length > 0 && (
+                          {file.metadata?.speakers?.length > 0 && file.tags?.length > 0 && (
                             <span className="text-zinc-600">|</span>
                           )}
-                          {file.metadata?.tags?.map((tag: string) => (
+                          {file.tags?.map((tag: string) => (
                             <span key={tag} className="px-2 py-0.5 bg-purple-900/50 text-purple-300 rounded-full">
                               {tag}
                             </span>

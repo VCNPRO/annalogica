@@ -429,9 +429,9 @@ export default function ProcessedFilesPage() {
       }
 
       // Solo descargar tags si se pidió "Aplicar Tags" o si no hay acciones definidas
-      if (job.metadata?.tags && (job.metadata?.tags as string[]).length > 0 && shouldDownload('Aplicar Tags')) {
+      if (job.tags && (job.tags as string[]).length > 0 && shouldDownload('Aplicar Tags')) {
         downloadTasks.push(async () => {
-          const tags = (job.metadata?.tags as string[]) || [];
+          const tags = (job.tags as string[]) || [];
           const tagsText = `Tags para: ${job.filename}\n\n- ${tags.join('\n- ')}`;
           const blob = await generatePdf('Tags', tagsText, job.filename);
           const handle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
@@ -1081,11 +1081,11 @@ export default function ProcessedFilesPage() {
                                     )}
 
                                     {/* Solo mostrar tags si se pidió "Aplicar Tags" o si no hay acciones definidas */}
-                                    {job.metadata?.tags && (job.metadata?.tags as string[]).length > 0 && shouldShow('Aplicar Tags') && (
+                                    {job.tags && (job.tags as string[]).length > 0 && shouldShow('Aplicar Tags') && (
                                       <button
                                         onClick={async () => {
                                           try {
-                                            const tags = (job.metadata?.tags as string[]) || [];
+                                            const tags = (job.tags as string[]) || [];
                                             const tagsText = `Tags para: ${job.filename}\n\n- ${tags.join('\n- ')}`;
                                             const pdfBlob = await generatePdf('Tags', tagsText, job.filename);
                                             triggerDownload(pdfBlob, `${baseFilename}-tags.pdf`);

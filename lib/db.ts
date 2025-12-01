@@ -39,6 +39,7 @@ export interface TranscriptionJob {
   vtt_url: string | null;
   speakers_url: string | null;
   summary_url: string | null;
+  tags: string[] | null; // Array of generated tags
   error_message: string | null;
   retry_count: number;
   max_retries: number;

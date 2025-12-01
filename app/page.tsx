@@ -824,8 +824,8 @@ export default function Dashboard() {
       }
       
       // Download Tags
-      if (job.metadata?.tags && job.metadata.tags.length > 0) {
-        const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
+      if (job.tags && job.tags.length > 0) {
+        const tagsText = `Tags para: ${file.name}\n\n- ${job.tags.join('\n- ')}`;
         if (format === 'pdf' || format === 'both') {
           const pdfBlob = await generatePdf('Tags', tagsText, file.name);
           const pdfHandle = await folderHandle.getFileHandle(`${baseName}-tags.pdf`, { create: true });
@@ -920,8 +920,8 @@ export default function Dashboard() {
     }
 
     // Download Tags
-    if (job.metadata?.tags && job.metadata.tags.length > 0) {
-      const tagsText = `Tags para: ${file.name}\n\n- ${job.metadata.tags.join('\n- ')}`;
+    if (job.tags && job.tags.length > 0) {
+      const tagsText = `Tags para: ${file.name}\n\n- ${job.tags.join('\n- ')}`;
       if (format === 'pdf' || format === 'both') {
         const pdfBlob = await generatePdf('Tags', tagsText, file.name);
         triggerDownload(pdfBlob, `${baseName}-tags.pdf`);

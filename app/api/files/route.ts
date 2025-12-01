@@ -25,6 +25,7 @@ export async function GET(request: Request) {
         audioDuration: job.audio_duration_seconds,
         jobId: job.id,
         status: job.status, // Include status for UI
+        tags: job.tags || [], // Include generated tags
         metadata: job.metadata,
     }));
 

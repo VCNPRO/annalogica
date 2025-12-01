@@ -92,10 +92,11 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Extract tags from metadata
+        // Extract tags from job
+        tags = job.tags || [];
+
         if (job.metadata && typeof job.metadata === 'object') {
           const metadata = job.metadata as any;
-          tags = metadata.tags || [];
 
           // Parse speakers from speakers_url if available
           if (job.speakers_url) {
