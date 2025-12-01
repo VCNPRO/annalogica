@@ -33,8 +33,9 @@ interface Job {
   vtt_url?: string;
   summary_url?: string;
   speakers_url?: string;
+  tags?: string[];
   metadata?: {
-    tags?: string[];
+    speakers?: string[];
   };
 }
 
