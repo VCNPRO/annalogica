@@ -21,12 +21,13 @@ interface ProcessedJob {
   summary_url?: string;
   speakers_url?: string;
   audio_url?: string; // 🔥 Add audio_url
+  tags?: string[]; // Tags array
   metadata?: {
-    tags?: string[];
     excelUrl?: string;
     pdfUrl?: string;
     fileType?: 'audio' | 'document';
     ttsUrl?: string; // 🔥 Add ttsUrl
+    speakers?: string[]; // Speakers array
   };
 }
 
