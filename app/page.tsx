@@ -392,6 +392,8 @@ export default function Dashboard() {
             },
           });
 
+          console.log('[Process] Vercel Blob upload response:', blob); // AGREGADO PARA DEPURACIÓN
+
           // Update with blobUrl
           setUploadedFiles(prev => prev.map(f =>
             f.id === fileId ? { ...f, uploadProgress: 100, status: 'pending', blobUrl: blob.url } : f
