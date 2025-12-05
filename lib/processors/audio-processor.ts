@@ -1,7 +1,8 @@
 // lib/processors/audio-processor.ts
-// Direct audio processing with Deepgram + OpenAI
+// Hybrid audio processing: Speechmatics (eu, gl) + Deepgram (rest) + OpenAI
 import OpenAI from 'openai';
 import { createClient } from '@deepgram/sdk';
+import { BatchClient } from '@speechmatics/batch-client';
 import { put, del } from '@vercel/blob';
 import { sql } from '@vercel/postgres';
 import {
@@ -24,6 +25,13 @@ const openai = process.env.OPENAI_API_KEY
 
 const deepgram = process.env.DEEPGRAM_API_KEY
   ? createClient(process.env.DEEPGRAM_API_KEY)
+  : null;
+
+const speechmatics = process.env.SPEECHMATICS_API_KEY
+  ? new BatchClient({
+      apiKey: process.env.SPEECHMATICS_API_KEY,
+      appId: 'annalogica'
+    })
   : null;
 
 // Helper functions for subtitles
@@ -53,9 +61,7 @@ export async function processAudioFile(jobId: string): Promise<void> {
     throw new Error('OpenAI API key not configured');
   }
 
-  if (!deepgram) {
-    throw new Error('Deepgram API key not configured');
-  }
+  // Note: deepgram and speechmatics are checked later based on language
 
   try {
     console.log('[AudioProcessor] Starting processing for job:', jobId);
@@ -119,86 +125,196 @@ export async function processAudioFile(jobId: string): Promise<void> {
       throw new Error(errorMsg);
     }
 
-    // STEP 2: Transcribe with Deepgram Nova-3
-    console.log('[AudioProcessor] Starting Deepgram transcription...');
+    // STEP 2: Transcribe with Speechmatics (eu, gl) or Deepgram (rest)
+    const useSprechmatics = jobLanguage === 'eu' || jobLanguage === 'gl';
+    const serviceName = useSprechmatics ? 'Speechmatics' : 'Deepgram';
+
+    console.log(`[AudioProcessor] Starting ${serviceName} transcription...`, {
+      language: jobLanguage,
+      reason: useSprechmatics ? 'Basque/Galician language' : 'Standard language'
+    });
+
     let transcriptionText: string;
     let transcriptionDuration: number;
     let transcriptionSegments: any[];
 
-    try {
-      // Build Deepgram transcription params
-      const deepgramOptions: any = {
-        model: 'nova-3',
-        smart_format: true,
-        diarize: true,
-        utterances: true,
-        punctuate: true
-      };
-
-      // Only add language if not auto-detection
-      if (jobLanguage && jobLanguage !== 'auto') {
-        deepgramOptions.language = jobLanguage;
-        console.log('[AudioProcessor] Using specified language:', jobLanguage);
-      } else {
-        console.log('[AudioProcessor] Using automatic language detection');
+    if (useSprechmatics) {
+      // SPEECHMATICS PATH (for eu, gl)
+      if (!speechmatics) {
+        throw new Error('Speechmatics API key not configured (required for Basque/Galician)');
       }
 
-      // Call Deepgram API with URL (no need to download file)
-      const { result, error } = await deepgram.listen.prerecorded.transcribeUrl(
-        { url: audioUrl },
-        deepgramOptions
-      );
+      try {
+        // Call Speechmatics Batch API with URL
+        const response = await speechmatics.transcribe(
+          { url: audioUrl },
+          {
+            transcription_config: {
+              language: jobLanguage,
+              operating_point: 'enhanced',
+              diarization: 'speaker',
+              enable_entities: false
+            }
+          },
+          'json-v2'
+        );
 
-      if (error) {
-        throw new Error(`Deepgram API error: ${error.message}`);
-      }
-
-      if (!result) {
-        throw new Error('Deepgram returned empty result');
-      }
-
-      // Extract transcription data from Deepgram response
-      const channel = result.results?.channels?.[0];
-      const alternative = channel?.alternatives?.[0];
-
-      if (!alternative) {
-        throw new Error('No transcription alternative found in Deepgram response');
-      }
-
-      transcriptionText = alternative.transcript || '';
-      transcriptionDuration = result.metadata?.duration || 0;
-      transcriptionSegments = result.results?.utterances || [];
-
-      console.log('[AudioProcessor] ✅ Deepgram transcription completed:', {
-        duration: `${transcriptionDuration}s`,
-        utterances: transcriptionSegments.length,
-        textLength: transcriptionText.length,
-        confidence: alternative.confidence
-      });
-
-      await updateTranscriptionProgress(jobId, 50);
-    } catch (error: any) {
-      const errorMsg = `Deepgram transcription failed: ${error.message}`;
-      await trackError(
-        'deepgram_transcription_error',
-        'critical',
-        errorMsg,
-        error,
-        {
-          userId,
-          metadata: {
-            jobId,
-            fileName,
-            audioUrl: audioUrl.substring(0, 100),
-            language: jobLanguage,
-            step: 'STEP 2: Deepgram Transcription',
-            errorType: error.constructor.name,
-            deepgramError: error.response?.data || error.message
-          }
+        // Type guard: ensure response is an object with results
+        if (!response || typeof response === 'string' || !('results' in response)) {
+          throw new Error('Speechmatics returned invalid response format');
         }
-      );
-      await markTranscriptionError(jobId, errorMsg);
-      throw new Error(errorMsg);
+
+        if (!response.results) {
+          throw new Error('Speechmatics returned empty result');
+        }
+
+        // Extract transcription from Speechmatics response
+        const words = response.results || [];
+        transcriptionText = words
+          .map((word: any) => word.alternatives?.[0]?.content || '')
+          .join(' ')
+          .trim();
+
+        // Calculate duration from last word end time
+        const lastWord = words[words.length - 1];
+        transcriptionDuration = lastWord?.end_time || 0;
+
+        // Group words into utterances by speaker
+        const utteranceMap = new Map<number, any>();
+        words.forEach((word: any) => {
+          const speaker = word.speaker || 0;
+          if (!utteranceMap.has(speaker)) {
+            utteranceMap.set(speaker, {
+              speaker,
+              start: word.start_time,
+              end: word.end_time,
+              words: []
+            });
+          }
+          const utterance = utteranceMap.get(speaker)!;
+          utterance.end = word.end_time;
+          utterance.words.push(word.alternatives?.[0]?.content || '');
+        });
+
+        transcriptionSegments = Array.from(utteranceMap.values()).map(u => ({
+          speaker: u.speaker,
+          start: u.start,
+          end: u.end,
+          transcript: u.words.join(' ')
+        }));
+
+        console.log('[AudioProcessor] ✅ Speechmatics transcription completed:', {
+          duration: `${transcriptionDuration}s`,
+          utterances: transcriptionSegments.length,
+          textLength: transcriptionText.length,
+          wordsCount: words.length
+        });
+
+        await updateTranscriptionProgress(jobId, 50);
+      } catch (error: any) {
+        const errorMsg = `Speechmatics transcription failed: ${error.message}`;
+        await trackError(
+          'speechmatics_transcription_error',
+          'critical',
+          errorMsg,
+          error,
+          {
+            userId,
+            metadata: {
+              jobId,
+              fileName,
+              audioUrl: audioUrl.substring(0, 100),
+              language: jobLanguage,
+              step: 'STEP 2: Speechmatics Transcription',
+              errorType: error.constructor.name,
+              speechmaticsError: error.response?.data || error.message
+            }
+          }
+        );
+        await markTranscriptionError(jobId, errorMsg);
+        throw new Error(errorMsg);
+      }
+    } else {
+      // DEEPGRAM PATH (for all other languages)
+      if (!deepgram) {
+        throw new Error('Deepgram API key not configured');
+      }
+
+      try {
+        // Build Deepgram transcription params
+        const deepgramOptions: any = {
+          model: 'nova-3',
+          smart_format: true,
+          diarize: true,
+          utterances: true,
+          punctuate: true
+        };
+
+        // Only add language if not auto-detection
+        if (jobLanguage && jobLanguage !== 'auto') {
+          deepgramOptions.language = jobLanguage;
+          console.log('[AudioProcessor] Using specified language:', jobLanguage);
+        } else {
+          console.log('[AudioProcessor] Using automatic language detection');
+        }
+
+        // Call Deepgram API with URL (no need to download file)
+        const { result, error } = await deepgram.listen.prerecorded.transcribeUrl(
+          { url: audioUrl },
+          deepgramOptions
+        );
+
+        if (error) {
+          throw new Error(`Deepgram API error: ${error.message}`);
+        }
+
+        if (!result) {
+          throw new Error('Deepgram returned empty result');
+        }
+
+        // Extract transcription data from Deepgram response
+        const channel = result.results?.channels?.[0];
+        const alternative = channel?.alternatives?.[0];
+
+        if (!alternative) {
+          throw new Error('No transcription alternative found in Deepgram response');
+        }
+
+        transcriptionText = alternative.transcript || '';
+        transcriptionDuration = result.metadata?.duration || 0;
+        transcriptionSegments = result.results?.utterances || [];
+
+        console.log('[AudioProcessor] ✅ Deepgram transcription completed:', {
+          duration: `${transcriptionDuration}s`,
+          utterances: transcriptionSegments.length,
+          textLength: transcriptionText.length,
+          confidence: alternative.confidence
+        });
+
+        await updateTranscriptionProgress(jobId, 50);
+      } catch (error: any) {
+        const errorMsg = `Deepgram transcription failed: ${error.message}`;
+        await trackError(
+          'deepgram_transcription_error',
+          'critical',
+          errorMsg,
+          error,
+          {
+            userId,
+            metadata: {
+              jobId,
+              fileName,
+              audioUrl: audioUrl.substring(0, 100),
+              language: jobLanguage,
+              step: 'STEP 2: Deepgram Transcription',
+              errorType: error.constructor.name,
+              deepgramError: error.response?.data || error.message
+            }
+          }
+        );
+        await markTranscriptionError(jobId, errorMsg);
+        throw new Error(errorMsg);
+      }
     }
 
     // STEP 3-5: Process speakers, summary, and tags in PARALLEL (optimization)
