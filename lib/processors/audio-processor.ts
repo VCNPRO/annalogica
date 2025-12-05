@@ -1,6 +1,7 @@
 // lib/processors/audio-processor.ts
-// Direct audio processing without Inngest
+// Direct audio processing with Deepgram + OpenAI
 import OpenAI from 'openai';
+import { createClient } from '@deepgram/sdk';
 import { put, del } from '@vercel/blob';
 import { sql } from '@vercel/postgres';
 import {
@@ -19,6 +20,10 @@ import { trackError } from '@/lib/error-tracker';
 
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+const deepgram = process.env.DEEPGRAM_API_KEY
+  ? createClient(process.env.DEEPGRAM_API_KEY)
   : null;
 
 // Helper functions for subtitles
@@ -46,6 +51,10 @@ function formatTimeVTT(seconds: number): string {
 export async function processAudioFile(jobId: string): Promise<void> {
   if (!openai) {
     throw new Error('OpenAI API key not configured');
+  }
+
+  if (!deepgram) {
+    throw new Error('Deepgram API key not configured');
   }
 
   try {
@@ -80,57 +89,18 @@ export async function processAudioFile(jobId: string): Promise<void> {
     // Update progress: 10%
     await updateTranscriptionProgress(jobId, 10);
 
-    // STEP 1: Download audio
-    console.log('[AudioProcessor] Downloading audio:', fileName);
-    let audioFileForWhisper: any;
+    // STEP 1: Validate audio URL (Deepgram works directly with URLs, no download needed)
+    console.log('[AudioProcessor] Validating audio URL:', fileName);
     try {
-      const response = await fetch(audioUrl);
-      if (!response.ok) {
-        const errorMsg = `Failed to download audio: HTTP ${response.status} ${response.statusText}`;
-        await trackError(
-          'audio_download_failed',
-          'high',
-          errorMsg,
-          new Error(errorMsg),
-          {
-            userId,
-            metadata: {
-              jobId,
-              fileName,
-              audioUrl: audioUrl.substring(0, 100),
-              httpStatus: response.status,
-              httpStatusText: response.statusText,
-              step: 'STEP 1: Download Audio'
-            }
-          }
-        );
-        throw new Error(errorMsg);
+      if (!audioUrl || !audioUrl.startsWith('http')) {
+        throw new Error('Invalid audio URL format');
       }
-
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = Buffer.from(arrayBuffer);
-
-      // Use Node.js 18+ File API for OpenAI compatibility
-      const { File } = await import('node:buffer');
-      audioFileForWhisper = new File(
-        [audioBuffer],
-        fileName,
-        {
-          type: response.headers.get('content-type') || 'audio/mpeg'
-        }
-      );
-
-      const audioSizeMB = (audioBuffer.length / 1024 / 1024).toFixed(2);
-      console.log('[AudioProcessor] ✅ Audio downloaded:', {
-        size: `${audioSizeMB} MB`,
-        type: audioFileForWhisper.type
-      });
-
+      console.log('[AudioProcessor] ✅ Audio URL validated');
       await updateTranscriptionProgress(jobId, 20);
     } catch (error: any) {
-      const errorMsg = `Audio download failed: ${error.message}`;
+      const errorMsg = `Audio URL validation failed: ${error.message}`;
       await trackError(
-        'audio_download_error',
+        'audio_url_validation_error',
         'critical',
         errorMsg,
         error,
@@ -140,7 +110,7 @@ export async function processAudioFile(jobId: string): Promise<void> {
             jobId,
             fileName,
             audioUrl: audioUrl.substring(0, 100),
-            step: 'STEP 1: Download Audio',
+            step: 'STEP 1: Validate Audio URL',
             errorType: error.constructor.name
           }
         }
@@ -149,46 +119,68 @@ export async function processAudioFile(jobId: string): Promise<void> {
       throw new Error(errorMsg);
     }
 
-    // STEP 2: Transcribe with Whisper
-    console.log('[AudioProcessor] Starting Whisper transcription...');
+    // STEP 2: Transcribe with Deepgram Nova-3
+    console.log('[AudioProcessor] Starting Deepgram transcription...');
     let transcriptionText: string;
     let transcriptionDuration: number;
     let transcriptionSegments: any[];
 
     try {
-      // Build transcription params
-      const transcriptionParams: any = {
-        file: audioFileForWhisper,
-        model: "whisper-1",
-        response_format: "verbose_json",
-        timestamp_granularities: ["segment", "word"]
+      // Build Deepgram transcription params
+      const deepgramOptions: any = {
+        model: 'nova-3',
+        smart_format: true,
+        diarize: true,
+        utterances: true,
+        punctuate: true
       };
 
       // Only add language if not auto-detection
       if (jobLanguage && jobLanguage !== 'auto') {
-        transcriptionParams.language = jobLanguage;
+        deepgramOptions.language = jobLanguage;
         console.log('[AudioProcessor] Using specified language:', jobLanguage);
       } else {
         console.log('[AudioProcessor] Using automatic language detection');
       }
 
-      const transcriptionResponse = await openai.audio.transcriptions.create(transcriptionParams) as any;
+      // Call Deepgram API with URL (no need to download file)
+      const { result, error } = await deepgram.listen.prerecorded.transcribeUrl(
+        { url: audioUrl },
+        deepgramOptions
+      );
 
-      transcriptionText = transcriptionResponse.text;
-      transcriptionDuration = transcriptionResponse.duration;
-      transcriptionSegments = transcriptionResponse.segments;
+      if (error) {
+        throw new Error(`Deepgram API error: ${error.message}`);
+      }
 
-      console.log('[AudioProcessor] ✅ Transcription completed:', {
+      if (!result) {
+        throw new Error('Deepgram returned empty result');
+      }
+
+      // Extract transcription data from Deepgram response
+      const channel = result.results?.channels?.[0];
+      const alternative = channel?.alternatives?.[0];
+
+      if (!alternative) {
+        throw new Error('No transcription alternative found in Deepgram response');
+      }
+
+      transcriptionText = alternative.transcript || '';
+      transcriptionDuration = result.metadata?.duration || 0;
+      transcriptionSegments = result.results?.utterances || [];
+
+      console.log('[AudioProcessor] ✅ Deepgram transcription completed:', {
         duration: `${transcriptionDuration}s`,
-        segments: transcriptionSegments?.length || 0,
-        textLength: transcriptionText.length
+        utterances: transcriptionSegments.length,
+        textLength: transcriptionText.length,
+        confidence: alternative.confidence
       });
 
       await updateTranscriptionProgress(jobId, 50);
     } catch (error: any) {
-      const errorMsg = `Whisper transcription failed: ${error.message}`;
+      const errorMsg = `Deepgram transcription failed: ${error.message}`;
       await trackError(
-        'whisper_transcription_error',
+        'deepgram_transcription_error',
         'critical',
         errorMsg,
         error,
@@ -197,12 +189,11 @@ export async function processAudioFile(jobId: string): Promise<void> {
           metadata: {
             jobId,
             fileName,
-            audioSizeMB: audioFileForWhisper?.size ? (audioFileForWhisper.size / 1024 / 1024).toFixed(2) : 'unknown',
-            audioType: audioFileForWhisper?.type,
+            audioUrl: audioUrl.substring(0, 100),
             language: jobLanguage,
-            step: 'STEP 2: Whisper Transcription',
+            step: 'STEP 2: Deepgram Transcription',
             errorType: error.constructor.name,
-            openAIError: error.response?.data || error.message
+            deepgramError: error.response?.data || error.message
           }
         }
       );
@@ -282,22 +273,24 @@ export async function processAudioFile(jobId: string): Promise<void> {
     });
     await updateTranscriptionProgress(jobId, 85);
 
-    // STEP 6: Generate subtitles (SRT and VTT)
+    // STEP 6: Generate subtitles (SRT and VTT) from Deepgram utterances
     console.log('[AudioProcessor] Generating subtitles...');
-    const segments = transcriptionSegments || [];
+    const utterances = transcriptionSegments || [];
 
-    // Generate SRT
-    const srtContent = segments.map((segment: any, index: number) => {
-      const startTime = formatTimeSRT(segment.start);
-      const endTime = formatTimeSRT(segment.end);
-      return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
+    // Generate SRT from Deepgram utterances
+    const srtContent = utterances.map((utterance: any, index: number) => {
+      const startTime = formatTimeSRT(utterance.start);
+      const endTime = formatTimeSRT(utterance.end);
+      const speakerLabel = utterance.speaker !== undefined ? `Speaker ${utterance.speaker}` : 'Speaker';
+      return `${index + 1}\n${startTime} --> ${endTime}\n${speakerLabel}: ${utterance.transcript.trim()}\n`;
     }).join('\n');
 
-    // Generate VTT
-    const vttContent = 'WEBVTT\n\n' + segments.map((segment: any, index: number) => {
-      const startTime = formatTimeVTT(segment.start);
-      const endTime = formatTimeVTT(segment.end);
-      return `${index + 1}\n${startTime} --> ${endTime}\n${segment.text.trim()}\n`;
+    // Generate VTT from Deepgram utterances
+    const vttContent = 'WEBVTT\n\n' + utterances.map((utterance: any, index: number) => {
+      const startTime = formatTimeVTT(utterance.start);
+      const endTime = formatTimeVTT(utterance.end);
+      const speakerLabel = utterance.speaker !== undefined ? `Speaker ${utterance.speaker}` : 'Speaker';
+      return `${index + 1}\n${startTime} --> ${endTime}\n<v ${speakerLabel}>${utterance.transcript.trim()}</v>\n`;
     }).join('\n');
 
     // Upload subtitles to blob

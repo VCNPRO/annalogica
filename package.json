@@ -13,7 +13,7 @@
     "test": "jest --ci --coverage --silent"
   },
   "dependencies": {
-    "@deepgram/sdk": "^3.3.4",
+    "@deepgram/sdk": "^3.13.0",
     "@google/generative-ai": "^0.24.1",
     "@sentry/nextjs": "^8.48.0",
     "@stripe/stripe-js": "^8.0.0",
