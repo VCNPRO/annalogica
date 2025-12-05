@@ -49,6 +49,8 @@ export default function ProcessedFilesPage() {
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
   const [translatingJob, setTranslatingJob] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState('en');
+  const [showTranslateModal, setShowTranslateModal] = useState(false);
+  const [jobToTranslate, setJobToTranslate] = useState<ProcessedJob | null>(null);
   const [userStats, setUserStats] = useState<{
     total: number;
     completed: number;
@@ -586,6 +588,71 @@ export default function ProcessedFilesPage() {
     }
   };
 
+  const handleTranslate = async () => {
+    if (!jobToTranslate) return;
+
+    setTranslatingJob(jobToTranslate.id);
+    setShowTranslateModal(false);
+
+    try {
+      showNotification('Traduciendo... Esto puede tardar un momento', 'info');
+
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          jobId: jobToTranslate.id,
+          targetLanguage
+        })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Error al traducir');
+      }
+
+      const data = await res.json();
+
+      // Descargar el PDF traducido automáticamente
+      if (data.pdfUrl) {
+        const pdfRes = await fetch(data.pdfUrl);
+        const pdfBlob = await pdfRes.blob();
+        triggerDownload(pdfBlob, data.filename);
+      }
+
+      showNotification(`✅ Traducción completada a ${getLanguageName(targetLanguage)}`, 'success');
+    } catch (err: any) {
+      console.error('Error al traducir:', err);
+      showNotification(`Error al traducir: ${err.message}`, 'error');
+    } finally {
+      setTranslatingJob(null);
+      setJobToTranslate(null);
+    }
+  };
+
+  const getLanguageName = (code: string): string => {
+    const languages: Record<string, string> = {
+      'en': 'Inglés',
+      'es': 'Español',
+      'ca': 'Catalán',
+      'eu': 'Euskera',
+      'gl': 'Gallego',
+      'pt': 'Portugués',
+      'fr': 'Francés',
+      'de': 'Alemán',
+      'it': 'Italiano',
+      'zh': 'Chino',
+      'ja': 'Japonés',
+      'ko': 'Coreano',
+      'ar': 'Árabe',
+      'ru': 'Ruso'
+    };
+    return languages[code] || code;
+  };
+
   const bgPrimary = darkMode ? 'bg-black' : 'bg-gray-50';
   const bgSecondary = darkMode ? 'bg-zinc-900' : 'bg-white';
   const textPrimary = darkMode ? 'text-white' : 'text-gray-900';
@@ -687,35 +754,6 @@ export default function ProcessedFilesPage() {
         <div className="flex-1 p-6 overflow-y-auto">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-white">{t('processedFiles.title')}</h2>
-
-            {/* Translation language selector */}
-            <div className="flex items-center gap-3">
-              <label htmlFor="target-language" className="text-sm text-zinc-400">
-                {t('processedFiles.translateLanguage')}
-              </label>
-              <select
-                id="target-language"
-                className="p-2 bg-zinc-800 rounded-lg border border-zinc-700 text-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                value={targetLanguage}
-                onChange={(e) => setTargetLanguage(e.target.value)}
-                style={{ minWidth: '150px' }}
-              >
-                <option value="en">English</option>
-                <option value="es">Español</option>
-                <option value="ca">Català</option>
-                <option value="eu">Euskera</option>
-                <option value="gl">Gallego</option>
-                <option value="pt">Português</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="it">Italiano</option>
-                <option value="zh">中文 (Chinese)</option>
-                <option value="ja">日本語 (Japanese)</option>
-                <option value="ko">한국어 (Korean)</option>
-                <option value="ar">العربية (Arabic)</option>
-                <option value="ru">Русский (Russian)</option>
-              </select>
-            </div>
           </div>
 
           <div className="mb-6">
@@ -1157,13 +1195,45 @@ export default function ProcessedFilesPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              onClick={() => handleDeleteJob(job.id)}
-                              className="text-red-600 hover:text-red-900"
-                              title={t('processedFiles.deleteFile')}
-                            >
-                              <Trash2 className="h-5 w-5" />
-                            </button>
+                            <div className="flex items-center justify-end gap-3">
+                              {/* Botón de traducir */}
+                              {job.txt_url && (
+                                <button
+                                  onClick={() => {
+                                    setJobToTranslate(job);
+                                    setShowTranslateModal(true);
+                                  }}
+                                  disabled={translatingJob === job.id}
+                                  className={`inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+                                    translatingJob === job.id
+                                      ? 'bg-gray-500 cursor-not-allowed'
+                                      : 'bg-purple-600 hover:bg-purple-700'
+                                  } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500`}
+                                  title="Traducir transcripción"
+                                >
+                                  {translatingJob === job.id ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                                      Traduciendo...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Languages className="h-4 w-4 mr-2" />
+                                      Traducir
+                                    </>
+                                  )}
+                                </button>
+                              )}
+
+                              {/* Botón de eliminar */}
+                              <button
+                                onClick={() => handleDeleteJob(job.id)}
+                                className="text-red-600 hover:text-red-900"
+                                title={t('processedFiles.deleteFile')}
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1175,6 +1245,90 @@ export default function ProcessedFilesPage() {
           )}
         </div>
       </div>
+
+      {/* Modal de Traducción */}
+      {showTranslateModal && jobToTranslate && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 rounded-lg border border-zinc-700 p-6 max-w-md w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Languages className="h-6 w-6 text-purple-500" />
+                Traducir Transcripción
+              </h3>
+              <button
+                onClick={() => {
+                  setShowTranslateModal(false);
+                  setJobToTranslate(null);
+                }}
+                className="text-zinc-400 hover:text-white"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-sm text-zinc-400 mb-4">
+                Archivo: <span className="text-white font-medium">{jobToTranslate.filename}</span>
+              </p>
+
+              <div className="mb-4">
+                <label htmlFor="modal-target-language" className="block text-sm font-medium text-zinc-300 mb-2">
+                  Idioma de destino:
+                </label>
+                <select
+                  id="modal-target-language"
+                  className="w-full p-3 bg-zinc-800 rounded-lg border border-zinc-700 text-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                >
+                  <option value="en">🇬🇧 Inglés (English)</option>
+                  <option value="es">🇪🇸 Español (Spanish)</option>
+                  <option value="ca">🏴 Catalán (Català)</option>
+                  <option value="eu">🔴 Euskera (Basque)</option>
+                  <option value="gl">🟢 Gallego (Galician)</option>
+                  <option value="pt">🇵🇹 Portugués (Português)</option>
+                  <option value="fr">🇫🇷 Francés (Français)</option>
+                  <option value="de">🇩🇪 Alemán (Deutsch)</option>
+                  <option value="it">🇮🇹 Italiano (Italian)</option>
+                  <option value="zh">🇨🇳 Chino (Chinese)</option>
+                  <option value="ja">🇯🇵 Japonés (Japanese)</option>
+                  <option value="ko">🇰🇷 Coreano (Korean)</option>
+                  <option value="ar">🇸🇦 Árabe (Arabic)</option>
+                  <option value="ru">🇷🇺 Ruso (Russian)</option>
+                </select>
+              </div>
+
+              <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3">
+                <p className="text-xs text-zinc-400">
+                  ℹ️ La traducción se realizará usando GPT-4o-mini para obtener una traducción precisa y natural de tu transcripción completa.
+                </p>
+                <p className="text-xs text-zinc-400 mt-2">
+                  📥 El PDF traducido se descargará automáticamente al finalizar.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowTranslateModal(false);
+                  setJobToTranslate(null);
+                }}
+                className="flex-1 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleTranslate}
+                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                <Languages className="h-4 w-4" />
+                Traducir Ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
