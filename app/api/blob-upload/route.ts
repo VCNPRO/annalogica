@@ -179,46 +179,23 @@ export async function POST(request: NextRequest): Promise<Response> {
         }
 
         try {
-          // Crea el job en DB (tu create acepta 3–5 args)
-          const jobRecord = await TranscriptionJobDB.create(
+          // ✅ SIMPLEMENTE LOGEA QUE EL ARCHIVO SE SUBIÓ
+          // El procesamiento se hace cuando el usuario hace clic en "Procesar Archivos"
+          // que llama a /api/process o /api/process-document
+          console.log('[blob-upload] ✅ Archivo subido correctamente a Blob:', {
             userId,
             filename,
-            blob.url,        // URL del Blob (se procesará/transcribirá por URL)
-            language,
-            fileSizeBytes
-          );
+            url: blob.url,
+            fileType,
+            size: fileSizeBytes,
+            language
+          });
 
-          // Obtiene el ID real del job desde el registro retornado
-          const jobId =
-            (jobRecord as any)?.id ||
-            (jobRecord as any)?._id ||
-            (jobRecord as any)?.jobId;
+          // NO creamos job aquí - se crea cuando el usuario hace clic en "Procesar"
+          // Esto evita crear jobs que nunca se procesan si el usuario cancela
 
-          console.log('[blob-upload] Job creado', { userId, filename, url: blob.url, fileType, jobId });
-
-          // Dispara el evento correcto de Inngest para que empiece YA el procesamiento
-          if (fileType.startsWith('audio/') || fileType.startsWith('video/')) {
-            await inngest.send({
-              name: 'audio/transcribe.requested',
-              data: { jobId },
-            });
-            console.log('[blob-upload] Evento enviado: audio/transcribe.requested', { jobId });
-          } else {
-            await inngest.send({
-              name: 'task/process-document',
-              data: {
-                jobId,
-                documentUrl: blob.url,
-                filename,
-                actions,
-                language,
-                summaryType,
-              },
-            });
-            console.log('[blob-upload] Evento enviado: task/process-document', { jobId });
-          }
-        } catch (dbOrEventError) {
-          console.error('[blob-upload] Error tras crear job o enviar evento:', dbOrEventError);
+        } catch (error) {
+          console.error('[blob-upload] Error en onUploadCompleted:', error);
         }
       },
     });
