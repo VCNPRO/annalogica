@@ -1196,8 +1196,11 @@ export default function ProcessedFilesPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex items-center justify-end gap-3">
-                              {/* Botón de traducir */}
-                              {job.txt_url && (
+                              {/* Botón de traducir - solo mostrar si tiene transcripción completa */}
+                              {(() => {
+                                const requestedActions = (job.metadata as any)?.actions || [];
+                                const hasTranscription = !requestedActions.length || requestedActions.includes('Transcribir');
+                                return job.txt_url && hasTranscription && (
                                 <button
                                   onClick={() => {
                                     setJobToTranslate(job);
@@ -1223,7 +1226,8 @@ export default function ProcessedFilesPage() {
                                     </>
                                   )}
                                 </button>
-                              )}
+                                );
+                              })()}
 
                               {/* Botón de eliminar */}
                               <button

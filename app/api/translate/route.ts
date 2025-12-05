@@ -42,18 +42,31 @@ export async function POST(request: NextRequest) {
 
     // Get the transcription text
     if (!job.txt_url) {
+      console.log('[Translate] No transcription available for job:', jobId);
       return NextResponse.json(
-        { error: 'Este archivo no tiene transcripción disponible' },
+        { error: 'Este archivo no tiene transcripción completa disponible. Solo se puede traducir archivos que tengan la acción "Transcribir" aplicada.' },
         { status: 400 }
       );
     }
 
     // Fetch the transcription text from the blob
+    console.log('[Translate] Fetching transcription from:', job.txt_url);
     const txtResponse = await fetch(job.txt_url);
     if (!txtResponse.ok) {
-      throw new Error('Error al obtener la transcripción');
+      console.error('[Translate] Failed to fetch transcription:', txtResponse.status, txtResponse.statusText);
+      throw new Error('Error al obtener la transcripción del archivo');
     }
     const originalText = await txtResponse.text();
+
+    if (!originalText || originalText.trim().length === 0) {
+      console.error('[Translate] Empty transcription text');
+      return NextResponse.json(
+        { error: 'La transcripción está vacía y no se puede traducir' },
+        { status: 400 }
+      );
+    }
+
+    console.log('[Translate] Transcription fetched successfully, length:', originalText.length);
 
     // Verificar que OpenAI esté configurado
     if (!openai) {
