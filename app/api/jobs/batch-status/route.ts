@@ -59,7 +59,9 @@ export async function POST(request: NextRequest) {
 
     // 5. Fetch jobs en batch (single query)
     // Usa índice idx_jobs_id_user para performance
-    const result = await sql<TranscriptionJob>`
+    // Construir placeholders para IN clause (más compatible con TypeScript)
+    const placeholders = jobIds.map((_, i) => `$${i + 2}`).join(', ');
+    const queryText = `
       SELECT
         id,
         user_id,
@@ -78,10 +80,15 @@ export async function POST(request: NextRequest) {
         error_message,
         metadata
       FROM transcription_jobs
-      WHERE id = ANY(${jobIds})
-        AND user_id = ${auth.userId}
+      WHERE id IN (${placeholders})
+        AND user_id = $1
       ORDER BY created_at DESC
     `;
+
+    const result = await sql.query<TranscriptionJob>(
+      queryText,
+      [auth.userId, ...jobIds]
+    );
 
     // 6. Crear map para lookup rápido
     const jobsMap = new Map(
