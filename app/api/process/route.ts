@@ -212,7 +212,7 @@ export async function POST(request: Request) {
       // Return error response
       return successResponse({
         success: false,
-        message: 'Error en el procesamiento. Por favor intenta de nuevo.',
+        message: processingError.message || 'Error en el procesamiento. Por favor intenta de nuevo.',
         jobId: job.id,
         status: 'failed',
         error: processingError.message
