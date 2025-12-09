@@ -238,6 +238,23 @@ export const TranscriptionJobDB = {
     return result.rows;
   },
 
+  // Find jobs by user ID with detailed info (optimized, no N+1)
+  // Usa el índice idx_jobs_user_status_created para performance máximo
+  findDetailedByUserId: async (userId: string, limit = 50): Promise<TranscriptionJob[]> => {
+    const result = await sql<TranscriptionJob>`
+      SELECT
+        j.*,
+        u.email as user_email,
+        u.client_id as user_client_id
+      FROM transcription_jobs j
+      LEFT JOIN users u ON j.user_id = u.id
+      WHERE j.user_id = ${userId}
+      ORDER BY j.created_at DESC
+      LIMIT ${limit}
+    `;
+    return result.rows;
+  },
+
   // Find pending jobs (for processing queue)
   findPending: async (limit = 10): Promise<TranscriptionJob[]> => {
     const result = await sql<TranscriptionJob>`
