@@ -37,11 +37,11 @@ export default function Results() {
     }
   };
 
-  const bgPrimary = darkMode ? 'bg-black' : 'bg-gray-50';
-  const bgSecondary = darkMode ? 'bg-zinc-900' : 'bg-white';
-  const textPrimary = darkMode ? 'text-white' : 'text-gray-900';
-  const textSecondary = darkMode ? 'text-zinc-400' : 'text-gray-600';
-  const border = darkMode ? 'border-zinc-800' : 'border-gray-200';
+  const bgPrimary = darkMode ? 'bg-black' : 'bg-[#f0f4f8]';
+  const bgSecondary = darkMode ? 'bg-zinc-900' : 'bg-[#e8edf2]';
+  const textPrimary = darkMode ? 'text-white' : 'text-[#1e293b]';
+  const textSecondary = darkMode ? 'text-zinc-400' : 'text-[#475569]';
+  const border = darkMode ? 'border-zinc-800' : 'border-[#cbd5e1]';
 
   if (loading) return <div className={`min-h-screen ${bgPrimary} flex items-center justify-center`}><div className="text-orange-500">Cargando...</div></div>;
 
