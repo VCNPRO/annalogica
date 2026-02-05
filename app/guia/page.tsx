@@ -6,7 +6,6 @@ import { ChevronDown, ChevronRight, Download, Home } from 'lucide-react';
 
 export default function GuiaUsuario() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'rapida' | 'completa'>('rapida');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['que-puede-hacer']));
 
   const toggleSection = (sectionId: string) => {
@@ -65,42 +64,14 @@ export default function GuiaUsuario() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
         {/* Hero */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            Guía de Usuario
+            Guía Completa de Usuario
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Aprende a utilizar <span className="font-orbitron text-orange-500 font-semibold">annalogica</span> para transcribir, analizar y gestionar tus contenidos con inteligencia artificial.
+            Aprende a utilizar <span className="font-orbitron text-orange-500 font-semibold">annalogica</span> para transcribir, analizar y gestionar tus contenidos de audio y vídeo con inteligencia artificial.
           </p>
         </div>
-
-        {/* Tabs */}
-        <div className="flex justify-center gap-4 mb-10">
-          <button
-            onClick={() => setActiveTab('rapida')}
-            className={`px-6 py-3 rounded-lg font-medium transition-all ${
-              activeTab === 'rapida'
-                ? 'bg-orange-500 text-white shadow-lg'
-                : 'bg-white text-gray-700 border border-gray-200 hover:border-orange-300'
-            }`}
-          >
-            Guía Rápida
-          </button>
-          <button
-            onClick={() => setActiveTab('completa')}
-            className={`px-6 py-3 rounded-lg font-medium transition-all ${
-              activeTab === 'completa'
-                ? 'bg-orange-500 text-white shadow-lg'
-                : 'bg-white text-gray-700 border border-gray-200 hover:border-orange-300'
-            }`}
-          >
-            Guía Completa
-          </button>
-        </div>
-
-        {/* === GUIA RAPIDA TAB === */}
-        {activeTab === 'rapida' && (
-        <>
 
         {/* ⭐ QUÉ PUEDE HACER - Sección destacada al inicio */}
         <Section
@@ -462,85 +433,6 @@ export default function GuiaUsuario() {
             </Step>
           </div>
         </Section>
-
-        {/* RAG - Pregúntale al Documento */}
-        <Section
-          id="rag"
-          title="🔍 Pregúntale al Documento (RAG)"
-          expanded={expandedSections.has('rag')}
-          onToggle={() => toggleSection('rag')}
-        >
-          <div className="space-y-4 text-gray-700">
-            <p>
-              <strong>RAG (Retrieval-Augmented Generation)</strong> te permite hacer preguntas en lenguaje natural sobre tus documentos.
-              El sistema busca la información relevante y genera respuestas precisas basadas en el contenido real.
-            </p>
-            <Step number={1} title="Crear una carpeta">
-              <p className="text-gray-700">Ve a "Pregúntale al Documento" y crea una carpeta temática (ej: "Contratos 2025").</p>
-            </Step>
-            <Step number={2} title="Subir documentos">
-              <p className="text-gray-700">Sube PDFs, DOCX o TXT a la carpeta. Se indexarán automáticamente.</p>
-            </Step>
-            <Step number={3} title="Hacer preguntas">
-              <p className="text-gray-700">Escribe tu pregunta en lenguaje natural. Ejemplo: "¿Cuál es la cláusula de penalización?"</p>
-            </Step>
-            <Step number={4} title="Ver fuentes">
-              <p className="text-gray-700">Cada respuesta incluye fuentes. Pulsa "Ver PDF" para abrir el documento original o "Descargar" para guardarlo.</p>
-            </Step>
-          </div>
-        </Section>
-
-        {/* Módulos y Permisos */}
-        <Section
-          id="modulos"
-          title="🔐 Módulos y Permisos"
-          expanded={expandedSections.has('modulos')}
-          onToggle={() => toggleSection('modulos')}
-        >
-          <div className="space-y-4 text-gray-700">
-            <p>
-              annalogica funciona con un <strong>sistema de módulos independientes</strong>. Cada funcionalidad es un módulo que puedes contratar según tus necesidades.
-            </p>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                <h4 className="font-semibold text-orange-900">Extracción de Datos — 29€/mes</h4>
-                <p className="text-sm text-orange-800">Transcripción IA de documentos PDF/imagen</p>
-              </div>
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-900">Pregúntale al Documento — 19€/mes</h4>
-                <p className="text-sm text-blue-800">Búsqueda semántica RAG sobre documentos</p>
-              </div>
-              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                <h4 className="font-semibold text-green-900">Revisión — 15€/mes</h4>
-                <p className="text-sm text-green-800">Panel de revisión y aprobación</p>
-              </div>
-              <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                <h4 className="font-semibold text-purple-900">Excel Master — 15€/mes</h4>
-                <p className="text-sm text-purple-800">Consolidación y descarga Excel</p>
-              </div>
-              <div className="p-4 bg-pink-50 rounded-lg border border-pink-200">
-                <h4 className="font-semibold text-pink-900">Procesamiento en Lote — 25€/mes</h4>
-                <p className="text-sm text-pink-800">Procesamiento masivo multi-documento</p>
-              </div>
-              <div className="p-4 bg-teal-50 rounded-lg border border-teal-200">
-                <h4 className="font-semibold text-teal-900">Plantillas — 10€/mes</h4>
-                <p className="text-sm text-teal-800">Crear y gestionar plantillas propias</p>
-              </div>
-            </div>
-            <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-              <p className="text-sm text-amber-800">
-                <strong>Paquetes sugeridos:</strong> Básico (Extracción) · Pro (Extracción + RAG + Batch) · Completo (Todos los módulos)
-              </p>
-            </div>
-          </div>
-        </Section>
-
-        </>
-        )}
-
-        {/* === GUIA COMPLETA TAB === */}
-        {activeTab === 'completa' && (
-        <>
 
         {/* Introducción Section */}
         <Section
@@ -1156,9 +1048,6 @@ export default function GuiaUsuario() {
             </div>
           </div>
         </Section>
-
-        </>
-        )}
 
       </div>
 

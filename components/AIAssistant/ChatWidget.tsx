@@ -16,7 +16,7 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: '¡Hola! Soy Laia, tu asistente virtual de annalogica. Puedo ayudarte con transcripciones, RAG, módulos, y más. ¿En qué puedo ayudarte hoy?'
+      content: '¡Hola! Soy el asistente virtual de annalogica. ¿En qué puedo ayudarte hoy?'
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
@@ -90,7 +90,7 @@ export function ChatWidget() {
     setMessages([
       {
         role: 'assistant',
-        content: '¡Hola! Soy Laia, tu asistente virtual de annalogica. Puedo ayudarte con transcripciones, RAG, módulos, y más. ¿En qué puedo ayudarte hoy?'
+        content: '¡Hola! Soy el asistente virtual de annalogica. ¿En qué puedo ayudarte hoy?'
       }
     ]);
   };
@@ -117,7 +117,7 @@ export function ChatWidget() {
       <div className="bg-orange-600 text-white p-4 rounded-t-lg flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MessageCircle className="w-5 h-5" />
-          <h3 className="font-semibold">Laia - Asistente annalogica</h3>
+          <h3 className="font-semibold">Asistente annalogica</h3>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -141,7 +141,7 @@ export function ChatWidget() {
       {!isMinimized && (
         <>
           {/* Mensajes */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f0f4f8]">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
             {messages.map((msg, index) => (
               <ChatMessage key={index} message={msg} />
             ))}
@@ -156,7 +156,7 @@ export function ChatWidget() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-[#cbd5e1] p-4">
+          <div className="border-t border-gray-200 p-4">
             <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
             <button
               onClick={handleClearChat}

@@ -55,24 +55,6 @@ export const downloadRateLimit = redis
     })
   : null;
 
-export const ragRateLimit = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(10, '1 m'), // 10 RAG queries per minute
-      analytics: true,
-      prefix: '@annalogica/rag',
-    })
-  : null;
-
-export const apiGeneralRateLimit = redis
-  ? new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(30, '1 m'), // 30 requests per minute general
-      analytics: true,
-      prefix: '@annalogica/api-general',
-    })
-  : null;
-
 /**
  * Get client identifier from request (user ID or IP)
  */

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Zap, Building2, GraduationCap, Radio, Package } from 'lucide-react';
+import { Check, Zap, Building2, GraduationCap, Radio } from 'lucide-react';
 import { PRICING_PLANS, PlanType } from '@/lib/stripe/config';
 import { useNotification } from '@/hooks/useNotification';
 import { Toast } from '@/components/Toast';
@@ -312,58 +312,6 @@ export default function PricingPage() {
               </div>
             );
           })}
-        </div>
-
-        {/* Modules Section */}
-        <div className="mt-24 max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Package className="h-8 w-8 text-orange-500" />
-              <h3 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Módulos Individuales
-              </h3>
-            </div>
-            <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              Contrata solo lo que necesitas. Cada módulo se puede activar de forma independiente.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { id: 'extraction', name: 'Extracción de Datos', desc: 'Extracción IA de documentos PDF/imagen', price: 29 },
-              { id: 'rag', name: 'Pregúntale al Documento', desc: 'Búsqueda semántica RAG sobre documentos', price: 19 },
-              { id: 'review', name: 'Revisión de Documentos', desc: 'Panel de revisión y aprobación', price: 15 },
-              { id: 'excel_master', name: 'Excel Master', desc: 'Consolidación y descarga Excel', price: 15 },
-              { id: 'batch', name: 'Procesamiento en Lote', desc: 'Procesamiento masivo multi-documento', price: 25 },
-              { id: 'templates', name: 'Plantillas Personalizadas', desc: 'Crear y gestionar plantillas propias', price: 10 },
-            ].map(mod => (
-              <div key={mod.id} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-shadow">
-                <h4 className="text-lg font-bold text-gray-900 dark:text-white mb-1">{mod.name}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{mod.desc}</p>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-orange-500">{mod.price}€</span>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">/mes</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 text-center">
-            <div className="inline-flex flex-col sm:flex-row gap-4 bg-gradient-to-r from-orange-50 to-blue-50 dark:from-gray-800 dark:to-gray-800 rounded-xl p-6 border border-orange-200 dark:border-gray-700">
-              <div className="text-left">
-                <p className="font-semibold text-gray-900 dark:text-white mb-1">Paquetes sugeridos</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  <strong>Básico:</strong> Extracción (29€) · <strong>Pro:</strong> Extracción + RAG + Batch (73€) · <strong>Completo:</strong> Todos (113€)
-                </p>
-              </div>
-              <a
-                href="mailto:infopreus@annalogica.eu?subject=Consulta Módulos"
-                className="self-center px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors whitespace-nowrap"
-              >
-                Contactar
-              </a>
-            </div>
-          </div>
         </div>
 
         {/* FAQ Section */}
