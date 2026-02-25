@@ -9,10 +9,10 @@ import { inngest } from '@/lib/inngest/client'; // 👈 CORREGIDO (singular)
 import { sql } from '@vercel/postgres';
 
 // Tamaños máximos (bytes)
-// 🔥 LÍMITES OPTIMIZADOS PARA BETA: Garantizan procesamiento <15 min
-const MAX_FILE_SIZE_AUDIO = 100 * 1024 * 1024;      // 100 MB (~100 min audio)
-const MAX_FILE_SIZE_VIDEO = 200 * 1024 * 1024;      // 200 MB (~200 min video)
-const MAX_FILE_SIZE_DOCUMENT = 50 * 1024 * 1024;    // 50 MB (sin cambios)
+// 🔥 LÍMITES OPTIMIZADOS PARA PRO: Soportan hasta 2GB (Límite Deepgram/Vercel Blob)
+const MAX_FILE_SIZE_AUDIO = 2 * 1024 * 1024 * 1024;    // 2 GB
+const MAX_FILE_SIZE_VIDEO = 2 * 1024 * 1024 * 1024;    // 2 GB
+const MAX_FILE_SIZE_DOCUMENT = 100 * 1024 * 1024;      // 100 MB
 
 // Tipos permitidos
 const ALLOWED_AUDIO_TYPES = [
