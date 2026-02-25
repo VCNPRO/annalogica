@@ -317,6 +317,15 @@ export async function processAudioFile(jobId: string): Promise<void> {
       }
     }
 
+    // NEW: Truncate transcription text for LLM processing if it's too long
+    // GPT-4o-mini has a large context window, but we should be safe with ~100k chars
+    const MAX_LLM_TEXT_LENGTH = 100000;
+    let llmTranscriptionText = transcriptionText;
+    if (transcriptionText.length > MAX_LLM_TEXT_LENGTH) {
+      console.log(`[AudioProcessor] Truncating text for LLM from ${transcriptionText.length} to ${MAX_LLM_TEXT_LENGTH} chars`);
+      llmTranscriptionText = transcriptionText.substring(0, MAX_LLM_TEXT_LENGTH) + "\n\n[...Texto truncado por longitud excesiva...]";
+    }
+
     // STEP 3-5: Process speakers, summary, and tags in PARALLEL (optimization)
     console.log('[AudioProcessor] Processing speakers, summary, and tags in parallel...', { language: promptLanguage });
     const summaryType = job.metadata?.summaryType || 'detailed';
@@ -333,7 +342,7 @@ export async function processAudioFile(jobId: string): Promise<void> {
           },
           {
             role: "user",
-            content: `Transcripcion:\n\n${transcriptionText}`
+            content: `Transcripcion:\n\n${llmTranscriptionText}`
           }
         ],
         temperature: 0.3,
@@ -350,7 +359,7 @@ export async function processAudioFile(jobId: string): Promise<void> {
           },
           {
             role: "user",
-            content: `Transcripcion:\n\n${transcriptionText}`
+            content: `Transcripcion:\n\n${llmTranscriptionText}`
           }
         ],
         temperature: 0.5,
@@ -367,7 +376,7 @@ export async function processAudioFile(jobId: string): Promise<void> {
           },
           {
             role: "user",
-            content: `Transcripcion:\n\n${transcriptionText}`
+            content: `Transcripcion:\n\n${llmTranscriptionText}`
           }
         ],
         temperature: 0.3,

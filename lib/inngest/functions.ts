@@ -90,10 +90,17 @@ export const transcribeFile = inngest.createFunction(
     const utterances = deepgramResult.results.utterances || [];
     const audioDuration = deepgramResult.metadata.duration;
 
+    // NEW: Truncate transcription text for LLM processing if it's too long
+    const MAX_LLM_TEXT_LENGTH = 100000;
+    let llmTranscriptionText = transcript;
+    if (transcript.length > MAX_LLM_TEXT_LENGTH) {
+      llmTranscriptionText = transcript.substring(0, MAX_LLM_TEXT_LENGTH) + "\n\n[...Texto truncado por longitud excesiva...]";
+    }
+
     let speakerIdentities: Record<string, { name?: string; role?: string }> = {};
     if (actions.includes('Oradores')) {
         speakerIdentities = await step.run('identify-speakers-openai', async () => {
-            const prompt = `Analiza la siguiente transcripción e identifica el nombre y/o cargo de cada hablante (ej: "Hablante 0", "Hablante 1"). Si un hablante dice su nombre o cargo, extráelo. Responde ÚNICAMENTE en formato JSON con la estructura: {"0": {"name": "Nombre Inferido", "role": "Cargo Inferido"}, "1": {"name": "...", "role": "..."}}. Si no puedes identificar a alguien, deja su nombre o cargo como un string vacío. Texto: \n---\n${transcript}`;
+            const prompt = `Analiza la siguiente transcripción e identifica el nombre y/o cargo de cada hablante (ej: "Hablante 0", "Hablante 1"). Si un hablante dice su nombre o cargo, extráelo. Responde ÚNICAMENTE en formato JSON con la estructura: {"0": {"name": "Nombre Inferido", "role": "Cargo Inferido"}, "1": {"name": "...", "role": "..."}}. Si no puedes identificar a alguien, deja su nombre o cargo como un string vacío. Texto: \n---\n${llmTranscriptionText}`;
             try {
                 const completion = await openai.chat.completions.create({
                     model: "gpt-4o-mini",
@@ -192,6 +199,13 @@ export const summarizeFile = inngest.createFunction(
       const textResponse = await fetch(job.txt_url!);
       const transcriptText = await textResponse.text();
 
+      // NEW: Truncate transcription text for LLM processing if it's too long
+      const MAX_LLM_TEXT_LENGTH = 100000;
+      let llmTranscriptionText = transcriptText;
+      if (transcriptText.length > MAX_LLM_TEXT_LENGTH) {
+        llmTranscriptionText = transcriptText.substring(0, MAX_LLM_TEXT_LENGTH) + "\n\n[...Texto truncado por longitud excesiva...]";
+      }
+
       const prompt = `
         Analiza la siguiente transcripción.
         ${generateSummary ? `Genera un resumen de tipo "${summaryType}".` : ''}
@@ -199,7 +213,7 @@ export const summarizeFile = inngest.createFunction(
         Responde en formato JSON con las claves "summary" y "tags". Si no se pide un resumen, la clave "summary" debe ser un string vacío. Si no se piden etiquetas, "tags" debe ser un array vacío.
         El texto es:
         ---
-        ${transcriptText}
+        ${llmTranscriptionText}
       `;
 
       const completion = await openai.chat.completions.create({

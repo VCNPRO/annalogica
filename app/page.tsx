@@ -315,6 +315,17 @@ export default function Dashboard() {
     try {
       // SECURITY: No necesitamos token, la cookie httpOnly se envía automáticamente
 
+      // PERFORMANCE: Validación de cantidad de archivos
+      const MAX_CONCURRENT_FILES = 50;
+      if (uploadedFiles.length + files.length > MAX_CONCURRENT_FILES) {
+        showNotification(
+          `No puedes tener más de ${MAX_CONCURRENT_FILES} archivos cargados simultáneamente.\n\n` +
+          `Actualmente tienes ${uploadedFiles.length} archivos. Por favor, procesa o elimina algunos antes de cargar más.`,
+          'error'
+        );
+        return;
+      }
+
       // PERFORMANCE: Validación de tamaño de archivos
       // Límite de Deepgram para audio/video: 2 GB
       // Límite de procesamiento para documentos: 100 MB
