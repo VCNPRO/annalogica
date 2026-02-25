@@ -21,8 +21,8 @@ import { trackError, extractRequestContext } from '@/lib/error-tracker';
 import type { JobCreateResponse } from '@/types/job';
 
 // Configure maximum execution time for audio processing
-// Pro plan: 900s (15 minutes), Hobby: 10s
-export const maxDuration = 900; // 15 minutes
+// Pro plan: 800s (max allowed), Hobby: 10s
+export const maxDuration = 800; // 13.3 minutes
 
 /**
  * POST /api/process
