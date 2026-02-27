@@ -1537,8 +1537,7 @@ export default function Dashboard() {
                         try {
                           const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
                           if (res.ok) {
-                            const data = await res.json();
-                            const job = data.job;
+                            const job = await res.json();
                             if (downloadDirHandle) {
                               await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
                             } else {
@@ -1618,8 +1617,7 @@ export default function Dashboard() {
                           try {
                             const res = await fetch(`/api/jobs/${file.jobId}`, { credentials: 'include' });
                             if (res.ok) {
-                              const data = await res.json();
-                              const job = data.job;
+                              const job = await res.json();
                               if (downloadDirHandle) {
                                 await downloadFilesOrganized(file, job, downloadDirHandle, downloadFormat);
                               } else {
