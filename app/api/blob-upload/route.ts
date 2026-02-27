@@ -80,7 +80,7 @@ export async function POST(request: NextRequest): Promise<Response> {
       request,
       body,
 
-      onBeforeGenerateToken: async (_pathname, clientPayload) => {
+      onBeforeGenerateToken: async (_pathname, clientPayload, _multipart) => {
         const payload =
           typeof clientPayload === 'string' ? safeJsonParse(clientPayload) : clientPayload ?? {};
 

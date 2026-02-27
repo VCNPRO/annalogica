@@ -90,6 +90,7 @@ export function useFileUpload(): UseFileUploadReturn {
           const blob = await upload(uniqueFilename, file, {
             access: 'public',
             handleUploadUrl: '/api/blob-upload',
+            multipart: true,
             clientPayload: JSON.stringify({
               size: file.size,
               type: file.type,
