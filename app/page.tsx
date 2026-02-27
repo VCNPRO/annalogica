@@ -972,6 +972,14 @@ export default function Dashboard() {
     }
   };
 
+  const getLanguageLabel = (code: string) => {
+    const labels: Record<string, string> = {
+      auto: 'Auto', es: 'ES', ca: 'CA', eu: 'EU', gl: 'GL',
+      pt: 'PT', en: 'EN', fr: 'FR', de: 'DE', it: 'IT'
+    };
+    return labels[code] || code.toUpperCase();
+  };
+
   if (loading) {
     return (
       <div className={`min-h-screen ${darkMode ? 'bg-black' : 'bg-gray-50'} flex items-center justify-center`}>
@@ -1370,6 +1378,9 @@ export default function Dashboard() {
                         className="form-checkbox h-4 w-4 text-orange-500 rounded"
                       />
                       <span className={`text-xs ${textPrimary} flex-1 truncate`}>{file.name}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-xs font-medium" title="Idioma">
+                        {getLanguageLabel(language)}
+                      </span>
                       {file.actions.length > 0 && (
                         <div className="flex flex-wrap gap-1 ml-auto">
                           {file.actions.map(action => (
@@ -1394,6 +1405,23 @@ export default function Dashboard() {
                     </div>
 
                     <div className="ml-6 space-y-1">
+                      {file.status === 'pending' && file.jobId && (
+                        <div>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className={`text-xs ${textSecondary}`}>En cola — esperando procesamiento</span>
+                            <div className="flex items-center gap-2">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                              </span>
+                              <span className="text-xs text-amber-500">En cola</span>
+                            </div>
+                          </div>
+                          <div className={`w-full ${darkMode ? 'bg-zinc-800' : 'bg-gray-200'} rounded-full h-1`}>
+                            <div className="bg-amber-500 h-1 rounded-full animate-pulse" style={{ width: '15%' }} />
+                          </div>
+                        </div>
+                      )}
                       {file.status === 'uploading' && (
                         <div>
                           <div className="flex justify-between items-center mb-1">
@@ -1482,39 +1510,6 @@ export default function Dashboard() {
                 </div>
 
 
-                <div className="flex items-center gap-2 mt-2">
-                  <span className={`text-xs ${textSecondary}`}>Formato:</span>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="radio"
-                      className="accent-orange-500 scale-75"
-                      name="downloadFormat"
-                      checked={downloadFormat === 'pdf'}
-                      onChange={() => setDownloadFormat('pdf')}
-                    />
-                    <span className={`text-xs ${textSecondary}`}>PDF</span>
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="radio"
-                      className="accent-orange-500 scale-75"
-                      name="downloadFormat"
-                      checked={downloadFormat === 'txt'}
-                      onChange={() => setDownloadFormat('txt')}
-                    />
-                    <span className={`text-xs ${textSecondary}`}>TXT</span>
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input
-                      type="radio"
-                      className="accent-orange-500 scale-75"
-                      name="downloadFormat"
-                      checked={downloadFormat === 'both'}
-                      onChange={() => setDownloadFormat('both')}
-                    />
-                    <span className={`text-xs ${textSecondary}`}>Ambos</span>
-                  </label>
-                </div>
 
 
               </div>
