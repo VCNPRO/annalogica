@@ -536,6 +536,7 @@ export default function Dashboard() {
     console.log('[Process] Files to process:', filesToProcess.map(f => ({ name: f.name, actions: f.actions, fileType: f.fileType, blobUrl: f.blobUrl })));
 
     let processedCount = 0;
+    let quotaError: string | null = null;
 
     // Procesar archivos según su tipo
     for (const file of filesToProcess) {
@@ -583,6 +584,12 @@ export default function Dashboard() {
           if (!processRes.ok) {
             const errorData = await processRes.json();
             console.error('[Process] Document API Error:', errorData);
+
+            if (processRes.status === 403 && (errorData.code === 'QUOTA_EXCEEDED' || errorData.error?.includes('límite'))) {
+              quotaError = errorData.error || 'Has alcanzado el límite de tu plan actual.';
+              break;
+            }
+
             throw new Error(errorData.error || 'Error al procesar documento');
           }
 
@@ -627,6 +634,12 @@ export default function Dashboard() {
           if (!processRes.ok) {
             const errorData = await processRes.json();
             console.error('[Process] API Error:', errorData);
+
+            if (processRes.status === 403 && (errorData.code === 'QUOTA_EXCEEDED' || errorData.error?.includes('límite'))) {
+              quotaError = errorData.error || 'Has alcanzado el límite de tu plan actual.';
+              break;
+            }
+
             throw new Error(errorData.error || 'Error al procesar');
           }
 
@@ -659,7 +672,9 @@ export default function Dashboard() {
 
     console.log('[Process] 🏁 Finished! Processed', processedCount, 'files');
 
-    if (processedCount > 0) {
+    if (quotaError) {
+      showNotification(`⚠️ ${quotaError}\n\nPuedes ampliar tu plan en la sección de Precios.`, 'info');
+    } else if (processedCount > 0) {
       showNotification(`${processedCount} archivo(s) enviado(s) a procesamiento. Ver progreso abajo.`, 'success');
     } else {
       showNotification('No se procesó ningún archivo. Verifica las acciones seleccionadas.', 'error');
@@ -1008,9 +1023,9 @@ export default function Dashboard() {
           <div className={`px-4 py-3 rounded-lg shadow-lg ${
             notification.type === 'success' ? 'bg-green-500 text-white' :
             notification.type === 'error' ? 'bg-red-500 text-white' :
-            'bg-blue-500 text-white'
-          } max-w-md`}>
-            <p className="text-sm font-medium">{notification.message}</p>
+            'bg-amber-500 text-white'
+          } max-w-lg`}>
+            <p className="text-sm font-medium whitespace-pre-line">{notification.message}</p>
           </div>
         </div>
       )}
