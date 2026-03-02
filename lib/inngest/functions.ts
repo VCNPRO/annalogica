@@ -11,10 +11,12 @@ import { put, del } from '@vercel/blob';
 import { createClient } from "@deepgram/sdk";
 import OpenAI from "openai";
 
-const deepgram = createClient(process.env.DEEPGRAM_API_KEY!);
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+const deepgram = process.env.DEEPGRAM_API_KEY
+  ? createClient(process.env.DEEPGRAM_API_KEY)
+  : null;
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null as unknown as OpenAI;
 
 // --- HELPERS (Funciones de ayuda) ---
 // La función 'generateSrt' y 'generateVtt' ahora aceptan 'any[]' para evitar el error.
@@ -76,6 +78,7 @@ export const transcribeFile = inngest.createFunction(
     });
 
     const deepgramResult = await step.run('transcribe-audio-deepgram', async () => {
+      if (!deepgram) throw new Error('Deepgram API key not configured');
       const { result, error } = await deepgram.listen.prerecorded.transcribeUrl(
           { url: audioUrl },
           { model: "nova-3", smart_format: true, diarize: true, utterances: true }

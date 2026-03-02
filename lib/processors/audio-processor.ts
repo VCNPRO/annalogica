@@ -54,6 +54,32 @@ function formatTimeVTT(seconds: number): string {
 }
 
 /**
+ * Post-process transcription text to add paragraph breaks every 3-5 sentences.
+ * Deepgram returns a continuous block of text; this makes it readable.
+ */
+function addParagraphBreaks(text: string): string {
+  // Split on sentence-ending punctuation followed by a space
+  const sentences = text.split(/(?<=[.!?])\s+/);
+  if (sentences.length <= 4) return text;
+
+  const paragraphs: string[] = [];
+  let current: string[] = [];
+
+  for (const sentence of sentences) {
+    current.push(sentence);
+    if (current.length >= 4) {
+      paragraphs.push(current.join(' '));
+      current = [];
+    }
+  }
+  if (current.length > 0) {
+    paragraphs.push(current.join(' '));
+  }
+
+  return paragraphs.join('\n\n');
+}
+
+/**
  * Process audio file directly (no Inngest)
  */
 export async function processAudioFile(jobId: string): Promise<void> {
@@ -316,6 +342,10 @@ export async function processAudioFile(jobId: string): Promise<void> {
         throw new Error(errorMsg);
       }
     }
+
+    // Post-process transcription to add paragraph breaks for readability
+    transcriptionText = addParagraphBreaks(transcriptionText);
+    console.log('[AudioProcessor] Transcription paragraphed:', { paragraphs: transcriptionText.split('\n\n').length });
 
     // NEW: Truncate transcription text for LLM processing if it's too long
     // GPT-4o-mini has a large context window, but we should be safe with ~100k chars

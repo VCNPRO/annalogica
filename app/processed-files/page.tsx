@@ -319,17 +319,22 @@ export default function ProcessedFilesPage() {
       doc.line(margin, yPosition, pageWidth - margin, yPosition);
       yPosition += 10;
 
-      // Body
+      // Body — split by paragraphs first, then by line width
       doc.setFontSize(10);
-      const splitText = doc.splitTextToSize(text, usableWidth);
+      const paragraphs = text.split('\n\n');
 
-      for (let i = 0; i < splitText.length; i++) {
-        if (yPosition > pageHeight - margin) {
-          doc.addPage();
-          yPosition = margin;
+      for (let p = 0; p < paragraphs.length; p++) {
+        const lines = doc.splitTextToSize(paragraphs[p].trim(), usableWidth);
+        for (let i = 0; i < lines.length; i++) {
+          if (yPosition > pageHeight - margin) {
+            doc.addPage();
+            yPosition = margin;
+          }
+          doc.text(lines[i], margin, yPosition);
+          yPosition += 5;
         }
-        doc.text(splitText[i], margin, yPosition);
-        yPosition += 5;
+        // Extra space between paragraphs
+        yPosition += 4;
       }
 
       return doc.output('blob');
@@ -432,7 +437,7 @@ export default function ProcessedFilesPage() {
       }
 
       // Solo descargar tags si se pidió "Aplicar Tags" o si no hay acciones definidas
-      if (job.tags && (job.tags as string[]).length > 0 && shouldDownload('Aplicar Tags')) {
+      if (job.tags && (job.tags as string[]).length > 0 && shouldDownload('Etiquetas')) {
         downloadTasks.push(async () => {
           const tags = (job.tags as string[]) || [];
           const tagsText = `Tags para: ${job.filename}\n\n- ${tags.join('\n- ')}`;
@@ -529,7 +534,7 @@ export default function ProcessedFilesPage() {
     }
 
     // Solo descargar tags si se pidió "Aplicar Tags" o si no hay acciones definidas
-    if (job.tags && (job.tags as string[]).length > 0 && shouldDownload('Aplicar Tags')) {
+    if (job.tags && (job.tags as string[]).length > 0 && shouldDownload('Etiquetas')) {
       downloadTasks.push(async () => {
         const tags = (job.tags as string[]) || [];
         const tagsText = `Tags para: ${job.filename}\n\n- ${tags.join('\n- ')}`;
@@ -1120,7 +1125,7 @@ export default function ProcessedFilesPage() {
                                     )}
 
                                     {/* Solo mostrar tags si se pidió "Aplicar Tags" o si no hay acciones definidas */}
-                                    {job.tags && (job.tags as string[]).length > 0 && shouldShow('Aplicar Tags') && (
+                                    {job.tags && (job.tags as string[]).length > 0 && shouldShow('Etiquetas') && (
                                       <button
                                         onClick={async () => {
                                           try {

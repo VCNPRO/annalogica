@@ -91,6 +91,7 @@ export default function Dashboard() {
   const [downloadDirHandle, setDownloadDirHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [createSubfolders, setCreateSubfolders] = useState(true);
   const [timerTick, setTimerTick] = useState(0); // Force re-render for timer updates
+  const [isProcessing, setIsProcessing] = useState(false);
   const [notification, setNotification] = useState<{message: string; type: 'success' | 'error' | 'info'} | null>(null);
 
   // Show notification function
@@ -513,6 +514,9 @@ export default function Dashboard() {
       return;
     }
 
+    setIsProcessing(true);
+    try {
+
     const filesToProcess = uploadedFiles.filter(file => selectedUploadedFileIds.has(file.id));
     console.log('[Process] Files to process (after filter):', filesToProcess.map(f => ({ name: f.name, actions: f.actions, fileType: f.fileType })));
 
@@ -682,6 +686,9 @@ export default function Dashboard() {
 
     // Deselect all after processing
     setSelectedUploadedFileIds(new Set());
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
 
@@ -770,17 +777,22 @@ export default function Dashboard() {
       doc.line(margin, yPosition, pageWidth - margin, yPosition);
       yPosition += 10;
 
-      // Body
+      // Body — split by paragraphs first, then by line width
       doc.setFontSize(10);
-      const splitText = doc.splitTextToSize(text, usableWidth);
+      const paragraphs = text.split('\n\n');
 
-      for (let i = 0; i < splitText.length; i++) {
-        if (yPosition > pageHeight - margin) {
-          doc.addPage();
-          yPosition = margin;
+      for (let p = 0; p < paragraphs.length; p++) {
+        const lines = doc.splitTextToSize(paragraphs[p].trim(), usableWidth);
+        for (let i = 0; i < lines.length; i++) {
+          if (yPosition > pageHeight - margin) {
+            doc.addPage();
+            yPosition = margin;
+          }
+          doc.text(lines[i], margin, yPosition);
+          yPosition += 5;
         }
-        doc.text(splitText[i], margin, yPosition);
-        yPosition += 5;
+        // Extra space between paragraphs
+        yPosition += 4;
       }
 
       return doc.output('blob');
@@ -1238,9 +1250,20 @@ export default function Dashboard() {
               {/* Fila 5: Procesar Archivos - ancho completo */}
               <button
                 onClick={handleProcessSelectedFiles}
-                className="w-full p-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors mt-2"
+                disabled={isProcessing}
+                className={`w-full p-2 ${isProcessing ? 'bg-green-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-600'} text-white rounded-lg text-sm font-medium transition-colors mt-2 flex items-center justify-center gap-2`}
               >
-                🚀 Procesar Archivos
+                {isProcessing ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Procesando...
+                  </>
+                ) : (
+                  '🚀 Procesar Archivos'
+                )}
               </button>
             </div>
           </div>
