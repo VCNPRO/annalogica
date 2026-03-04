@@ -655,11 +655,11 @@ export default function Dashboard() {
           console.log('[Process] ✅ Job created:', jobId, file.name);
           processedCount++;
 
-          // Update file with jobId
+          // Update file with jobId — set to 'processing' so progress bar shows immediately
           setUploadedFiles(prev => prev.map(f => {
             if (f.id === file.id) {
               console.log('[Process] MATCH! Updating file:', f.id, 'with jobId:', jobId);
-              return { ...f, jobId, status: 'pending' as const };
+              return { ...f, jobId, status: 'processing' as const, processingStartTime: Date.now(), processingProgress: 5 };
             }
             return f;
           }));

@@ -1,3 +1,4 @@
+import { waitUntil } from '@vercel/functions';
 import { verifyRequestAuth } from '@/lib/auth';
 import { processRateLimit, getClientIdentifier, checkRateLimit } from '@/lib/rate-limit';
 import { TranscriptionJobDB } from '@/lib/db';
@@ -7,8 +8,6 @@ import {
   successResponse,
   handleError,
   unauthorizedResponse,
-  forbiddenResponse,
-  badRequestResponse
 } from '@/lib/api-response';
 import {
   ValidationError,
@@ -21,19 +20,16 @@ import { trackError, extractRequestContext } from '@/lib/error-tracker';
 import type { JobCreateResponse } from '@/types/job';
 
 // Configure maximum execution time for audio processing
-// Pro plan: 800s (max allowed), Hobby: 10s
-export const maxDuration = 800; // 13.3 minutes
+export const maxDuration = 800;
 
 /**
  * POST /api/process
- * Process audio transcription synchronously
- * May take 2-5 minutes for audio files
+ * Creates a transcription job and processes it in the background.
+ * Returns jobId immediately so the client can poll for progress.
  */
 export async function POST(request: Request) {
   try {
     // SECURITY: Verify authentication
-    logger.info('Process API: Authentication check started');
-
     const user = verifyRequestAuth(request);
 
     if (!user) {
@@ -41,22 +37,10 @@ export async function POST(request: Request) {
       return unauthorizedResponse();
     }
 
-    logger.info('Process API: User authenticated', {
-      userId: user.userId,
-      email: user.email
-    });
-
-    // QUOTA: Check subscription status and quota (separate quotas for audio)
-    logger.info('Process API: Checking audio quota', { userId: user.userId });
+    // QUOTA: Check subscription status and quota
     const quotaStatus = await checkSeparateQuotas(user.userId);
 
     if (!quotaStatus.canUploadAudio) {
-      logger.info('Process API: Audio quota exceeded', {
-        userId: user.userId,
-        usageAudioMinutes: quotaStatus.usageAudioMinutes,
-        quotaAudioMinutes: quotaStatus.quotaAudioMinutes
-      });
-
       throw new QuotaExceededError(
         quotaStatus.message || 'Has alcanzado el límite de minutos de audio de tu plan',
         quotaStatus.quotaAudioMinutes,
@@ -64,11 +48,6 @@ export async function POST(request: Request) {
         quotaStatus.resetDate
       );
     }
-
-    logger.info('Process API: Audio quota verified', {
-      userId: user.userId,
-      remainingAudioMinutes: quotaStatus.remainingAudioMinutes
-    });
 
     // SECURITY: Rate limiting
     const identifier = getClientIdentifier(request, user.userId);
@@ -83,33 +62,20 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { audioUrl, filename, language, actions = [], summaryType = 'detailed' } = body;
 
-    // Validate required fields
     validateRequired(body, ['audioUrl', 'filename', 'language']);
-
-    // Validate URL format
     validateUrl(audioUrl);
 
-    // Validate filename
     if (typeof filename !== 'string' || filename.trim().length === 0) {
       throw new ValidationError('Filename debe ser un string no vacío');
     }
 
-    // Validate actions array
     if (!Array.isArray(actions)) {
       throw new ValidationError('Actions debe ser un array');
     }
 
-    // Validate summaryType
     if (summaryType !== 'short' && summaryType !== 'detailed') {
       throw new ValidationError('summaryType debe ser "short" o "detailed"');
     }
-
-    logger.info('Process API: Received request params', {
-      userId: user.userId,
-      filename,
-      actions,
-      summaryType
-    });
 
     // Create job in database
     const job = await TranscriptionJobDB.create(
@@ -124,102 +90,69 @@ export async function POST(request: Request) {
       await TranscriptionJobDB.updateResults(job.id, {
         metadata: { actions, summaryType }
       });
-      logger.info('Process API: Metadata stored', {
-        jobId: job.id,
-        actions,
-        summaryType
-      });
     }
 
-    logger.info('Process API: Job created', {
+    logger.info('Process API: Job created, starting background processing', {
       jobId: job.id,
       userId: user.userId,
-      filename,
-      audioUrl: audioUrl.substring(0, 50) + '...'
+      filename
     });
 
-    logger.info('Process API: Starting synchronous processing', { jobId: job.id });
+    // Process in background — function keeps running after response is sent
+    waitUntil(
+      (async () => {
+        try {
+          await processAudioFile(job.id);
+          logger.info('Process API: Background processing completed', { jobId: job.id });
 
-    // Process audio synchronously (wait for completion before responding)
-    // This is necessary because Vercel Functions terminate after sending response
-    // For beta with short audios (<30min) this is acceptable
-    try {
-      await processAudioFile(job.id);
-      logger.info('Process API: Processing completed successfully', { jobId: job.id });
+          // Increment audio usage based on actual duration
+          try {
+            const { getTranscriptionJob } = await import('@/lib/db/transcriptions');
+            const completedJob = await getTranscriptionJob(job.id);
 
-      // QUOTA: Increment audio usage based on actual duration
-      try {
-        const { getTranscriptionJob } = await import('@/lib/db/transcriptions');
-        const completedJob = await getTranscriptionJob(job.id);
-
-        if (completedJob && completedJob.audio_duration_seconds) {
-          const durationMinutes = completedJob.audio_duration_seconds / 60;
-          await incrementAudioUsage(user.userId, durationMinutes);
-          logger.info('Process API: Audio usage incremented', {
-            userId: user.userId,
-            durationSeconds: completedJob.audio_duration_seconds,
-            durationMinutes
-          });
-        } else {
-          // Fallback: increment 1 minute if duration unknown
-          await incrementAudioUsage(user.userId, 1);
-          logger.warn('Process API: Audio duration unknown, incremented 1 minute', { userId: user.userId });
-        }
-      } catch (error) {
-        // Don't fail the request if usage increment fails
-        logger.error('Process API: Failed to increment audio usage (non-fatal)', error, {
-          userId: user.userId,
-          jobId: job.id
-        });
-      }
-
-      // Return success with completed status
-      const completedResponse: JobCreateResponse = {
-        success: true,
-        message: 'Transcripción completada exitosamente.',
-        jobId: job.id,
-        status: 'completed'
-      };
-
-      return successResponse(completedResponse, 'Procesamiento completado', 200);
-    } catch (processingError: any) {
-      logger.error('Process API: Processing failed', processingError, {
-        jobId: job.id,
-        userId: user.userId
-      });
-
-      // Track error en sistema de monitoreo
-      const context = extractRequestContext(request);
-      await trackError(
-        'processing_error',
-        'critical',
-        processingError.message || 'Error desconocido en procesamiento de audio',
-        processingError,
-        {
-          ...context,
-          userId: user.userId,
-          userEmail: user.email,
-          metadata: {
-            jobId: job.id,
-            filename,
-            audioUrl: audioUrl.substring(0, 100),
-            actions,
-            summaryType
+            if (completedJob && completedJob.audio_duration_seconds) {
+              const durationMinutes = completedJob.audio_duration_seconds / 60;
+              await incrementAudioUsage(user.userId, durationMinutes);
+            } else {
+              await incrementAudioUsage(user.userId, 1);
+            }
+          } catch (usageError) {
+            logger.error('Process API: Failed to increment audio usage (non-fatal)', usageError, {
+              userId: user.userId,
+              jobId: job.id
+            });
           }
-        }
-      );
+        } catch (processingError: any) {
+          logger.error('Process API: Background processing failed', processingError, {
+            jobId: job.id,
+            userId: user.userId
+          });
 
-      // Return error response
-      return successResponse({
-        success: false,
-        message: processingError.message || 'Error en el procesamiento. Por favor intenta de nuevo.',
-        jobId: job.id,
-        status: 'failed',
-        error: processingError.message
-      }, 'Error en procesamiento', 500);
-    }
+          await trackError(
+            'processing_error',
+            'critical',
+            processingError.message || 'Error en procesamiento de audio',
+            processingError,
+            {
+              userId: user.userId,
+              userEmail: user.email,
+              metadata: { jobId: job.id, filename, audioUrl: audioUrl.substring(0, 100) }
+            }
+          );
+        }
+      })()
+    );
+
+    // Return immediately with jobId — client polls /api/jobs/:jobId for progress
+    const response: JobCreateResponse = {
+      success: true,
+      message: 'Procesamiento iniciado. Puedes ver el progreso en tiempo real.',
+      jobId: job.id,
+      status: 'processing'
+    };
+
+    return successResponse(response, 'Procesamiento iniciado', 202);
   } catch (error: any) {
-    // Track error en sistema de monitoreo
     const context = extractRequestContext(request);
     await trackError(
       'api_process_error',
