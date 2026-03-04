@@ -4,8 +4,6 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import { verifyRequestAuth } from '@/lib/auth';
-import { TranscriptionJobDB } from '@/lib/db';
-import { inngest } from '@/lib/inngest/client'; // 👈 CORREGIDO (singular)
 import { sql } from '@vercel/postgres';
 
 // Tamaños máximos (bytes)
@@ -61,11 +59,9 @@ async function getUserPreferredLanguage(userId: string): Promise<string> {
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
-  // Autenticación
+  // Auth check moved inside onBeforeGenerateToken so that
+  // Vercel's server-side onUploadCompleted webhook is not blocked.
   const auth = verifyRequestAuth(request);
-  if (!auth) {
-    return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
-  }
 
   let body: HandleUploadBody;
   try {
@@ -81,6 +77,11 @@ export async function POST(request: NextRequest): Promise<Response> {
       body,
 
       onBeforeGenerateToken: async (_pathname, clientPayload, _multipart) => {
+        // Auth required for token generation (client request)
+        if (!auth) {
+          throw new Error('No autenticado');
+        }
+
         const payload =
           typeof clientPayload === 'string' ? safeJsonParse(clientPayload) : clientPayload ?? {};
 
